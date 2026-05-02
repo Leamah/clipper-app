@@ -101,8 +101,10 @@ async function handleSignOut(request: NextRequest) {
         }
       } catch(e) { console.error('storage nuke', e); }
 
-      // Hard redirect (replace so back button doesn't return here)
-      setTimeout(function(){ location.replace('/'); }, 50);
+      // Hard redirect to login WITH signedout flag — the login page
+      // does another aggressive cleanup pass and refuses to bounce
+      // back to /dashboard even if a stale session is reconstituted.
+      setTimeout(function(){ location.replace('/login?signedout=1'); }, 100);
     })();
   </script>
 </body>

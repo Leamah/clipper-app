@@ -21,6 +21,34 @@ function LoginForm() {
   useEffect(() => {
     const raw = searchParams.get('error')
     if (raw) setError(ERROR_MESSAGES[raw] ?? 'Something went wrong. Please try again.')
+
+    // If we just signed out, aggressively kill any leftover session state
+    // before the Supabase client has a chance to silently refresh.
+    if (searchParams.get('signedout') === '1') {
+      void (async () => {
+        try { await supabase.auth.signOut({ scope: 'global' }) } catch { /* noop */ }
+        if (typeof window !== 'undefined') {
+          // Wipe all sb-* / supabase-* entries from web storage
+          ;[localStorage, sessionStorage].forEach((store) => {
+            Object.keys(store).forEach((k) => {
+              if (k.startsWith('sb-') || k.includes('supabase')) store.removeItem(k)
+            })
+          })
+          // And nuke every visible sb-* cookie across all domain/path combos
+          const host = window.location.hostname
+          const apex = host.replace(/^www\./, '')
+          const domains = ['', host, `.${host}`, apex, `.${apex}`]
+          const paths   = ['/', '/auth', '/dashboard', '/login']
+          document.cookie.split(';').forEach((c) => {
+            const name = c.split('=')[0].trim()
+            if (!name.startsWith('sb-')) return
+            domains.forEach((d) => paths.forEach((p) => {
+              document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${p}${d ? `; domain=${d}` : ''}`
+            }))
+          })
+        }
+      })()
+    }
   }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {

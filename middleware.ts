@@ -47,7 +47,9 @@ export async function middleware(request: NextRequest) {
   }
 
   // Already logged in → skip login page, go to dashboard
-  if (user && pathname === '/login') {
+  // EXCEPT when ?signedout=1 is set — the user is mid-cleanup and we
+  // must not bounce them back to a session they're trying to drop.
+  if (user && pathname === '/login' && request.nextUrl.searchParams.get('signedout') !== '1') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
