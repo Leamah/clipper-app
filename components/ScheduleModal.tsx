@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Calendar, Download, Loader2 } from 'lucide-react'
 import { PLATFORMS, type PlatformId, type ClipResult } from '@/lib/types'
+import { downloadFile } from '@/lib/download'
 
 interface Props {
   clip:    ClipResult
@@ -27,13 +28,6 @@ export default function ScheduleModal({ clip, onClose, onSaved }: Props) {
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
     )
 
-  const triggerDownload = () => {
-    const a = document.createElement('a')
-    a.href     = clip.public_url
-    a.download = clip.clip_name
-    a.click()
-  }
-
   const handleSubmit = async () => {
     if (platforms.length === 0) { setError('Select at least one platform'); return }
     setLoading(true); setError(null)
@@ -52,8 +46,8 @@ export default function ScheduleModal({ clip, onClose, onSaved }: Props) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed to queue')
 
-      // Auto-download so the file is ready to post
-      triggerDownload()
+      // Auto-download so the file is ready to post (fetch-blob method for cross-origin)
+      await downloadFile(clip.public_url, clip.clip_name)
       onSaved()
       onClose()
     } catch (e) {
@@ -92,15 +86,14 @@ export default function ScheduleModal({ clip, onClose, onSaved }: Props) {
               </p>
             </div>
             {/* Inline download shortcut */}
-            <a
-              href={clip.public_url}
-              download={clip.clip_name}
-              onClick={(e) => e.stopPropagation()}
+            <button
+              onClick={() => downloadFile(clip.public_url, clip.clip_name)}
               className="ml-auto flex-shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
               title="Download now"
+              type="button"
             >
               <Download className="w-3.5 h-3.5" />
-            </a>
+            </button>
           </div>
 
           {/* Caption */}

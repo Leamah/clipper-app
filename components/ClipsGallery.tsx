@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { ClipperJob, ClipResult } from '@/lib/types'
-import { Copy, Trash2, Check, Play, Download, CalendarPlus } from 'lucide-react'
+import { Copy, Trash2, Check, Play, Download, CalendarPlus, Loader2 } from 'lucide-react'
 import ScheduleModal from '@/components/ScheduleModal'
+import { downloadFile } from '@/lib/download'
 
 interface Props {
   jobs: ClipperJob[]
@@ -16,10 +17,20 @@ interface FlatClip extends ClipResult {
 }
 
 function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string) => void }) {
-  const [copied,    setCopied]    = useState(false)
-  const [deleting,  setDeleting]  = useState(false)
-  const [hovering,  setHovering]  = useState(false)
+  const [copied,     setCopied]     = useState(false)
+  const [deleting,   setDeleting]   = useState(false)
+  const [hovering,   setHovering]   = useState(false)
   const [scheduling, setScheduling] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      await downloadFile(clip.public_url, clip.clip_name)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(clip.public_url)
@@ -91,14 +102,17 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 pt-1">
-          {/* Download — direct browser download */}
-          <a
-            href={clip.public_url}
-            download={clip.clip_name}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+          {/* Download */}
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-50"
           >
-            <Download className="w-3 h-3" /> Download
-          </a>
+            {downloading
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <Download className="w-3 h-3" />}
+            Download
+          </button>
           {/* Queue for posting */}
           <button
             onClick={() => setScheduling(true)}

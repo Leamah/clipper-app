@@ -7,6 +7,7 @@ import { PLATFORMS } from '@/lib/types'
 import { Scissors, Calendar, CheckCircle2, XCircle, Clock, Loader2, Trash2, RefreshCw, Download } from 'lucide-react'
 import Link from 'next/link'
 import UserNav from '@/components/UserNav'
+import { downloadFile } from '@/lib/download'
 
 const STATUS_TABS = [
   { key: 'all',       label: 'All'       },
@@ -103,14 +104,14 @@ function PostRow({
       {/* Actions */}
       <div className="flex-shrink-0 flex items-center gap-1">
         {/* Always show download */}
-        <a
-          href={post.public_url}
-          download={post.clip_name}
+        <button
+          onClick={() => downloadFile(post.public_url, post.clip_name)}
           className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
           title="Download"
+          type="button"
         >
           <Download className="w-3.5 h-3.5" />
-        </a>
+        </button>
 
         {post.status === 'scheduled' && (
           <>
