@@ -17,17 +17,21 @@ export interface ClipResult {
 }
 
 export interface ClipperJob {
-  id:           string
-  url:          string
-  title:        string | null
-  platform:     string | null
-  duration_sec: number | null
-  status:       JobStatus
-  progress_pct: number
-  error_msg:    string | null
-  clips:        ClipResult[]
-  created_at:   string
-  updated_at:   string
+  id:                  string
+  url:                 string
+  user_id:             string | null
+  title:               string | null
+  platform:            string | null
+  duration_sec:        number | null
+  status:              JobStatus
+  progress_pct:        number
+  error_msg:           string | null
+  clips:               ClipResult[]
+  num_clips:           number
+  clip_instructions:   string | null
+  target_duration_sec: number
+  created_at:          string
+  updated_at:          string
 }
 
 export interface StorageClip {

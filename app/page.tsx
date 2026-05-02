@@ -6,13 +6,21 @@ import type { ClipperJob } from '@/lib/types'
 import ClipForm from '@/components/ClipForm'
 import JobsList from '@/components/JobsList'
 import ClipsGallery from '@/components/ClipsGallery'
+import UserNav from '@/components/UserNav'
+import UsageBar from '@/components/UsageBar'
 import { Scissors } from 'lucide-react'
 
 export default function Home() {
-  const [jobs, setJobs] = useState<ClipperJob[]>([])
+  const [jobs,    setJobs]    = useState<ClipperJob[]>([])
   const [loading, setLoading] = useState(true)
+  const [userId,  setUserId]  = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null))
+  }, [])
 
   const fetchJobs = useCallback(async () => {
+    if (!userId) return
     const { data } = await supabase
       .from('clipper_jobs')
       .select('*')
@@ -20,17 +28,17 @@ export default function Home() {
       .limit(50)
     if (data) setJobs(data as ClipperJob[])
     setLoading(false)
-  }, [])
+  }, [userId])
 
   useEffect(() => {
+    if (!userId) return
     fetchJobs()
 
-    // Real-time subscription
     const channel = supabase
-      .channel('clipper_jobs_changes')
+      .channel('clipper_jobs_rt')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'clipper_jobs' },
+        { event: '*', schema: 'public', table: 'clipper_jobs', filter: `user_id=eq.${userId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             setJobs((prev) => [payload.new as ClipperJob, ...prev])
@@ -46,18 +54,13 @@ export default function Home() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [fetchJobs])
-
-  const handleNewJob = (job: ClipperJob) => {
-    setJobs((prev) => [job, ...prev])
-  }
+  }, [userId, fetchJobs])
 
   const activeJobs = jobs.filter((j) => j.status !== 'done' && j.status !== 'error')
   const doneJobs   = jobs.filter((j) => j.status === 'done')
 
   return (
     <div className="min-h-screen">
-      {/* Hero glow */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-violet-600/10 blur-[120px] rounded-full" />
       </div>
@@ -71,12 +74,14 @@ export default function Home() {
             </div>
             <span className="font-semibold text-sm tracking-tight">Clipper</span>
           </div>
-          <span className="ml-auto text-xs text-zinc-500">AI-powered clip extraction</span>
+          <div className="ml-auto flex items-center gap-4">
+            <UsageBar />
+            <UserNav />
+          </div>
         </div>
       </header>
 
       <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-16">
-
         {/* Hero */}
         <section className="text-center space-y-6 pt-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-medium">
@@ -90,10 +95,9 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-zinc-400 text-lg max-w-lg mx-auto">
-            Paste any YouTube, TikTok, Instagram or X video. AI finds the best 45–90 second moments and delivers them instantly.
+            Paste any YouTube, TikTok, Instagram or X video. Tell the AI exactly what you want — it finds and cuts those moments for you.
           </p>
-
-          <ClipForm onJobCreated={handleNewJob} />
+          <ClipForm onJobCreated={(job) => setJobs((prev) => [job, ...prev])} />
         </section>
 
         {/* Active Jobs */}
@@ -109,12 +113,13 @@ export default function Home() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-widest">Your Clips</h2>
             {doneJobs.length > 0 && (
-              <span className="text-xs text-zinc-500">{doneJobs.reduce((acc, j) => acc + (j.clips?.length ?? 0), 0)} clips</span>
+              <span className="text-xs text-zinc-500">
+                {doneJobs.reduce((acc, j) => acc + (j.clips?.length ?? 0), 0)} clips
+              </span>
             )}
           </div>
           <ClipsGallery jobs={doneJobs} />
         </section>
-
       </main>
     </div>
   )
