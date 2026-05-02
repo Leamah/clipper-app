@@ -91,7 +91,7 @@ export default function Dashboard() {
         <section className="text-center space-y-6 pt-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-            Powered by GPT-4o-mini + Whisper
+            AI-powered clipping
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
             Turn long videos into<br />

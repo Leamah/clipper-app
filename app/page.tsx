@@ -15,7 +15,7 @@ const STEPS = [
   {
     n:     '02',
     title: 'AI finds the moments',
-    body:  'Whisper transcribes the audio. GPT-4o reads the transcript and picks the sharpest 45–90 second windows, ranked by score.',
+    body:  'The AI analyses the transcript and picks the sharpest 45–90 second windows, ranked by virality score.',
   },
   {
     n:     '03',
@@ -87,7 +87,7 @@ export default function LandingPage() {
           <div className="inline-flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
             <span className="text-xs text-zinc-500 uppercase tracking-widest">
-              Whisper · GPT-4o · ffmpeg
+              AI-powered video clipping
             </span>
           </div>
 
