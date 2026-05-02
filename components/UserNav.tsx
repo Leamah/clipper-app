@@ -31,7 +31,10 @@ export default function UserNav() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    // Hard reload so the SSR middleware re-evaluates auth state and clears
+    // any cached session — router.push() does a soft nav and middleware
+    // can race with cookie clearing.
+    window.location.href = '/'
   }
 
   if (!email) return null
