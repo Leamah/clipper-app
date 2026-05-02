@@ -30,11 +30,25 @@ export default function UserNav() {
   }, [])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    // Hard reload so the SSR middleware re-evaluates auth state and clears
-    // any cached session — router.push() does a soft nav and middleware
-    // can race with cookie clearing.
-    window.location.href = '/'
+    // Clear client storage first (handles localStorage / non-HTTPOnly cookies
+    // that the browser client created)
+    try {
+      await supabase.auth.signOut({ scope: 'global' })
+    } catch { /* swallow — server route is the real source of truth */ }
+
+    if (typeof window !== 'undefined') {
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith('sb-')) localStorage.removeItem(k)
+      })
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('sb-')) sessionStorage.removeItem(k)
+      })
+    }
+
+    // Hand off to the server route which clears the SSR cookies (the ones
+    // JS can't touch) and then 303-redirects to /. This is what actually
+    // makes the session disappear for the next page load's middleware.
+    window.location.href = '/auth/signout'
   }
 
   if (!email) return null
