@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+type CookieToSet = { name: string; value: string; options?: Record<string, unknown> }
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
 
@@ -11,11 +13,12 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
-        setAll: (cookiesToSet) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setAll: (cookiesToSet: CookieToSet[]) => {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, options as any)
           )
         },
       },
@@ -25,8 +28,8 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  const isAuthRoute    = pathname === '/login' || pathname.startsWith('/auth')
-  const isAdminRoute   = pathname.startsWith('/admin')
+  const isAuthRoute     = pathname === '/login' || pathname.startsWith('/auth')
+  const isAdminRoute    = pathname.startsWith('/admin')
   const isApiAdminRoute = pathname.startsWith('/api/admin')
 
   // Unauthenticated → /login
