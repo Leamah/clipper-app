@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { ScheduledPost } from '@/lib/types'
+import type { ScheduledPost, PostStatus } from '@/lib/types'
 import { PLATFORMS } from '@/lib/types'
 import { Scissors, Calendar, CheckCircle2, XCircle, Clock, Loader2, Trash2, RefreshCw, Download } from 'lucide-react'
 import Link from 'next/link'
