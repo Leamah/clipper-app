@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { ClipperJob, ClipResult } from '@/lib/types'
-import { Copy, Trash2, Check, Play, ExternalLink, CalendarPlus } from 'lucide-react'
+import { Copy, Trash2, Check, Play, Download, CalendarPlus } from 'lucide-react'
 import ScheduleModal from '@/components/ScheduleModal'
 
 interface Props {
@@ -90,31 +90,29 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
         </p>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-          <button
-            onClick={handleCopy}
+        <div className="flex items-center gap-1.5 pt-1">
+          {/* Download — direct browser download */}
+          <a
+            href={clip.public_url}
+            download={clip.clip_name}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
           >
-            {copied ? (
-              <><Check className="w-3 h-3 text-emerald-400" /> Copied</>
-            ) : (
-              <><Copy className="w-3 h-3" /> Copy</>
-            )}
-          </button>
+            <Download className="w-3 h-3" /> Download
+          </a>
+          {/* Queue for posting */}
           <button
             onClick={() => setScheduling(true)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 transition-colors"
           >
-            <CalendarPlus className="w-3 h-3" /> Schedule
+            <CalendarPlus className="w-3 h-3" /> Queue
           </button>
-          <a
-            href={clip.public_url}
-            target="_blank"
-            rel="noopener noreferrer"
+          {/* Copy URL */}
+          <button
+            onClick={handleCopy}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
           >
-            <ExternalLink className="w-3 h-3" />
-          </a>
+            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          </button>
           <button
             onClick={handleDelete}
             disabled={deleting}
@@ -128,7 +126,7 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
           <ScheduleModal
             clip={clip}
             onClose={() => setScheduling(false)}
-            onPosted={() => setScheduling(false)}
+            onSaved={() => setScheduling(false)}
           />
         )}
       </div>

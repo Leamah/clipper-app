@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { ScheduledPost } from '@/lib/types'
 import { PLATFORMS } from '@/lib/types'
-import { Scissors, Calendar, CheckCircle2, XCircle, Clock, Loader2, Trash2, RefreshCw } from 'lucide-react'
+import { Scissors, Calendar, CheckCircle2, XCircle, Clock, Loader2, Trash2, RefreshCw, Download } from 'lucide-react'
 import Link from 'next/link'
 import UserNav from '@/components/UserNav'
 
@@ -44,13 +44,24 @@ function formatDate(iso: string | null) {
   }).format(new Date(iso))
 }
 
-function PostRow({ post, onCancel }: { post: ScheduledPost; onCancel: (id: string) => void }) {
-  const [cancelling, setCancelling] = useState(false)
+function PostRow({
+  post,
+  onUpdate,
+}: {
+  post:     ScheduledPost
+  onUpdate: (id: string, status: PostStatus) => void
+}) {
+  const [busy, setBusy] = useState(false)
 
-  const handleCancel = async () => {
-    setCancelling(true)
-    await fetch(`/api/schedule?id=${post.id}`, { method: 'DELETE' })
-    onCancel(post.id)
+  const act = async (status: 'posted' | 'cancelled') => {
+    setBusy(true)
+    await fetch('/api/schedule', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: post.id, status }),
+    })
+    onUpdate(post.id, status)
+    setBusy(false)
   }
 
   const platformEmojis = post.platforms
@@ -78,7 +89,7 @@ function PostRow({ post, onCancel }: { post: ScheduledPost; onCancel: (id: strin
             <span className="text-sm tracking-wider">{platformEmojis}</span>
           )}
           <span className="text-xs text-zinc-600 ml-auto">
-            {post.scheduled_at ? formatDate(post.scheduled_at) : 'Immediate'}
+            {post.scheduled_at ? formatDate(post.scheduled_at) : '—'}
           </span>
         </div>
 
@@ -87,23 +98,41 @@ function PostRow({ post, onCancel }: { post: ScheduledPost; onCancel: (id: strin
         )}
 
         <p className="text-xs text-zinc-600 truncate">{post.clip_name}</p>
-
-        {post.error_msg && (
-          <p className="text-xs text-red-400 line-clamp-1">{post.error_msg}</p>
-        )}
       </div>
 
-      {/* Cancel button */}
-      {post.status === 'scheduled' && (
-        <button
-          onClick={handleCancel}
-          disabled={cancelling}
-          className="flex-shrink-0 p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-50"
-          title="Cancel post"
+      {/* Actions */}
+      <div className="flex-shrink-0 flex items-center gap-1">
+        {/* Always show download */}
+        <a
+          href={post.public_url}
+          download={post.clip_name}
+          className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          title="Download"
         >
-          {cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-        </button>
-      )}
+          <Download className="w-3.5 h-3.5" />
+        </a>
+
+        {post.status === 'scheduled' && (
+          <>
+            <button
+              onClick={() => act('posted')}
+              disabled={busy}
+              className="px-2 py-1 rounded-lg text-xs font-medium text-emerald-400 hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
+              title="Mark as posted"
+            >
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : '✓ Done'}
+            </button>
+            <button
+              onClick={() => act('cancelled')}
+              disabled={busy}
+              className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-50"
+              title="Remove from queue"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -148,9 +177,6 @@ export default function SchedulePage() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [userId, fetchPosts])
-
-  const handleCancel = (id: string) =>
-    setPosts((prev) => prev.map((p) => p.id === id ? { ...p, status: 'cancelled' } : p))
 
   const filtered = tab === 'all'
     ? posts.filter((p) => p.status !== 'cancelled')
@@ -253,7 +279,13 @@ export default function SchedulePage() {
         ) : (
           <div className="space-y-3">
             {filtered.map((post) => (
-              <PostRow key={post.id} post={post} onCancel={handleCancel} />
+              <PostRow
+                key={post.id}
+                post={post}
+                onUpdate={(id, status) =>
+                  setPosts((prev) => prev.map((p) => p.id === id ? { ...p, status } : p))
+                }
+              />
             ))}
           </div>
         )}
