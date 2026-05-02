@@ -13,7 +13,7 @@ export async function GET() {
     {
       cookies: {
         getAll() { return cookieStore.getAll() },
-        setAll(cs) { cs.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) },
+        setAll() {}, // read-only — no cookies to set in API routes
       },
     }
   )
