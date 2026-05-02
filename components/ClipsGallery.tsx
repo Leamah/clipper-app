@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { ClipperJob, ClipResult } from '@/lib/types'
-import { Copy, Trash2, Check, Play, ExternalLink } from 'lucide-react'
+import { Copy, Trash2, Check, Play, ExternalLink, CalendarPlus } from 'lucide-react'
+import ScheduleModal from '@/components/ScheduleModal'
 
 interface Props {
   jobs: ClipperJob[]
@@ -15,9 +16,10 @@ interface FlatClip extends ClipResult {
 }
 
 function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string) => void }) {
-  const [copied,   setCopied]   = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [hovering, setHovering] = useState(false)
+  const [copied,    setCopied]    = useState(false)
+  const [deleting,  setDeleting]  = useState(false)
+  const [hovering,  setHovering]  = useState(false)
+  const [scheduling, setScheduling] = useState(false)
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(clip.public_url)
@@ -88,7 +90,7 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
         </p>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex items-center gap-1.5 pt-1 flex-wrap">
           <button
             onClick={handleCopy}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
@@ -96,8 +98,14 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
             {copied ? (
               <><Check className="w-3 h-3 text-emerald-400" /> Copied</>
             ) : (
-              <><Copy className="w-3 h-3" /> Copy URL</>
+              <><Copy className="w-3 h-3" /> Copy</>
             )}
+          </button>
+          <button
+            onClick={() => setScheduling(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 transition-colors"
+          >
+            <CalendarPlus className="w-3 h-3" /> Schedule
           </button>
           <a
             href={clip.public_url}
@@ -105,7 +113,7 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
           >
-            <ExternalLink className="w-3 h-3" /> Open
+            <ExternalLink className="w-3 h-3" />
           </a>
           <button
             onClick={handleDelete}
@@ -115,6 +123,14 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
             <Trash2 className="w-3 h-3" />
           </button>
         </div>
+
+        {scheduling && (
+          <ScheduleModal
+            clip={clip}
+            onClose={() => setScheduling(false)}
+            onPosted={() => setScheduling(false)}
+          />
+        )}
       </div>
     </div>
   )

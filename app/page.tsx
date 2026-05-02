@@ -9,6 +9,7 @@ import ClipsGallery from '@/components/ClipsGallery'
 import UserNav from '@/components/UserNav'
 import UsageBar from '@/components/UsageBar'
 import { Scissors } from 'lucide-react'
+import Link from 'next/link'
 
 export default function Home() {
   const [jobs,    setJobs]    = useState<ClipperJob[]>([])
@@ -74,6 +75,10 @@ export default function Home() {
             </div>
             <span className="font-semibold text-sm tracking-tight">Clipper</span>
           </div>
+          <nav className="flex items-center gap-1 ml-4">
+            <span className="px-3 py-1.5 rounded-lg text-xs text-violet-300 bg-violet-500/10 font-medium">Clips</span>
+            <Link href="/schedule" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Stream</Link>
+          </nav>
           <div className="ml-auto flex items-center gap-4">
             <UsageBar />
             <UserNav />

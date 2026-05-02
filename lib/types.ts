@@ -40,3 +40,31 @@ export interface StorageClip {
   created_at: string
   public_url: string
 }
+
+export type PostStatus = 'scheduled' | 'posting' | 'posted' | 'failed' | 'cancelled'
+
+export const PLATFORMS = [
+  { id: 'tiktok',    label: 'TikTok',    emoji: '🎵' },
+  { id: 'instagram', label: 'Instagram', emoji: '📸' },
+  { id: 'youtube',   label: 'YouTube',   emoji: '▶️' },
+  { id: 'twitter',   label: 'X',         emoji: '𝕏'  },
+  { id: 'facebook',  label: 'Facebook',  emoji: '👥' },
+] as const
+
+export type PlatformId = typeof PLATFORMS[number]['id']
+
+export interface ScheduledPost {
+  id:                string
+  user_id:           string
+  clip_name:         string
+  public_url:        string
+  caption:           string | null
+  platforms:         PlatformId[]
+  scheduled_at:      string | null
+  status:            PostStatus
+  ayrshare_post_id:  string | null
+  platform_post_ids: Record<string, string> | null
+  error_msg:         string | null
+  created_at:        string
+  updated_at:        string
+}
