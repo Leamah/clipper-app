@@ -73,7 +73,7 @@ export default function Home() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
               <Scissors className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-semibold text-sm tracking-tight">Clipper</span>
+            <span className="font-semibold text-sm tracking-tight">Klippa</span>
           </div>
           <nav className="flex items-center gap-1 ml-4">
             <span className="px-3 py-1.5 rounded-lg text-xs text-violet-300 bg-violet-500/10 font-medium">Clips</span>

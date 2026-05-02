@@ -201,7 +201,7 @@ export default function SchedulePage() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
               <Scissors className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-semibold text-sm tracking-tight">Clipper</span>
+            <span className="font-semibold text-sm tracking-tight">Klippa</span>
           </Link>
           <nav className="flex items-center gap-1 ml-4">
             <Link href="/" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clips</Link>

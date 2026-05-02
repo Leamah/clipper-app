@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Clipper — AI Video Clipping',
+  title: 'Klippa — AI Video Clipping',
   description: 'Paste a video URL, get the best 45-90 second clips in minutes.',
 }
 

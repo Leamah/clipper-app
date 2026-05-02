@@ -1,14 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Scissors, Mail, Loader2, CheckCircle2 } from 'lucide-react'
+import { Scissors, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
-export default function LoginPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  auth_callback_failed: 'Sign-in link failed. Please request a new one.',
+  access_denied:        'Access denied. Your link may have expired — request a new one.',
+  otp_expired:          'This magic link has expired. Please request a new one below.',
+}
+
+function LoginForm() {
+  const searchParams = useSearchParams()
   const [email,   setEmail]   = useState('')
   const [loading, setLoading] = useState(false)
   const [sent,    setSent]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+
+  useEffect(() => {
+    const raw = searchParams.get('error')
+    if (raw) setError(ERROR_MESSAGES[raw] ?? 'Something went wrong. Please try again.')
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,34 +53,44 @@ export default function LoginPage() {
       <div className="relative w-full max-w-sm space-y-8">
         {/* Logo */}
         <div className="text-center space-y-3">
-          <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 items-center justify-center mx-auto">
+          <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 items-center justify-center mx-auto shadow-lg shadow-violet-900/40">
             <Scissors className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Clipper</h1>
-            <p className="text-sm text-zinc-500 mt-1">Sign in to your account</p>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Klippa</h1>
+            <p className="text-sm text-zinc-500 mt-1">AI-powered video clipping</p>
           </div>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-6">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-6 shadow-xl">
           {sent ? (
             <div className="text-center space-y-3 py-4">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-              <p className="font-medium text-white">Check your email</p>
-              <p className="text-sm text-zinc-400">
-                We sent a magic link to <span className="text-zinc-200">{email}</span>.
-                Click it to sign in — no password needed.
+              <div className="inline-flex w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 items-center justify-center mx-auto">
+                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+              </div>
+              <p className="font-semibold text-white text-lg">Check your inbox</p>
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                We sent a magic link to{' '}
+                <span className="text-violet-300 font-medium">{email}</span>.
+                <br />
+                Click the link to sign in — no password needed.
               </p>
+              <p className="text-xs text-zinc-600 pt-1">The link expires in 60 minutes.</p>
               <button
                 onClick={() => { setSent(false); setEmail('') }}
-                className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 mt-2"
+                className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 mt-2 transition-colors"
               >
                 Use a different email
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-zinc-200">Sign in</p>
+                <p className="text-xs text-zinc-500">Enter your email and we'll send a magic link.</p>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-400">Email address</label>
                 <div className="relative">
@@ -85,15 +108,16 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">
+                <div className="flex items-start gap-2 text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2.5">
+                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                   {error}
-                </p>
+                </div>
               )}
 
               <button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-br from-violet-500 to-purple-600 text-white hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-br from-violet-500 to-purple-600 text-white hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-900/30"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                 {loading ? 'Sending…' : 'Send magic link'}
@@ -103,9 +127,17 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-zinc-600">
-          Access is invite-only. Contact the admin if you need an account.
+          Access is invite-only. Contact your admin if you need an account.
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }
