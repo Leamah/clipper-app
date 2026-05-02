@@ -1,131 +1,217 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import type { ClipperJob } from '@/lib/types'
-import ClipForm from '@/components/ClipForm'
-import JobsList from '@/components/JobsList'
-import ClipsGallery from '@/components/ClipsGallery'
-import UserNav from '@/components/UserNav'
-import UsageBar from '@/components/UsageBar'
-import { Scissors } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
+import { Scissors, ArrowRight, Check } from 'lucide-react'
 
-export default function Home() {
-  const [jobs,    setJobs]    = useState<ClipperJob[]>([])
-  const [loading, setLoading] = useState(true)
-  const [userId,  setUserId]  = useState<string | null>(null)
+const STEPS = [
+  {
+    n:     '01',
+    title: 'Paste a link',
+    body:  'Drop any YouTube, TikTok, Instagram, X or Facebook URL. No accounts, no installs — just the link.',
+  },
+  {
+    n:     '02',
+    title: 'AI finds the moments',
+    body:  'Whisper transcribes the audio. GPT-4o reads the transcript and picks the sharpest 45–90 second windows, ranked by score.',
+  },
+  {
+    n:     '03',
+    title: 'Download & post',
+    body:  'Clips land in your gallery with hooks written for each one. One-click download, straight to your device.',
+  },
+]
 
+const FEATURES = [
+  'Clips scored by virality potential',
+  'Hook copy written for each clip',
+  'Works across every major platform',
+  'One-click download to device',
+  'Content queue & posting schedule',
+  'Processes a 60-min video in under 3 min',
+]
+
+export default function LandingPage() {
+  const router        = useRouter()
+  const [url, setUrl] = useState('')
+  const [ready, setReady] = useState(false)
+
+  // If already signed in, skip straight to the dashboard
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null))
-  }, [])
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) router.replace('/dashboard')
+      else setReady(true)
+    })
+  }, [router])
 
-  const fetchJobs = useCallback(async () => {
-    if (!userId) return
-    const { data } = await supabase
-      .from('clipper_jobs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50)
-    if (data) setJobs(data as ClipperJob[])
-    setLoading(false)
-  }, [userId])
+  if (!ready) return null
 
-  useEffect(() => {
-    if (!userId) return
-    fetchJobs()
-
-    const channel = supabase
-      .channel('clipper_jobs_rt')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'clipper_jobs', filter: `user_id=eq.${userId}` },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setJobs((prev) => [payload.new as ClipperJob, ...prev])
-          } else if (payload.eventType === 'UPDATE') {
-            setJobs((prev) =>
-              prev.map((j) => (j.id === payload.new.id ? (payload.new as ClipperJob) : j))
-            )
-          } else if (payload.eventType === 'DELETE') {
-            setJobs((prev) => prev.filter((j) => j.id !== payload.old.id))
-          }
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [userId, fetchJobs])
-
-  const activeJobs = jobs.filter((j) => j.status !== 'done' && j.status !== 'error')
-  const doneJobs   = jobs.filter((j) => j.status === 'done')
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    router.push('/login')
+  }
 
   return (
-    <div className="min-h-screen">
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-violet-600/10 blur-[120px] rounded-full" />
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
+
+      {/* Background glow */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-60 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-violet-600/[0.07] blur-[160px] rounded-full" />
       </div>
 
-      {/* Nav */}
-      <header className="relative z-10 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
+      {/* ── Nav ── */}
+      <header className="relative z-10 border-b border-zinc-800/40">
+        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-md shadow-violet-900/40">
               <Scissors className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-semibold text-sm tracking-tight">Klippa</span>
           </div>
-          <nav className="flex items-center gap-1 ml-4">
-            <span className="px-3 py-1.5 rounded-lg text-xs text-violet-300 bg-violet-500/10 font-medium">Clips</span>
-            <Link href="/schedule" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Stream</Link>
-          </nav>
-          <div className="ml-auto flex items-center gap-4">
-            <UsageBar />
-            <UserNav />
-          </div>
+          <Link
+            href="/login"
+            className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-100 transition-colors"
+          >
+            Sign in <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </header>
 
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-16">
-        {/* Hero */}
-        <section className="text-center space-y-6 pt-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse-slow" />
-            Powered by GPT-4o-mini + Whisper
+      {/* ── Hero ── */}
+      <section className="relative z-10 max-w-5xl mx-auto px-6 pt-24 pb-24">
+        <div className="max-w-2xl space-y-8">
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+            <span className="text-xs text-zinc-500 uppercase tracking-widest">
+              Whisper · GPT-4o · ffmpeg
+            </span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
-            Turn long videos into<br />
-            <span className="bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
-              viral clips
+
+          {/* Headline */}
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.04]">
+            Long videos.<br />
+            <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-violet-300 bg-clip-text text-transparent">
+              Sharp clips.
             </span>
           </h1>
-          <p className="text-zinc-400 text-lg max-w-lg mx-auto">
-            Paste any YouTube, TikTok, Instagram or X video. Tell the AI exactly what you want — it finds and cuts those moments for you.
+
+          {/* Subtext */}
+          <p className="text-lg sm:text-xl text-zinc-400 leading-relaxed max-w-lg">
+            Paste any link. Klippa finds the best moments,
+            cuts them, scores them, and writes the hooks —
+            ready to post in minutes.
           </p>
-          <ClipForm onJobCreated={(job) => setJobs((prev) => [job, ...prev])} />
-        </section>
 
-        {/* Active Jobs */}
-        {(loading || activeJobs.length > 0) && (
-          <section>
-            <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-widest mb-4">Processing</h2>
-            <JobsList jobs={activeJobs} loading={loading} />
-          </section>
-        )}
+          {/* Input */}
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-xl">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
+              className="flex-1 bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-3.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-violet-500/50 transition-colors"
+            />
+            <button
+              type="submit"
+              className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-900/30 whitespace-nowrap"
+            >
+              Get clips <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
 
-        {/* Clips Gallery */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-widest">Your Clips</h2>
-            {doneJobs.length > 0 && (
-              <span className="text-xs text-zinc-500">
-                {doneJobs.reduce((acc, j) => acc + (j.clips?.length ?? 0), 0)} clips
-              </span>
-            )}
+          {/* Platforms */}
+          <p className="text-xs text-zinc-700 tracking-wider">
+            YouTube &nbsp;·&nbsp; TikTok &nbsp;·&nbsp; Instagram &nbsp;·&nbsp; X &nbsp;·&nbsp; Facebook
+          </p>
+        </div>
+      </section>
+
+      {/* ── How it works ── */}
+      <section className="relative z-10 border-t border-zinc-800/50">
+        <div className="max-w-5xl mx-auto px-6 py-20">
+          <p className="text-xs text-zinc-600 uppercase tracking-widest mb-14">How it works</p>
+          <div className="grid sm:grid-cols-3 gap-10 sm:gap-6">
+            {STEPS.map((s) => (
+              <div key={s.n} className="space-y-4">
+                <span className="block text-7xl font-black text-zinc-800/70 leading-none select-none">
+                  {s.n}
+                </span>
+                <h3 className="text-sm font-semibold text-zinc-100">{s.title}</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">{s.body}</p>
+              </div>
+            ))}
           </div>
-          <ClipsGallery jobs={doneJobs} />
-        </section>
-      </main>
+        </div>
+      </section>
+
+      {/* ── What you get ── */}
+      <section className="relative z-10 border-t border-zinc-800/50">
+        <div className="max-w-5xl mx-auto px-6 py-20">
+          <div className="grid sm:grid-cols-2 gap-14 items-start">
+
+            <div className="space-y-5">
+              <p className="text-xs text-zinc-600 uppercase tracking-widest">What you get</p>
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
+                Everything a creator
+                needs.{' '}
+                <span className="text-zinc-600">Nothing they don&apos;t.</span>
+              </h2>
+              <p className="text-sm text-zinc-500 leading-relaxed">
+                Klippa is built for speed. No timeline to scrub, no settings
+                to configure. Paste a link, wait two minutes, post.
+              </p>
+            </div>
+
+            <ul className="space-y-3 pt-1">
+              {FEATURES.map((f) => (
+                <li key={f} className="flex items-center gap-3 text-sm">
+                  <span className="w-5 h-5 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3 text-violet-400" />
+                  </span>
+                  <span className="text-zinc-300">{f}</span>
+                </li>
+              ))}
+            </ul>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA strip ── */}
+      <section className="relative z-10 border-t border-zinc-800/50">
+        <div className="max-w-5xl mx-auto px-6 py-20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Made for creators who move fast.
+            </p>
+            <p className="text-sm text-zinc-500">No editing skills required.</p>
+          </div>
+          <Link
+            href="/login"
+            className="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-900/30"
+          >
+            Start clipping <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="relative z-10 border-t border-zinc-800/40">
+        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
+              <Scissors className="w-2.5 h-2.5 text-white" />
+            </div>
+            <span className="text-xs font-medium text-zinc-600">Klippa</span>
+          </div>
+          <p className="text-xs text-zinc-700">© 2025 Klippa. All rights reserved.</p>
+        </div>
+      </footer>
+
     </div>
   )
 }

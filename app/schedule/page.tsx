@@ -198,14 +198,14 @@ export default function SchedulePage() {
       {/* Nav */}
       <header className="relative z-10 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
               <Scissors className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-semibold text-sm tracking-tight">Klippa</span>
           </Link>
           <nav className="flex items-center gap-1 ml-4">
-            <Link href="/" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clips</Link>
+            <Link href="/dashboard" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clips</Link>
             <span className="px-3 py-1.5 rounded-lg text-xs text-violet-300 bg-violet-500/10 font-medium">Stream</span>
           </nav>
           <div className="ml-auto">
@@ -274,7 +274,7 @@ export default function SchedulePage() {
             <p className="text-sm text-zinc-500">No {tab === 'all' ? '' : tab} posts yet</p>
             <p className="text-xs text-zinc-600">
               Schedule clips from the{' '}
-              <Link href="/" className="text-violet-400 hover:underline">clips dashboard</Link>
+              <Link href="/dashboard" className="text-violet-400 hover:underline">clips dashboard</Link>
             </p>
           </div>
         ) : (

@@ -28,18 +28,19 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  const isAuthRoute     = pathname === '/login' || pathname.startsWith('/auth')
+  // Routes that don't require authentication
+  const isPublicRoute   = pathname === '/' || pathname === '/login' || pathname.startsWith('/auth')
   const isAdminRoute    = pathname.startsWith('/admin')
   const isApiAdminRoute = pathname.startsWith('/api/admin')
 
-  // Unauthenticated → /login
-  if (!user && !isAuthRoute) {
+  // Unauthenticated → /login (except public routes)
+  if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Already logged in → skip login page
+  // Already logged in → skip login page, go to dashboard
   if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/', request.url))
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   // Admin routes: verify plan
