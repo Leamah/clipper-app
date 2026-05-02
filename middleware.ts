@@ -5,6 +5,15 @@ import type { NextRequest } from 'next/server'
 type CookieToSet = { name: string; value: string; options?: Record<string, unknown> }
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Skip ALL middleware processing on /auth/* routes. Otherwise getUser()
+  // here triggers a token refresh that writes fresh sb-* cookies onto the
+  // response and overwrites the signout route's cookie-clearing work.
+  if (pathname.startsWith('/auth/')) {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -26,10 +35,9 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const { pathname } = request.nextUrl
 
   // Routes that don't require authentication
-  const isPublicRoute   = pathname === '/' || pathname === '/login' || pathname.startsWith('/auth')
+  const isPublicRoute   = pathname === '/' || pathname === '/login'
   const isAdminRoute    = pathname.startsWith('/admin')
   const isApiAdminRoute = pathname.startsWith('/api/admin')
 
