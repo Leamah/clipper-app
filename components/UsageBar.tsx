@@ -43,7 +43,7 @@ export default function UsageBar() {
   if (used === null) return null
   if (plan === 'admin') return (
     <p className="text-xs text-zinc-600">
-      <span className="text-violet-400 font-medium">∞</span> clips — admin
+      <span className="text-violet-400 font-medium">∞</span> clips · admin
     </p>
   )
 

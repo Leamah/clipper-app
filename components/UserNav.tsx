@@ -64,7 +64,7 @@ export default function UserNav() {
               <p className="text-xs text-zinc-400 truncate">{email}</p>
               <p className="text-xs font-medium text-zinc-200 mt-0.5 capitalize flex items-center gap-1">
                 {isAdmin ? <Shield className="w-3 h-3 text-violet-400" /> : <User className="w-3 h-3 text-zinc-500" />}
-                {isAdmin ? 'Admin — unlimited' : `Free — ${profile?.clips_limit ?? 5} clips/mo`}
+                {isAdmin ? 'Admin · unlimited' : `Free · ${profile?.clips_limit ?? 5} clips/mo`}
               </p>
             </div>
             {isAdmin && (

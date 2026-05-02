@@ -10,7 +10,7 @@ const STEPS = [
   {
     n:     '01',
     title: 'Paste a link',
-    body:  'Drop any YouTube, TikTok, Instagram, X or Facebook URL. No accounts, no installs — just the link.',
+    body:  'Drop any YouTube, TikTok, Instagram, X or Facebook URL. No accounts, no installs. Just the link.',
   },
   {
     n:     '02',
@@ -102,8 +102,8 @@ export default function LandingPage() {
           {/* Subtext */}
           <p className="text-lg sm:text-xl text-zinc-400 leading-relaxed max-w-lg">
             Paste any link. Klippa finds the best moments,
-            cuts them, scores them, and writes the hooks —
-            ready to post in minutes.
+            cuts them, scores them, and writes the hooks.
+            Ready to post in minutes.
           </p>
 
           {/* Input */}

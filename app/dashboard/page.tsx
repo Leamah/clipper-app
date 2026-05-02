@@ -100,7 +100,7 @@ export default function Dashboard() {
             </span>
           </h1>
           <p className="text-zinc-400 text-lg max-w-lg mx-auto">
-            Paste any YouTube, TikTok, Instagram or X video. Tell the AI exactly what you want — it finds and cuts those moments for you.
+            Paste any YouTube, TikTok, Instagram or X video. Tell the AI exactly what you want and it finds and cuts those moments for you.
           </p>
           <ClipForm onJobCreated={(job) => setJobs((prev) => [job, ...prev])} />
         </section>

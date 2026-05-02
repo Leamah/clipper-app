@@ -7,7 +7,7 @@ import { Scissors, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react
 
 const ERROR_MESSAGES: Record<string, string> = {
   auth_callback_failed: 'Sign-in link failed. Please request a new one.',
-  access_denied:        'Access denied. Your link may have expired — request a new one.',
+  access_denied:        'Access denied. Your link may have expired. Request a new one.',
   otp_expired:          'This magic link has expired. Please request a new one below.',
 }
 
@@ -74,7 +74,7 @@ function LoginForm() {
                 We sent a magic link to{' '}
                 <span className="text-violet-300 font-medium">{email}</span>.
                 <br />
-                Click the link to sign in — no password needed.
+                Click the link to sign in. No password needed.
               </p>
               <p className="text-xs text-zinc-600 pt-1">The link expires in 60 minutes.</p>
               <button

@@ -130,7 +130,7 @@ export default function ClipForm({ onJobCreated }: Props) {
                 className="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-violet-500/60 transition-colors"
               />
               <p className="text-xs text-zinc-600">
-                Be specific — the AI will target exactly this content instead of guessing.
+                Be specific. The AI will target exactly this content instead of guessing.
               </p>
             </div>
 

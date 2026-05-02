@@ -64,7 +64,7 @@ export default function ScheduleModal({ clip, onClose, onSaved }: Props) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <div>
             <h2 className="font-semibold text-sm">Queue for Posting</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Plan when & where — clip downloads automatically</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Plan when and where. Clip downloads automatically.</p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors">
             <X className="w-4 h-4" />
@@ -145,7 +145,7 @@ export default function ScheduleModal({ clip, onClose, onSaved }: Props) {
               className="w-full rounded-xl bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-violet-500"
             />
             <p className="text-xs text-zinc-600">
-              This is a reminder — you post manually. The clip will download now.
+              This is a reminder. You post manually. The clip will download now.
             </p>
           </div>
 
