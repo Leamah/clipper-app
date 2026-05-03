@@ -29,27 +29,8 @@ export default function UserNav() {
     })
   }, [])
 
-  const handleLogout = async () => {
-    // Clear client storage first (handles localStorage / non-HTTPOnly cookies
-    // that the browser client created)
-    try {
-      await supabase.auth.signOut({ scope: 'global' })
-    } catch { /* swallow — server route is the real source of truth */ }
-
-    if (typeof window !== 'undefined') {
-      Object.keys(localStorage).forEach((k) => {
-        if (k.startsWith('sb-')) localStorage.removeItem(k)
-      })
-      Object.keys(sessionStorage).forEach((k) => {
-        if (k.startsWith('sb-')) sessionStorage.removeItem(k)
-      })
-    }
-
-    // Hand off to the server route which clears the SSR cookies (the ones
-    // JS can't touch) and then 303-redirects to /. This is what actually
-    // makes the session disappear for the next page load's middleware.
-    window.location.href = '/auth/signout'
-  }
+  // Note: Sign out is now a plain <a href> link instead of a JS handler,
+  // so it works even if React state is broken or JS has errors elsewhere.
 
   if (!email) return null
 
@@ -93,13 +74,13 @@ export default function UserNav() {
                 Manage users
               </button>
             )}
-            <button
-              onClick={handleLogout}
+            <a
+              href="/auth/signout"
               className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
               Sign out
-            </button>
+            </a>
           </div>
         </>
       )}
