@@ -151,13 +151,27 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
 export default function ClipsGallery({ jobs }: Props) {
   const [deleted, setDeleted] = useState<Set<string>>(new Set())
 
+  // Defensive: backend has stored clips as either a real array or a JSON
+  // string in different code paths. Normalise to an array.
+  const parseClips = (raw: unknown): ClipResult[] => {
+    if (!raw) return []
+    if (Array.isArray(raw)) return raw as ClipResult[]
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+      } catch { return [] }
+    }
+    return []
+  }
+
   // Flatten all clips from all done jobs, dedupe by clip_name as a safety
   // net in case the same job slipped into state twice.
   const seen = new Set<string>()
   const allClips: FlatClip[] = jobs
     .flatMap((job) =>
-      (job.clips || [])
-        .filter((c) => !deleted.has(c.clip_name))
+      parseClips(job.clips)
+        .filter((c) => c && c.clip_name && !deleted.has(c.clip_name))
         .map((c) => ({ ...c, job_id: job.id, job_title: job.title }))
     )
     .filter((c) => {
