@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { ClipperJob } from '@/lib/types'
-import { Scissors, Loader2, AlertCircle, ChevronDown } from 'lucide-react'
+import { Scissors, Loader2, AlertCircle, ChevronDown, Captions } from 'lucide-react'
 
 interface Props {
   onJobCreated: (job: ClipperJob) => void
@@ -18,13 +18,14 @@ const DURATIONS = [
 const CLIP_COUNTS = [1, 2, 3, 4, 5]
 
 export default function ClipForm({ onJobCreated }: Props) {
-  const [url,         setUrl]         = useState('')
-  const [instructions, setInstructions] = useState('')
-  const [numClips,    setNumClips]    = useState(3)
-  const [duration,    setDuration]    = useState(60)
-  const [showOptions, setShowOptions] = useState(false)
-  const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
+  const [url,            setUrl]            = useState('')
+  const [instructions,   setInstructions]   = useState('')
+  const [numClips,       setNumClips]       = useState(3)
+  const [duration,       setDuration]       = useState(60)
+  const [enableCaptions, setEnableCaptions] = useState(true)
+  const [showOptions,    setShowOptions]    = useState(false)
+  const [loading,        setLoading]        = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,6 +52,7 @@ export default function ClipForm({ onJobCreated }: Props) {
           num_clips:            numClips,
           target_duration_sec:  duration,
           clip_instructions:    instructions.trim() || null,
+          enable_captions:      enableCaptions,
         })
         .select()
         .single()
@@ -70,6 +72,7 @@ export default function ClipForm({ onJobCreated }: Props) {
         setInstructions('')
         setNumClips(3)
         setDuration(60)
+        setEnableCaptions(true)
         setShowOptions(false)
       }
     } catch (err: unknown) {
@@ -177,6 +180,35 @@ export default function ClipForm({ onJobCreated }: Props) {
                 </div>
               </div>
             </div>
+
+            {/* Captions toggle */}
+            <button
+              type="button"
+              onClick={() => setEnableCaptions((v) => !v)}
+              className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
+                enableCaptions
+                  ? 'border-violet-500/40 bg-violet-500/10'
+                  : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 text-left">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  enableCaptions ? 'bg-violet-500/20 text-violet-300' : 'bg-zinc-800 text-zinc-500'
+                }`}>
+                  <Captions className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-zinc-200">Burn-in captions</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">Auto-generated captions baked into the clip</p>
+                </div>
+              </div>
+              <div className={`relative w-10 h-5 rounded-full transition-colors ${enableCaptions ? 'bg-violet-500' : 'bg-zinc-700'}`}>
+                <div
+                  className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                  style={{ transform: enableCaptions ? 'translateX(20px)' : 'translateX(0)' }}
+                />
+              </div>
+            </button>
           </div>
         )}
       </form>

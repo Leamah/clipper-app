@@ -30,6 +30,7 @@ export interface ClipperJob {
   num_clips:           number
   clip_instructions:   string | null
   target_duration_sec: number
+  enable_captions:     boolean
   created_at:          string
   updated_at:          string
 }
