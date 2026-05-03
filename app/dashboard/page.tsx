@@ -42,7 +42,12 @@ export default function Dashboard() {
         { event: '*', schema: 'public', table: 'clipper_jobs', filter: `user_id=eq.${userId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setJobs((prev) => [payload.new as ClipperJob, ...prev])
+            // Dedupe — ClipForm also adds the job optimistically.
+            setJobs((prev) =>
+              prev.some((j) => j.id === payload.new.id)
+                ? prev
+                : [payload.new as ClipperJob, ...prev]
+            )
           } else if (payload.eventType === 'UPDATE') {
             setJobs((prev) =>
               prev.map((j) => (j.id === payload.new.id ? (payload.new as ClipperJob) : j))

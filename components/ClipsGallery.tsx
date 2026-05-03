@@ -151,13 +151,20 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
 export default function ClipsGallery({ jobs }: Props) {
   const [deleted, setDeleted] = useState<Set<string>>(new Set())
 
-  // Flatten all clips from all done jobs
+  // Flatten all clips from all done jobs, dedupe by clip_name as a safety
+  // net in case the same job slipped into state twice.
+  const seen = new Set<string>()
   const allClips: FlatClip[] = jobs
     .flatMap((job) =>
       (job.clips || [])
         .filter((c) => !deleted.has(c.clip_name))
         .map((c) => ({ ...c, job_id: job.id, job_title: job.title }))
     )
+    .filter((c) => {
+      if (seen.has(c.clip_name)) return false
+      seen.add(c.clip_name)
+      return true
+    })
     // Sort by score desc, then newest first
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
