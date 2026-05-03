@@ -54,6 +54,39 @@ export const PLATFORMS = [
 
 export type PlatformId = typeof PLATFORMS[number]['id']
 
+export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+export interface UserWatermark {
+  id:           string
+  user_id:      string
+  name:         string
+  storage_path: string
+  position:     WatermarkPosition
+  opacity:      number
+  scale:        number
+  is_default:   boolean
+  created_at:   string
+  url?:         string
+}
+
+export interface UserReaction {
+  id:             string
+  user_id:        string
+  name:           string
+  storage_path:   string
+  thumbnail_path: string | null
+  duration_sec:   number | null
+  created_at:     string
+  thumbnailUrl?:  string
+}
+
+export type OverlayOptions = {
+  watermark_id:      string | null
+  reaction_video_id: string | null
+  reaction_position: WatermarkPosition
+  commentary_text:   string
+}
+
 export interface ScheduledPost {
   id:                string
   user_id:           string

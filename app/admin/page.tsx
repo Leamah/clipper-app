@@ -44,7 +44,7 @@ function EditModal({ user, onClose, onSave }: {
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-zinc-400">Plan</label>
           <div className="flex gap-2">
-            {['free', 'admin'].map((p) => (
+            {(['free', 'premium', 'admin'] as const).map((p) => (
               <button
                 key={p}
                 type="button"
@@ -55,7 +55,7 @@ function EditModal({ user, onClose, onSave }: {
                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                 }`}
               >
-                {p === 'admin' ? '⚡ Admin' : 'Free'}
+                {p === 'admin' ? '⚡ Admin' : p === 'premium' ? '✨ Premium' : 'Free'}
               </button>
             ))}
           </div>
@@ -184,7 +184,8 @@ export default function AdminPage() {
                   <td colSpan={5} className="text-center py-12 text-zinc-500 text-sm">No users yet</td>
                 </tr>
               ) : users.map((user) => {
-                const isAdmin = user.plan === 'admin'
+                const isAdmin   = user.plan === 'admin'
+                const isPremium = user.plan === 'premium'
                 const cap     = user.clips_limit ?? 0
                 const pct     = cap > 0 ? Math.min((user.used_this_month / cap) * 100, 100) : 0
 
@@ -195,15 +196,15 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                        isAdmin
-                          ? 'bg-violet-500/20 text-violet-300'
-                          : 'bg-zinc-800 text-zinc-400'
+                        isAdmin   ? 'bg-violet-500/20 text-violet-300' :
+                        isPremium ? 'bg-purple-500/20 text-purple-300' :
+                                    'bg-zinc-800 text-zinc-400'
                       }`}>
-                        {isAdmin ? '⚡ admin' : user.plan}
+                        {isAdmin ? '⚡ admin' : isPremium ? '✨ premium' : user.plan}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {isAdmin ? (
+                      {isAdmin || user.clips_limit === null ? (
                         <span className="text-xs text-zinc-500">{user.used_this_month} (unlimited)</span>
                       ) : (
                         <div className="flex items-center gap-2">

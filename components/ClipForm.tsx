@@ -1,9 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { ClipperJob } from '@/lib/types'
+import type { ClipperJob, OverlayOptions } from '@/lib/types'
+import ClipOverlayOptions from '@/components/ClipOverlayOptions'
 import { Scissors, Loader2, AlertCircle, ChevronDown, Type } from 'lucide-react'
+
+const DEFAULT_OVERLAYS: OverlayOptions = {
+  watermark_id:      null,
+  reaction_video_id: null,
+  reaction_position: 'top-right',
+  commentary_text:   '',
+}
 
 interface Props {
   onJobCreated: (job: ClipperJob) => void
@@ -26,6 +34,22 @@ export default function ClipForm({ onJobCreated }: Props) {
   const [showOptions,    setShowOptions]    = useState(false)
   const [loading,        setLoading]        = useState(false)
   const [error,          setError]          = useState<string | null>(null)
+  const [overlays,       setOverlays]       = useState<OverlayOptions>(DEFAULT_OVERLAYS)
+  const [isPremium,      setIsPremium]      = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('clipper_user_profiles')
+        .select('plan')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          setIsPremium(data?.plan === 'premium' || data?.plan === 'admin')
+        })
+    })
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,6 +77,12 @@ export default function ClipForm({ onJobCreated }: Props) {
           target_duration_sec:  duration,
           clip_instructions:    instructions.trim() || null,
           enable_captions:      enableCaptions,
+          watermark_id:         overlays.watermark_id,
+          reaction_video_id:    overlays.reaction_video_id,
+          reaction_position:    overlays.reaction_video_id ? overlays.reaction_position : null,
+          commentary_text:      overlays.reaction_video_id && overlays.commentary_text.trim()
+                                  ? overlays.commentary_text.trim()
+                                  : null,
         })
         .select()
         .single()
@@ -74,6 +104,7 @@ export default function ClipForm({ onJobCreated }: Props) {
         setDuration(60)
         setEnableCaptions(true)
         setShowOptions(false)
+        setOverlays(DEFAULT_OVERLAYS)
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create job')
@@ -209,6 +240,8 @@ export default function ClipForm({ onJobCreated }: Props) {
                 />
               </div>
             </button>
+
+            <ClipOverlayOptions isPremium={isPremium} value={overlays} onChange={setOverlays} />
           </div>
         )}
       </form>
