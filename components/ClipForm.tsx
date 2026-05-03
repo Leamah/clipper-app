@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { ClipperJob } from '@/lib/types'
-import { Scissors, Loader2, AlertCircle, ChevronDown, Captions } from 'lucide-react'
+import { Scissors, Loader2, AlertCircle, ChevronDown, Type } from 'lucide-react'
 
 interface Props {
   onJobCreated: (job: ClipperJob) => void
@@ -195,7 +195,7 @@ export default function ClipForm({ onJobCreated }: Props) {
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                   enableCaptions ? 'bg-violet-500/20 text-violet-300' : 'bg-zinc-800 text-zinc-500'
                 }`}>
-                  <Captions className="w-4 h-4" />
+                  <Type className="w-4 h-4" />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-zinc-200">Burn-in captions</p>
