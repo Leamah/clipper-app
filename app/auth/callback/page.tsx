@@ -13,63 +13,50 @@ function CallbackHandler() {
 
   useEffect(() => {
     let cancelled = false
+    const finish = (path: string) => { if (!cancelled) router.replace(path) }
 
-    const finish = (path: string) => {
-      if (!cancelled) router.replace(path)
-    }
-
-    // 1) Hard error param from Supabase (e.g. expired link)
+    // 1) Hard error param from Supabase (expired link, etc.)
     const supaError = searchParams.get('error')
-    const errDesc   = searchParams.get('error_description')
     if (supaError) {
-      finish(`/login?error=${encodeURIComponent(errDesc ?? supaError)}`)
+      finish(`/login?error=${encodeURIComponent(searchParams.get('error_description') ?? supaError)}`)
       return
     }
 
-    // 2) PKCE flow — exchange code (works only if same browser as the request)
+    // 2) PKCE flow — ?code= in query string (same-browser only)
     const code = searchParams.get('code')
     if (code) {
-      supabase.auth.exchangeCodeForSession(code)
-        .then(({ error }) => {
-          if (error) {
-            console.error('[auth/callback] exchange failed:', error)
-            // Don't fail yet — implicit fallback might still kick in
-            return
-          }
-          finish('/dashboard')
-        })
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) setErrorMsg('Sign-in failed. The link may have expired — please request a new one.')
+        else finish('/dashboard')
+      })
+      return
     }
 
-    // 3) Listen for SIGNED_IN regardless of flow.
-    //    For implicit flow, the browser client picks up the URL hash
-    //    fragment automatically when the page loads (detectSessionInUrl).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
-          finish('/dashboard')
-        }
+    // 3) Implicit flow — access_token in URL hash.
+    //    Parse it manually instead of relying on detectSessionInUrl timing,
+    //    because the supabase singleton fires SIGNED_IN before this component
+    //    mounts, so onAuthStateChange would miss it.
+    const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
+    if (hash) {
+      const p             = new URLSearchParams(hash)
+      const access_token  = p.get('access_token')
+      const refresh_token = p.get('refresh_token')
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+          if (error) setErrorMsg('Sign-in failed. The link may have expired — please request a new one.')
+          else finish('/dashboard')
+        })
+        return
       }
-    )
+    }
 
-    // 4) Also explicitly check if a session is already present
+    // 4) Already signed in (e.g. user hit Back after a successful sign-in)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) finish('/dashboard')
+      else setErrorMsg('Sign-in could not be completed. The link may have expired — please request a new one.')
     })
 
-    // 5) Last-resort timeout — show actionable error
-    const timer = setTimeout(() => {
-      if (cancelled) return
-      const hash = typeof window !== 'undefined' ? window.location.hash : ''
-      const params = typeof window !== 'undefined' ? window.location.search : ''
-      console.error('[auth/callback] timeout. hash:', hash, 'params:', params)
-      setErrorMsg('Sign-in could not be completed. The link may have expired or been opened in a different browser. Please request a new one.')
-    }, 8_000)
-
-    return () => {
-      cancelled = true
-      subscription.unsubscribe()
-      clearTimeout(timer)
-    }
+    return () => { cancelled = true }
   }, [router, searchParams])
 
   if (errorMsg) {
