@@ -15,48 +15,49 @@ function CallbackHandler() {
     let cancelled = false
     const finish = (path: string) => { if (!cancelled) router.replace(path) }
 
-    // 1) Hard error param from Supabase (expired link, etc.)
+    // Hard error param from Supabase (expired link, etc.)
     const supaError = searchParams.get('error')
     if (supaError) {
       finish(`/login?error=${encodeURIComponent(searchParams.get('error_description') ?? supaError)}`)
       return
     }
 
-    // 2) PKCE flow — ?code= in query string (same-browser only)
+    // PKCE: exchange code — only works when the same browser made the request
     const code = searchParams.get('code')
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (error) setErrorMsg('Sign-in failed. The link may have expired — please request a new one.')
-        else finish('/dashboard')
+        if (!cancelled) {
+          if (error) finish('/login?error=auth_callback_failed')
+          else finish('/dashboard')
+        }
       })
       return
     }
 
-    // 3) Implicit flow — access_token in URL hash.
-    //    Parse it manually instead of relying on detectSessionInUrl timing,
-    //    because the supabase singleton fires SIGNED_IN before this component
-    //    mounts, so onAuthStateChange would miss it.
-    const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
-    if (hash) {
-      const p             = new URLSearchParams(hash)
-      const access_token  = p.get('access_token')
-      const refresh_token = p.get('refresh_token')
-      if (access_token && refresh_token) {
-        supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
-          if (error) setErrorMsg('Sign-in failed. The link may have expired — please request a new one.')
-          else finish('/dashboard')
-        })
-        return
-      }
-    }
-
-    // 4) Already signed in (e.g. user hit Back after a successful sign-in)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Implicit flow (hash-based) or already signed in.
+    // The supabase singleton's detectSessionInUrl processes the hash automatically
+    // and fires onAuthStateChange. We listen for that AND poll getSession() in case
+    // the event already fired before this component mounted.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) finish('/dashboard')
-      else setErrorMsg('Sign-in could not be completed. The link may have expired — please request a new one.')
     })
 
-    return () => { cancelled = true }
+    const poll = () => supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled && session) finish('/dashboard')
+    })
+
+    poll()
+    const t1 = setTimeout(poll, 300)
+    const t2 = setTimeout(poll, 1000)
+    const t3 = setTimeout(() => {
+      if (!cancelled) finish('/login?error=auth_callback_failed')
+    }, 6000)
+
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3)
+    }
   }, [router, searchParams])
 
   if (errorMsg) {
