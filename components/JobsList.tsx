@@ -30,7 +30,7 @@ function JobCard({ job }: { job: ClipperJob }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-zinc-100 truncate">
-            {job.title ?? new URL(job.url).hostname}
+            {job.title ?? (() => { try { return new URL(job.url).hostname } catch { return job.url } })()}
           </p>
           <p className="text-xs text-zinc-500 truncate mt-0.5">{job.url}</p>
         </div>

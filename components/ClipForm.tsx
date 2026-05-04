@@ -66,7 +66,7 @@ export default function ClipForm({ onJobCreated }: Props) {
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setError('You must be signed in'); return }
+      if (!user) { setError('You must be signed in'); setLoading(false); return }
 
       const { data, error: dbErr } = await supabase
         .from('clipper_jobs')

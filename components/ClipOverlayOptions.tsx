@@ -29,8 +29,7 @@ export default function ClipOverlayOptions({ isPremium, value, onChange }: Props
       .then(({ data }) => {
         if (!data?.length) return
         setWatermarks(data)
-        const def = data.find((w) => w.is_default) ?? data[0]
-        onChange({ ...value, watermark_id: def.id })
+        // Don't auto-apply — user must explicitly toggle the watermark on
       })
 
     supabase

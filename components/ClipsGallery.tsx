@@ -67,7 +67,7 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
           className="w-full h-full object-cover"
           muted
           preload="metadata"
-          {...(hovering ? { autoPlay: true } : {})}
+          autoPlay={hovering}
           loop
         />
         {!hovering && (

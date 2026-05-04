@@ -30,8 +30,9 @@ export default function UserNav() {
 
   if (!email) return null
 
-  const initials = email.slice(0, 2).toUpperCase()
-  const isAdmin  = profile?.plan === 'admin'
+  const initials   = email.slice(0, 2).toUpperCase()
+  const isAdmin    = profile?.plan === 'admin'
+  const isPremium  = profile?.plan === 'premium'
 
   return (
     <div className="flex items-center gap-2">
@@ -55,9 +56,9 @@ export default function UserNav() {
             {initials}
           </span>
           <span className="text-zinc-300 max-w-[120px] truncate hidden sm:block">{email}</span>
-          {isAdmin && (
+          {(isAdmin || isPremium) && (
             <span className="px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[10px] font-semibold uppercase tracking-wide">
-              Admin
+              {isAdmin ? 'Admin' : 'Pro'}
             </span>
           )}
         </button>
@@ -69,8 +70,8 @@ export default function UserNav() {
               <div className="px-3 py-3 border-b border-zinc-800">
                 <p className="text-xs text-zinc-400 truncate">{email}</p>
                 <p className="text-xs font-medium text-zinc-200 mt-0.5 capitalize flex items-center gap-1">
-                  {isAdmin ? <Shield className="w-3 h-3 text-violet-400" /> : <User className="w-3 h-3 text-zinc-500" />}
-                  {isAdmin ? 'Admin · unlimited' : `Free · ${profile?.clips_limit ?? 5} clips/mo`}
+                  {isAdmin || isPremium ? <Shield className="w-3 h-3 text-violet-400" /> : <User className="w-3 h-3 text-zinc-500" />}
+                  {isAdmin ? 'Admin · unlimited' : isPremium ? `Premium · ${profile?.clips_limit ?? '∞'} clips/mo` : `Free · ${profile?.clips_limit ?? 5} clips/mo`}
                 </p>
               </div>
               {isAdmin && (

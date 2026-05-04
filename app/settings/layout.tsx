@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Scissors, Droplets, Video } from 'lucide-react'
 
 const NAV = [
@@ -7,6 +10,8 @@ const NAV = [
 ]
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
@@ -24,6 +29,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             <Link href="/schedule" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
               Stream
             </Link>
+            <span className="px-3 py-1.5 rounded-lg text-xs text-violet-300 bg-violet-500/10 font-medium">Settings</span>
           </nav>
         </div>
       </header>
@@ -32,16 +38,23 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         <aside className="w-48 shrink-0">
           <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest mb-3">Settings</p>
           <nav className="space-y-1">
-            {NAV.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 transition-colors"
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </Link>
-            ))}
+            {NAV.map(({ href, label, icon: Icon }) => {
+              const active = pathname === href
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    active
+                      ? 'bg-violet-500/10 text-violet-300'
+                      : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </Link>
+              )
+            })}
           </nav>
         </aside>
 
