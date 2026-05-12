@@ -42,7 +42,26 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
     if (!confirm(`Delete "${clip.clip_name}"?`)) return
     setDeleting(true)
     try {
+      // 1. Remove file from storage
       await supabase.storage.from('clipper_clips').remove([clip.clip_name])
+
+      // 2. Remove this clip from the job's clips array in the DB so it
+      //    doesn't reappear after a page refresh or realtime update.
+      const { data: job } = await supabase
+        .from('clipper_jobs')
+        .select('clips')
+        .eq('id', clip.job_id)
+        .single()
+      if (job?.clips) {
+        const updated = (job.clips as import('@/lib/types').ClipResult[]).filter(
+          (c) => c.clip_name !== clip.clip_name
+        )
+        await supabase
+          .from('clipper_jobs')
+          .update({ clips: updated })
+          .eq('id', clip.job_id)
+      }
+
       onDelete(clip.clip_name)
     } catch {
       setDeleting(false)
