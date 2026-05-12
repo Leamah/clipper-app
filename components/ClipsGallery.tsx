@@ -53,7 +53,7 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
         .eq('id', clip.job_id)
         .single()
       if (job?.clips) {
-        const updated = (job.clips as import('@/lib/types').ClipResult[]).filter(
+        const updated = (job.clips as ClipResult[]).filter(
           (c) => c.clip_name !== clip.clip_name
         )
         await supabase
