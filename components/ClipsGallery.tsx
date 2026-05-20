@@ -53,9 +53,15 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
         .eq('id', clip.job_id)
         .single()
       if (job?.clips) {
-        const updated = (job.clips as ClipResult[]).filter(
-          (c) => c.clip_name !== clip.clip_name
-        )
+        // clips may be a JS array or a JSON string (legacy double-encoding) —
+        // normalise before filtering so the update always works.
+        const raw = job.clips
+        const current: ClipResult[] = Array.isArray(raw)
+          ? raw
+          : typeof raw === 'string'
+            ? (() => { try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch { return [] } })()
+            : []
+        const updated = current.filter((c) => c.clip_name !== clip.clip_name)
         await supabase
           .from('clipper_jobs')
           .update({ clips: updated })
