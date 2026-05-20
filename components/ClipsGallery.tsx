@@ -62,10 +62,12 @@ function ClipCard({ clip, onDelete }: { clip: FlatClip; onDelete: (name: string)
             ? (() => { try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch { return [] } })()
             : []
         const updated = current.filter((c) => c.clip_name !== clip.clip_name)
-        await supabase
-          .from('clipper_jobs')
-          .update({ clips: updated })
-          .eq('id', clip.job_id)
+        if (updated.length === 0) {
+          // Last clip removed — delete the whole job row so it never reappears
+          await supabase.from('clipper_jobs').delete().eq('id', clip.job_id)
+        } else {
+          await supabase.from('clipper_jobs').update({ clips: updated }).eq('id', clip.job_id)
+        }
       }
 
       onDelete(clip.clip_name)
