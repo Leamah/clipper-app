@@ -35,22 +35,12 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Join klippa_profiles with auth.users via service role
-  const { data: profiles, error } = await admin
-    .from('klippa_profiles')
-    .select('id, employment_type, tax_year, subscription_tier, onboarding_complete, created_at')
+  const { data: docs, error } = await admin
+    .from('klippa_documents')
+    .select('id, user_id, document_type, original_filename, ocr_status, created_at')
     .order('created_at', { ascending: false })
+    .limit(100)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Fetch emails from auth.users
-  const { data: authUsers } = await admin.auth.admin.listUsers()
-  const emailMap = Object.fromEntries((authUsers?.users ?? []).map((u) => [u.id, u.email]))
-
-  const users = (profiles ?? []).map((p) => ({
-    ...p,
-    email: emailMap[p.id] ?? 'unknown',
-  }))
-
-  return NextResponse.json({ users })
+  return NextResponse.json({ docs })
 }

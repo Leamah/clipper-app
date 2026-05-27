@@ -7,9 +7,7 @@ type CookieToSet = { name: string; value: string; options?: Record<string, unkno
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Skip ALL middleware processing on /auth/* routes. Otherwise getUser()
-  // here triggers a token refresh that writes fresh sb-* cookies onto the
-  // response and overwrites the signout route's cookie-clearing work.
+  // Skip middleware on /auth/* — avoid disrupting magic-link / signout flows
   if (pathname.startsWith('/auth/')) {
     return NextResponse.next()
   }
@@ -36,33 +34,41 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Routes that don't require authentication
   const isPublicRoute   = pathname === '/' || pathname === '/login'
+  const isOnboarding    = pathname.startsWith('/onboarding')
   const isAdminRoute    = pathname.startsWith('/admin')
   const isApiAdminRoute = pathname.startsWith('/api/admin')
 
-  // Unauthenticated → /login (except public routes)
+  // Unauthenticated → /login
   if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Already logged in → skip login page, go to dashboard
-  // EXCEPT when ?signedout=1 is set — the user is mid-cleanup and we
-  // must not bounce them back to a session they're trying to drop.
+  // Already logged in → skip login page
   if (user && pathname === '/login' && request.nextUrl.searchParams.get('signedout') !== '1') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Admin routes: verify plan
-  if (user && (isAdminRoute || isApiAdminRoute)) {
+  if (user) {
+    // Fetch klippa profile to check onboarding + admin status
     const { data: profile } = await supabase
-      .from('clipper_user_profiles')
-      .select('plan')
+      .from('klippa_profiles')
+      .select('onboarding_complete, subscription_tier')
       .eq('id', user.id)
       .single()
 
-    if (profile?.plan !== 'admin') {
-      return NextResponse.redirect(new URL('/', request.url))
+    // Admin routes: require subscription_tier === 'admin' (or set via profile)
+    if (isAdminRoute || isApiAdminRoute) {
+      if (profile?.subscription_tier !== 'admin') {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+    }
+
+    // Redirect to onboarding if profile not complete (except when already there)
+    if (!isOnboarding && !isPublicRoute) {
+      if (!profile || !profile.onboarding_complete) {
+        return NextResponse.redirect(new URL('/onboarding', request.url))
+      }
     }
   }
 

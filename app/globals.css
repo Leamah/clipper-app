@@ -18,6 +18,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Shared input style — used across all Klippa forms */
+.input {
+  @apply w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60 transition-colors;
+}
+
+select.input {
+  @apply cursor-pointer;
+}
+
 /* Progress bar shimmer */
 .progress-shimmer {
   background: linear-gradient(

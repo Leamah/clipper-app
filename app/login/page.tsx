@@ -1,9 +1,11 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Scissors, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ShieldCheck, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
 const ERROR_MESSAGES: Record<string, string> = {
   auth_callback_failed: 'Sign-in link failed. Please request a new one.',
@@ -75,18 +77,18 @@ function LoginForm() {
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
       {/* Glow */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-violet-600/10 blur-[100px] rounded-full" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/10 blur-[100px] rounded-full" />
       </div>
 
       <div className="relative w-full max-w-sm space-y-8">
         {/* Logo */}
         <div className="text-center space-y-3">
-          <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 items-center justify-center mx-auto shadow-lg shadow-violet-900/40">
-            <Scissors className="w-5 h-5 text-white" />
+          <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 items-center justify-center mx-auto shadow-lg shadow-emerald-900/40">
+            <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Klippa</h1>
-            <p className="text-sm text-zinc-500 mt-1">AI-powered video clipping</p>
+            <p className="text-sm text-zinc-500 mt-1">Tax made simple for South African freelancers</p>
           </div>
         </div>
 
@@ -100,7 +102,7 @@ function LoginForm() {
               <p className="font-semibold text-white text-lg">Check your inbox</p>
               <p className="text-sm text-zinc-400 leading-relaxed">
                 We sent a magic link to{' '}
-                <span className="text-violet-300 font-medium">{email}</span>.
+                <span className="text-emerald-300 font-medium">{email}</span>.
                 <br />
                 Click the link to sign in. No password needed.
               </p>
@@ -130,7 +132,7 @@ function LoginForm() {
                     placeholder="you@example.com"
                     required
                     disabled={loading}
-                    className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-violet-500/60 transition-colors disabled:opacity-60"
+                    className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60 transition-colors disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -145,7 +147,7 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-br from-violet-500 to-purple-600 text-white hover:from-violet-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-900/30"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-br from-emerald-500 to-purple-600 text-white hover:from-emerald-400 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-900/30"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                 {loading ? 'Sending…' : 'Send magic link'}
@@ -155,7 +157,7 @@ function LoginForm() {
         </div>
 
         <p className="text-center text-xs text-zinc-600">
-          Access is invite-only. Contact your admin if you need an account.
+          Free to start. Built for South African freelancers &amp; consultants.
         </p>
       </div>
     </div>

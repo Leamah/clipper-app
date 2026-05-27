@@ -1,16 +1,31 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+let _client: SupabaseClient | null = null
 
-// Use the implicit flow for magic links so cross-device clicks work
-// (PKCE requires the code verifier to be on the same browser session
-// that requested the link, which often isn't the case in real usage).
-export const supabase = createBrowserClient(url, key, {
-  auth: {
-    flowType:            'implicit',
-    detectSessionInUrl:  true,
-    persistSession:      true,
-    autoRefreshToken:    true,
+function getClient(): SupabaseClient {
+  if (!_client) {
+    _client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          flowType:           'implicit',
+          detectSessionInUrl: true,
+          persistSession:     true,
+          autoRefreshToken:   true,
+        },
+      }
+    )
+  }
+  return _client
+}
+
+// Lazy proxy — the real client is only created on first property access (at runtime,
+// not at module import time), so Next.js static analysis during `next build` doesn't
+// throw "URL and API key are required" when env vars aren't set locally.
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_, prop: string | symbol) {
+    return (getClient() as any)[prop as string]
   },
 })

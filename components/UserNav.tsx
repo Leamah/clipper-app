@@ -4,15 +4,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { LogOut, Shield, User } from 'lucide-react'
-
-interface Profile {
-  plan:        string
-  clips_limit: number | null
-}
+import type { KlippaProfile } from '@/lib/types'
 
 export default function UserNav() {
   const [email,   setEmail]   = useState<string | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setProfile] = useState<Pick<KlippaProfile, 'subscription_tier'> | null>(null)
   const [open,    setOpen]    = useState(false)
 
   useEffect(() => {
@@ -20,8 +16,8 @@ export default function UserNav() {
       if (!user) return
       setEmail(user.email ?? null)
       supabase
-        .from('clipper_user_profiles')
-        .select('plan, clips_limit')
+        .from('klippa_profiles')
+        .select('subscription_tier')
         .eq('id', user.id)
         .single()
         .then(({ data }) => setProfile(data))
@@ -30,13 +26,12 @@ export default function UserNav() {
 
   if (!email) return null
 
-  const initials   = email.slice(0, 2).toUpperCase()
-  const isAdmin    = profile?.plan === 'admin'
-  const isPremium  = profile?.plan === 'premium'
+  const initials  = email.slice(0, 2).toUpperCase()
+  const isAdmin   = profile?.subscription_tier === 'admin'
+  const isPro     = profile?.subscription_tier === 'professional'
 
   return (
     <div className="flex items-center gap-2">
-      {/* Always-visible Sign out link — no dropdown gating */}
       <a
         href="/auth/signout"
         className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-red-400 hover:bg-red-900/10 transition-colors"
@@ -46,18 +41,17 @@ export default function UserNav() {
         Sign out
       </a>
 
-      {/* Avatar dropdown — for email display + admin link */}
       <div className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border border-zinc-800 hover:border-zinc-700 bg-zinc-900/60 transition-colors text-xs"
         >
-          <span className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-white text-[10px] font-bold">
+          <span className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white text-[10px] font-bold">
             {initials}
           </span>
           <span className="text-zinc-300 max-w-[120px] truncate hidden sm:block">{email}</span>
-          {(isAdmin || isPremium) && (
-            <span className="px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[10px] font-semibold uppercase tracking-wide">
+          {(isAdmin || isPro) && (
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold uppercase tracking-wide">
               {isAdmin ? 'Admin' : 'Pro'}
             </span>
           )}
@@ -70,8 +64,10 @@ export default function UserNav() {
               <div className="px-3 py-3 border-b border-zinc-800">
                 <p className="text-xs text-zinc-400 truncate">{email}</p>
                 <p className="text-xs font-medium text-zinc-200 mt-0.5 capitalize flex items-center gap-1">
-                  {isAdmin || isPremium ? <Shield className="w-3 h-3 text-violet-400" /> : <User className="w-3 h-3 text-zinc-500" />}
-                  {isAdmin ? 'Admin · unlimited' : isPremium ? `Premium · ${profile?.clips_limit ?? '∞'} clips/mo` : `Free · ${profile?.clips_limit ?? 5} clips/mo`}
+                  {isAdmin || isPro
+                    ? <Shield className="w-3 h-3 text-emerald-400" />
+                    : <User className="w-3 h-3 text-zinc-500" />}
+                  {isAdmin ? 'Admin' : isPro ? 'Professional' : 'Free plan'}
                 </p>
               </div>
               {isAdmin && (
@@ -80,11 +76,17 @@ export default function UserNav() {
                   onClick={() => setOpen(false)}
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
                 >
-                  <Shield className="w-3.5 h-3.5 text-violet-400" />
-                  Manage users
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  Admin panel
                 </Link>
               )}
-              {/* Mobile-visible signout (the header link is hidden < sm) */}
+              <Link
+                href="/settings"
+                onClick={() => setOpen(false)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                Tax profile settings
+              </Link>
               <a
                 href="/auth/signout"
                 className="sm:hidden w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-colors"

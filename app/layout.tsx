@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Klippa | AI Video Clipping',
-  description: 'Paste a video URL, get the best 45-90 second clips in minutes.',
+  title: 'Klippa | Tax Made Simple',
+  description: 'Know your tax. Keep more money. Built for South African freelancers and consultants.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
