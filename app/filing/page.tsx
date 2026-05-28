@@ -108,7 +108,7 @@ export default function FilingPage() {
 
   const taxResult = calculateTax({
     grossIncome:          totalIncome,
-    raContributions:      profile.has_ra ? Math.min(totalIncome * 0.275, 350_000) : 0,
+    raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, totalIncome * 0.275, 350_000) : 0,
     pensionContributions: profile.has_pension ? (profile.pension_contributions ?? 0) : 0,
     homeofficePct:        profile.works_from_home ? profile.home_office_pct : 0,
     homeExpenses:         0,
@@ -274,7 +274,7 @@ export default function FilingPage() {
 
             <div className="space-y-4">
               {[
-                { n: '01', title: 'Log in to SARS eFiling', body: 'Go to efiling.sars.gov.za and log in with your username and password. If you haven\'t registered, click "Register" and complete the process.', link: 'https://www.efiling.sars.gov.za', linkLabel: 'Open eFiling portal' },
+                { n: '01', title: 'Log in to SARS eFiling', body: 'Go to secure.sarsefiling.co.za and log in with your username and password. If you haven\'t registered, click "Register" and complete the process.', link: 'https://secure.sarsefiling.co.za/app/login', linkLabel: 'Open eFiling portal' },
                 { n: '02', title: 'Select "Returns" → "Returns Issued" → "Personal Income Tax (ITR12)"', body: 'From your dashboard, navigate to the Returns menu. Find the ITR12 for the current tax year and click "Open."' },
                 { n: '03', title: 'Enter your income', body: `In the "Income" section, find "Local income" and enter your freelance/consulting income. Use the values from your cheat sheet:\n• Code 3699 (Freelance): ${formatRand(totalIncome)}` },
                 { n: '04', title: 'Enter your deductions', body: `In the "Deductions" section, enter your business expense deductions:\n${taxResult.section11fRa > 0 ? `• Code 4001 (RA): ${formatRand(taxResult.section11fRa)}\n` : ''}${taxResult.otherDeductions > 0 ? `• Code 4018 (Other deductions): ${formatRand(taxResult.otherDeductions)}` : ''}` },

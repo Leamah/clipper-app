@@ -335,19 +335,17 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
             />
           </Field>
 
-          {!doClassify && (
-            <Field label="Category">
-              <select
-                value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}
-                className="input"
-              >
-                {(Object.entries(EXPENSE_CATEGORY_LABELS) as [ExpenseCategory, string][]).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </Field>
-          )}
+          <Field label="Category">
+            <select
+              value={form.category}
+              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}
+              className="input"
+            >
+              {(Object.entries(EXPENSE_CATEGORY_LABELS) as [ExpenseCategory, string][]).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </Field>
 
           <button
             type="button"

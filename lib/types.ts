@@ -60,6 +60,7 @@ export interface KlippaProfile {
   has_vehicle:          boolean
   vehicle_value:        number                // for SARS fixed-cost table
   has_ra:               boolean
+  ra_contributions:     number
   has_pension:          boolean
   pension_contributions: number
   has_medical:          boolean

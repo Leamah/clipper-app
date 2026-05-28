@@ -80,7 +80,9 @@ export default function MileagePage() {
     const a    = document.createElement('a')
     a.href     = url
     a.download = `klippa_logbook_${new Date().getFullYear()}.csv`
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 

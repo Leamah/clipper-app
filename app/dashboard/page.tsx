@@ -97,7 +97,7 @@ export default function Dashboard() {
   const taxResult = profile
     ? calculateTax({
         grossIncome:          totalIncome,
-        raContributions:      profile.has_ra ? Math.min(totalIncome * 0.275, 350_000) : 0,
+        raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, totalIncome * 0.275, 350_000) : 0,
         pensionContributions: profile.has_pension ? (profile.pension_contributions ?? 0) : 0,
         homeofficePct:        profile.works_from_home ? profile.home_office_pct : 0,
         homeExpenses:         0,
@@ -272,6 +272,7 @@ export default function Dashboard() {
               </div>
               <BreakdownRow label="Tax on taxable income" value={formatRand(taxResult.grossTax)} />
               <BreakdownRow label="Primary rebate" value={`− ${formatRand(taxResult.primaryRebate)}`} muted />
+              {taxResult.medicalAidCredits > 0 && <BreakdownRow label="Medical aid credits (Section 6A)" value={`− ${formatRand(taxResult.medicalAidCredits)}`} muted />}
               <div className="border-t border-zinc-800 pt-2">
                 <BreakdownRow label="Tax payable" value={formatRand(taxResult.taxPayable)} bold />
               </div>

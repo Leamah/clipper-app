@@ -58,6 +58,7 @@ export default function SettingsPage() {
         has_vehicle:          profile.has_vehicle,
         vehicle_value:        profile.vehicle_value,
         has_ra:               profile.has_ra,
+        ra_contributions:     profile.ra_contributions ?? 0,
         has_pension:          profile.has_pension,
         pension_contributions: profile.pension_contributions,
         has_medical:          profile.has_medical,
@@ -190,9 +191,18 @@ export default function SettingsPage() {
         <Section title="Retirement savings (Section 11F)">
           <ToggleRow label="I have a Retirement Annuity (RA)" sub="Contributions deductible up to 27.5% of income or R350,000"
             value={profile.has_ra} onChange={(v) => update('has_ra', v)} />
+          {profile.has_ra && (
+            <div className="pl-4 space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400">Annual RA contributions (R)</label>
+              <input type="number" min={0} step={100} value={profile.ra_contributions ?? 0}
+                onChange={(e) => update('ra_contributions', parseFloat(e.target.value) || 0)}
+                placeholder="0.00" className="input w-full" />
+              <p className="text-xs text-zinc-600">Your deduction is capped at the lesser of this amount, 27.5% of income, or R350,000.</p>
+            </div>
+          )}
           <ToggleRow label="I contribute to a Pension Fund" sub="Combined with RA under Section 11F deduction"
             value={profile.has_pension} onChange={(v) => update('has_pension', v)} />
-          {(profile.has_pension) && (
+          {profile.has_pension && (
             <div className="pl-4 space-y-1.5">
               <label className="text-xs font-medium text-zinc-400">Annual pension fund contributions (R)</label>
               <input type="number" min={0} step={100} value={profile.pension_contributions ?? 0}
