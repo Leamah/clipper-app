@@ -8,7 +8,8 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Skip middleware on /auth/* — avoid disrupting magic-link / signout flows
-  if (pathname.startsWith('/auth/')) {
+  // Also skip the Ozow webhook — it's server-to-server and has no session
+  if (pathname.startsWith('/auth/') || pathname === '/api/payments/ozow/notify') {
     return NextResponse.next()
   }
 
@@ -34,10 +35,18 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isPublicRoute   = pathname === '/' || pathname === '/login'
+  // Pricing and payment pages are accessible without login (so users can see plans)
+  const isPublicRoute   = (
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/pricing' ||
+    pathname.startsWith('/payments/')      // success / cancel pages
+  )
   const isOnboarding    = pathname.startsWith('/onboarding')
   const isAdminRoute    = pathname.startsWith('/admin')
   const isApiAdminRoute = pathname.startsWith('/api/admin')
+  // Ozow notify webhook must be reachable without a session (Ozow posts server-to-server)
+  const isPaymentWebhook = pathname === '/api/payments/ozow/notify'
 
   // Unauthenticated → /login
   if (!user && !isPublicRoute) {
