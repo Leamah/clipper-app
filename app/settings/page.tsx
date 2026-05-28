@@ -51,6 +51,19 @@ export default function SettingsPage() {
       .from('klippa_profiles')
       .update({
         full_name:            profile.full_name,
+        home_suburb:          profile.home_suburb || null,
+        work_suburb:          profile.work_suburb || null,
+        commute_km:           profile.commute_km ?? 0,
+        office_mon:           profile.office_mon,
+        office_tue:           profile.office_tue,
+        office_wed:           profile.office_wed,
+        office_thu:           profile.office_thu,
+        office_fri:           profile.office_fri,
+        opening_odometer:     profile.opening_odometer ?? 0,
+        vehicle_make:         profile.vehicle_make || null,
+        vehicle_model:        profile.vehicle_model || null,
+        vehicle_year:         profile.vehicle_year || null,
+        logbook_reminder:     profile.logbook_reminder ?? 'weekly',
         employment_type:      profile.employment_type,
         work_location:        profile.work_location,
         works_from_home,
@@ -172,17 +185,111 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        {/* ── Commute & logbook ── */}
+        <Section title="Commute & logbook">
+          <p className="text-xs text-zinc-500 -mt-2">
+            Set this up once. Klippa will auto-build your logbook each week and ask you to confirm it.
+          </p>
+
+          {/* Home & work locations */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400">Home suburb / area</label>
+              <input type="text" value={profile.home_suburb ?? ''} onChange={(e) => update('home_suburb', e.target.value)}
+                placeholder="e.g. Sandton" className="input w-full" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400">Regular business location</label>
+              <input type="text" value={profile.work_suburb ?? ''} onChange={(e) => update('work_suburb', e.target.value)}
+                placeholder="e.g. Rosebank / Client offices" className="input w-full" />
+            </div>
+          </div>
+
+          {/* Commute distance */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">One-way distance (km)</label>
+            <input type="number" min={0} step={0.5} value={profile.commute_km ?? 0}
+              onChange={(e) => update('commute_km', parseFloat(e.target.value) || 0)}
+              placeholder="e.g. 18" className="input w-full" />
+            <p className="text-xs text-zinc-600">Look this up once on Google Maps. Klippa uses it for every auto-generated trip.</p>
+          </div>
+
+          {/* Office days */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-zinc-400">Days per week at your regular business location</label>
+            <div className="flex gap-2">
+              {([
+                { key: 'office_mon', label: 'Mon' },
+                { key: 'office_tue', label: 'Tue' },
+                { key: 'office_wed', label: 'Wed' },
+                { key: 'office_thu', label: 'Thu' },
+                { key: 'office_fri', label: 'Fri' },
+              ] as { key: keyof KlippaProfile; label: string }[]).map(({ key, label }) => (
+                <button key={key} type="button"
+                  onClick={() => update(key, !profile[key])}
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${profile[key] ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-600">Days not selected are treated as home/remote days in your logbook.</p>
+          </div>
+
+          {/* Opening odometer */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Opening odometer at start of tax year (km)</label>
+            <input type="number" min={0} step={1} value={profile.opening_odometer ?? 0}
+              onChange={(e) => update('opening_odometer', parseInt(e.target.value) || 0)}
+              placeholder="e.g. 48250" className="input w-full" />
+            <p className="text-xs text-zinc-600">SARS requires the odometer reading at the start and end of the tax year.</p>
+          </div>
+
+          {/* Logbook reminder */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-zinc-400">Logbook review reminders</label>
+            <div className="flex gap-2">
+              {(['weekly', 'monthly', 'none'] as const).map((opt) => (
+                <button key={opt} type="button"
+                  onClick={() => update('logbook_reminder', opt)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all ${profile.logbook_reminder === opt ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Section>
+
         {/* ── Vehicle ── */}
         <Section title="Vehicle & travel">
           <ToggleRow label="I drive for work" sub="Enables travel deduction based on SARS fixed-cost table"
             value={profile.has_vehicle} onChange={(v) => update('has_vehicle', v)} />
           {profile.has_vehicle && (
-            <div className="pl-4 space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Vehicle purchase value (incl. VAT)</label>
-              <input type="number" min={0} step={1000} value={profile.vehicle_value ?? 0}
-                onChange={(e) => update('vehicle_value', parseFloat(e.target.value) || 0)}
-                placeholder="e.g. 350000" className="input w-full" />
-              <p className="text-xs text-zinc-600">Used to look up the SARS fixed-cost table for your travel deduction rate.</p>
+            <div className="pl-4 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-400">Make</label>
+                  <input type="text" value={profile.vehicle_make ?? ''} onChange={(e) => update('vehicle_make', e.target.value)}
+                    placeholder="e.g. Toyota" className="input w-full" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-400">Model</label>
+                  <input type="text" value={profile.vehicle_model ?? ''} onChange={(e) => update('vehicle_model', e.target.value)}
+                    placeholder="e.g. Corolla" className="input w-full" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-400">Year</label>
+                  <input type="number" min={2000} max={2030} value={profile.vehicle_year ?? new Date().getFullYear()}
+                    onChange={(e) => update('vehicle_year', parseInt(e.target.value) || null as unknown as number)}
+                    placeholder="2022" className="input w-full" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400">Purchase value (incl. VAT)</label>
+                <input type="number" min={0} step={1000} value={profile.vehicle_value ?? 0}
+                  onChange={(e) => update('vehicle_value', parseFloat(e.target.value) || 0)}
+                  placeholder="e.g. 350000" className="input w-full" />
+                <p className="text-xs text-zinc-600">Used to look up the SARS fixed-cost table for your travel deduction rate.</p>
+              </div>
             </div>
           )}
         </Section>

@@ -59,6 +59,21 @@ export interface KlippaProfile {
   home_office_pct:      number
   has_vehicle:          boolean
   vehicle_value:        number                // for SARS fixed-cost table
+  // Commute & logbook setup
+  home_suburb:          string | null
+  work_suburb:          string | null
+  commute_km:           number
+  office_mon:           boolean
+  office_tue:           boolean
+  office_wed:           boolean
+  office_thu:           boolean
+  office_fri:           boolean
+  opening_odometer:     number
+  vehicle_make:         string | null
+  vehicle_model:        string | null
+  vehicle_year:         number | null
+  logbook_reminder:     'weekly' | 'monthly' | 'none'
+  // Retirement savings
   has_ra:               boolean
   ra_contributions:     number
   has_pension:          boolean
@@ -165,7 +180,17 @@ export interface KlippaMileageTrip {
   purpose:          string
   trip_type:        'business' | 'private'
   deductible_amount: number | null
+  review_week:      string | null   // e.g. '2025-W22'
   created_at:       string
+}
+
+export interface KlippaLogbookReview {
+  id:               string
+  user_id:          string
+  review_week:      string
+  trips_confirmed:  number
+  km_confirmed:     number
+  reviewed_at:      string
 }
 
 // ── Tax Engine Types ───────────────────────────────────────

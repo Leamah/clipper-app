@@ -9,6 +9,21 @@ import UserNav from '@/components/UserNav'
 import { ShieldCheck, TrendingUp, AlertCircle, CheckCircle2, ChevronRight, Clock, Plus, FileText, Receipt, ArrowUpRight } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord } from '@/lib/types'
 import { calculateTax, getITR12Deadline, daysUntilDeadline } from '@/lib/tax-engine'
+import { startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear } from 'date-fns'
+
+function countPendingLogbookWeeks(taxYear: number, reviewedWeekKeys: string[]): number {
+  const taxStart = new Date(taxYear - 1, 2, 1)
+  const cutoff   = startOfWeek(new Date(), { weekStartsOn: 1 })
+  const reviewed = new Set(reviewedWeekKeys)
+  let count = 0
+  let ws    = startOfWeek(taxStart, { weekStartsOn: 1 })
+  while (isBefore(ws, cutoff)) {
+    const key = `${getISOWeekYear(ws)}-W${String(getISOWeek(ws)).padStart(2, '0')}`
+    if (!reviewed.has(key)) count++
+    ws = addWeeks(ws, 1)
+  }
+  return count
+}
 
 function formatRand(n: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -40,17 +55,19 @@ function NavBar() {
 }
 
 export default function Dashboard() {
-  const [profile,       setProfile]       = useState<KlippaProfile | null>(null)
-  const [taxReturn,     setTaxReturn]     = useState<KlippaTaxReturn | null>(null)
-  const [incomeRecords, setIncomeRecords] = useState<KlippaIncomeRecord[]>([])
-  const [expenseRecords,setExpenseRecords]= useState<KlippaExpenseRecord[]>([])
-  const [userId,        setUserId]        = useState<string | null>(null)
-  const [loading,       setLoading]       = useState(true)
+  const [profile,           setProfile]           = useState<KlippaProfile | null>(null)
+  const [taxReturn,         setTaxReturn]         = useState<KlippaTaxReturn | null>(null)
+  const [incomeRecords,     setIncomeRecords]     = useState<KlippaIncomeRecord[]>([])
+  const [expenseRecords,    setExpenseRecords]    = useState<KlippaExpenseRecord[]>([])
+  const [logbookPending,    setLogbookPending]    = useState(0)
+  const [userId,            setUserId]            = useState<string | null>(null)
+  const [loading,           setLoading]           = useState(true)
 
   const loadData = useCallback(async (uid: string) => {
-    const [profileRes, returnRes] = await Promise.all([
+    const [profileRes, returnRes, reviewsRes] = await Promise.all([
       supabase.from('klippa_profiles').select('*').eq('id', uid).single(),
       supabase.from('klippa_tax_returns').select('*').eq('user_id', uid).order('tax_year', { ascending: false }).limit(1).single(),
+      supabase.from('klippa_logbook_reviews').select('review_week').eq('user_id', uid),
     ])
 
     const prof = profileRes.data as KlippaProfile | null
@@ -58,6 +75,11 @@ export default function Dashboard() {
 
     setProfile(prof)
     setTaxReturn(ret)
+
+    if (prof?.commute_km && prof.commute_km > 0) {
+      const reviewedKeys = (reviewsRes.data ?? []).map((r: { review_week: string }) => r.review_week)
+      setLogbookPending(countPendingLogbookWeeks(prof.tax_year, reviewedKeys))
+    }
 
     if (ret) {
       const [incRes, expRes] = await Promise.all([
@@ -258,6 +280,18 @@ export default function Dashboard() {
             </Link>
           ))}
         </div>
+
+        {/* Logbook review prompt */}
+        {logbookPending > 0 && (
+          <Link href="/mileage"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 transition-colors">
+            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-sm text-amber-200 flex-1">
+              <span className="font-semibold">{logbookPending} {logbookPending === 1 ? 'week' : 'weeks'} of logbook</span> {logbookPending === 1 ? 'needs' : 'need'} your review
+            </p>
+            <ChevronRight className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          </Link>
+        )}
 
         {/* Tax breakdown (visible when there's data) */}
         {taxResult && totalIncome > 0 && (
