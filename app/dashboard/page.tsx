@@ -211,9 +211,9 @@ export default function Dashboard() {
             icon={<TrendingUp className="w-4 h-4" />}
           />
           <MetricCard
-            label="Tax to Save"
+            label="Tax Provision"
             value={formatRand(Math.max(0, taxToSave))}
-            sub={taxResult ? `${((taxResult.taxPayable / Math.max(1, totalIncome)) * 100).toFixed(1)}% effective rate` : 'Add income to calculate'}
+            sub={taxResult ? `${((taxResult.taxPayable / Math.max(1, totalIncome)) * 100).toFixed(1)}% effective rate — set this aside` : 'Add income to calculate'}
             color="amber"
             icon={<AlertCircle className="w-4 h-4" />}
           />

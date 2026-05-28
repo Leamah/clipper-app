@@ -27,7 +27,7 @@ const PAIN_POINTS = [
 
 // Outcome-focused features (no tool names)
 const FEATURES = [
-  'Live "Tax to Save" meter so you always know what to set aside',
+  'Live tax provision meter so you always know exactly what to set aside for SARS',
   'Snap a receipt to see what is deductible and exactly how much',
   'Mixed-use intelligence: the right percentage for phone, laptop, home office',
   'Auto-generated mileage logbook, SARS-compliant',

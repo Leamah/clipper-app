@@ -20,11 +20,18 @@ body {
 
 /* Shared input style — used across all Klippa forms */
 .input {
-  @apply w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60 transition-colors;
+  @apply w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60 transition-colors;
+  min-height: 48px;
 }
 
 select.input {
   @apply cursor-pointer;
+}
+
+/* Prevent number spinners from interfering with click-to-select */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 0.4;
 }
 
 /* Progress bar shimmer */
