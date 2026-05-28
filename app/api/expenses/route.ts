@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { classifyExpense } from '@/lib/expense-classifier'
+import { analyzeMixedUse } from '@/lib/mixed-use-classifier'
 import type { KlippaProfile } from '@/lib/types'
 
 function createSupabaseServer() {
@@ -12,7 +13,8 @@ function createSupabaseServer() {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: (cs: { name: string; value: string; options?: object }[]) => cs.forEach(({ name, value, options }) => cookieStore.set(name, value, options as any)),
+        setAll: (cs: { name: string; value: string; options?: object }[]) =>
+          cs.forEach(({ name, value, options }) => cookieStore.set(name, value, options as any)),
       },
     }
   )
@@ -31,38 +33,68 @@ export async function POST(request: NextRequest) {
   }
 
   let classification = null
+  let mixedUse       = null
 
-  // If classify=true, run AI classification
   if (classify) {
     const { data: profile } = await supabase
       .from('klippa_profiles')
-      .select('employment_type, works_from_home, has_vehicle')
+      .select('employment_type, works_from_home, work_location, has_vehicle, home_office_pct')
       .eq('id', user.id)
       .single()
 
     if (profile) {
-      classification = await classifyExpense(
-        { merchant_name: merchant_name ?? '', amount: parseFloat(amount), description, expense_date },
-        profile as Pick<KlippaProfile, 'employment_type' | 'works_from_home' | 'has_vehicle'>
-      )
+      const expenseInput = {
+        merchant_name: merchant_name ?? '',
+        amount:        parseFloat(amount),
+        description,
+        expense_date,
+      }
+
+      // Run both classifiers in parallel
+      const [classResult, mixedResult] = await Promise.all([
+        classifyExpense(
+          expenseInput,
+          profile as Pick<KlippaProfile, 'employment_type' | 'works_from_home' | 'has_vehicle'>
+        ),
+        analyzeMixedUse(expenseInput, {
+          employment_type: profile.employment_type,
+          work_location:   profile.work_location ?? 'office_only',
+          works_from_home: profile.works_from_home,
+          has_vehicle:     profile.has_vehicle,
+          home_office_pct: profile.home_office_pct ?? 0,
+        }),
+      ])
+
+      classification = classResult
+      mixedUse       = mixedResult
     }
   }
+
+  // Use mixed-use percentage if available (more accurate), else fall back to basic classifier
+  const deductiblePct = mixedUse?.business_pct ?? classification?.deductible_percentage ?? 100
 
   const { data, error } = await supabase
     .from('klippa_expense_records')
     .insert({
       user_id:               user.id,
       tax_return_id:         tax_return_id ?? null,
-      category:              classification?.category ?? category ?? 'other',
+      category:              mixedUse?.category ?? classification?.category ?? category ?? 'other',
       merchant_name:         merchant_name ?? null,
       amount:                parseFloat(amount),
-      deductible_percentage: classification?.deductible_percentage ?? 100,
+      deductible_percentage: deductiblePct,
       expense_date:          expense_date ?? null,
       description:           description ?? null,
       classification_status: classify ? 'pending' : 'confirmed',
-      ai_confidence:         classification?.confidence ?? null,
-      ai_reasoning:          classification?.reasoning ?? null,
-      ai_audit_risk:         classification?.audit_risk ?? null,
+      ai_confidence:         mixedUse?.confidence        ?? classification?.confidence ?? null,
+      ai_reasoning:          mixedUse?.reasoning         ?? classification?.reasoning  ?? null,
+      ai_audit_risk:         mixedUse?.audit_risk        ?? classification?.audit_risk ?? null,
+      ai_is_mixed_use:       mixedUse?.is_mixed_use      ?? false,
+      ai_conservative_pct:   mixedUse?.conservative_pct  ?? null,
+      ai_aggressive_pct:     mixedUse?.aggressive_pct    ?? null,
+      ai_sars_rule:          mixedUse?.sars_rule         ?? null,
+      ai_audit_triggers:     mixedUse?.audit_triggers    ?? null,
+      ai_required_evidence:  mixedUse?.required_evidence ?? null,
+      ai_behavioral_tip:     mixedUse?.behavioral_tip    ?? null,
       capture_method:        'manual',
     })
     .select()
@@ -70,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ record: data, classification })
+  return NextResponse.json({ record: data, classification, mixedUse })
 }
 
 export async function PATCH(request: NextRequest) {

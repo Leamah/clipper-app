@@ -23,7 +23,7 @@ function formatDate(s: string | null) {
   return new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s))
 }
 
-// ── AI Classification card ────────────────────────────────
+// ── AI Classification card (with mixed-use intelligence) ──
 
 function AiResultCard({ record, onAccept, onReject, loading }: {
   record:   KlippaExpenseRecord
@@ -31,10 +31,12 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
   onReject: () => void
   loading:  boolean
 }) {
+  const [showEvidence, setShowEvidence] = useState(false)
+
   const riskColor = {
-    high:   'text-red-400',
-    medium: 'text-amber-400',
-    low:    'text-emerald-400',
+    high:   'text-red-400 bg-red-500/10',
+    medium: 'text-amber-400 bg-amber-500/10',
+    low:    'text-emerald-400 bg-emerald-500/10',
   }[record.ai_audit_risk ?? 'low']
 
   const confidenceColor = {
@@ -43,57 +45,133 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
     low:    'bg-red-500/15 text-red-300',
   }[record.ai_confidence ?? 'medium']
 
+  const isMixed      = record.ai_is_mixed_use
+  const conservative = record.ai_conservative_pct
+  const aggressive   = record.ai_aggressive_pct
+  const recommended  = record.deductible_percentage
+
   return (
     <div className="rounded-xl border border-zinc-700 bg-zinc-800/50 p-4 space-y-3">
+      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-0.5">
-          <p className="text-sm font-medium text-zinc-100">{record.merchant_name || '(no merchant)'}</p>
-          <p className="text-xs text-zinc-500">{formatDate(record.expense_date)}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-zinc-100">{record.merchant_name || '(no merchant)'}</p>
+            {isMixed && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 uppercase">Mixed use</span>
+            )}
+          </div>
+          <p className="text-xs text-zinc-500">{formatDate(record.expense_date)} · {EXPENSE_CATEGORY_LABELS[record.category]}</p>
         </div>
-        <div className="text-right">
+        <div className="text-right flex-shrink-0">
           <p className="text-sm font-bold text-zinc-100 tabular-nums">{formatRand(record.amount)}</p>
-          <p className="text-xs text-emerald-400 tabular-nums">Claim {formatRand(record.deductible_amount)}</p>
+          <p className="text-xs text-emerald-400 tabular-nums font-medium">Claim {formatRand(record.deductible_amount)}</p>
         </div>
       </div>
 
-      {/* AI result */}
-      <div className="rounded-lg bg-zinc-900/60 p-3 space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-zinc-400">{EXPENSE_CATEGORY_LABELS[record.category]}</span>
+      {/* SARS Rule — plain English */}
+      {record.ai_sars_rule && (
+        <div className="rounded-lg bg-zinc-900/80 border border-zinc-800 px-3 py-2.5">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">SARS says</p>
+          <p className="text-xs text-zinc-300 leading-relaxed">{record.ai_sars_rule}</p>
+        </div>
+      )}
+
+      {/* Reasoning */}
+      {record.ai_reasoning && (
+        <p className="text-xs text-zinc-400 leading-relaxed italic px-1">&ldquo;{record.ai_reasoning}&rdquo;</p>
+      )}
+
+      {/* Deductibility range (mixed-use) */}
+      {isMixed && conservative != null && aggressive != null ? (
+        <div className="rounded-lg bg-zinc-900/60 p-3 space-y-2.5">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide">Deductibility range</p>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="space-y-0.5">
+              <p className="text-xs text-zinc-500">Conservative</p>
+              <p className="text-sm font-bold text-zinc-400">{conservative}%</p>
+              <p className="text-xs text-zinc-600">{formatRand(record.amount * conservative / 100)}</p>
+            </div>
+            <div className="space-y-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 py-1">
+              <p className="text-xs text-emerald-400 font-medium">Recommended</p>
+              <p className="text-sm font-bold text-emerald-300">{recommended}%</p>
+              <p className="text-xs text-emerald-500">{formatRand(record.deductible_amount)}</p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-xs text-zinc-500">Maximum</p>
+              <p className="text-sm font-bold text-zinc-400">{aggressive}%</p>
+              <p className="text-xs text-zinc-600">{formatRand(record.amount * aggressive / 100)}</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap px-1">
+          <span className="text-xs text-zinc-400">{recommended}% deductible</span>
           {record.ai_confidence && (
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${confidenceColor}`}>
-              {record.ai_confidence} confidence
+              {record.ai_confidence}
             </span>
           )}
           {record.ai_audit_risk && (
-            <span className={`flex items-center gap-1 text-xs ${riskColor}`}>
+            <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${riskColor}`}>
               <ShieldAlert className="w-3 h-3" />
               {record.ai_audit_risk} audit risk
             </span>
           )}
         </div>
-        {record.ai_reasoning && (
-          <p className="text-xs text-zinc-400 leading-relaxed italic">&ldquo;{record.ai_reasoning}&rdquo;</p>
-        )}
-        <p className="text-xs text-zinc-500">{record.deductible_percentage}% deductible</p>
-      </div>
+      )}
+
+      {/* Behavioral tip */}
+      {record.ai_behavioral_tip && (
+        <div className="flex items-start gap-2 rounded-lg bg-blue-500/8 border border-blue-500/15 px-3 py-2">
+          <span className="text-blue-400 mt-0.5 flex-shrink-0">💡</span>
+          <p className="text-xs text-blue-300 leading-relaxed">{record.ai_behavioral_tip}</p>
+        </div>
+      )}
+
+      {/* Evidence & triggers toggle */}
+      {((record.ai_required_evidence?.length ?? 0) > 0 || (record.ai_audit_triggers?.length ?? 0) > 0) && (
+        <button onClick={() => setShowEvidence((v) => !v)}
+          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1">
+          <ChevronDown className={`w-3 h-3 transition-transform ${showEvidence ? 'rotate-180' : ''}`} />
+          {showEvidence ? 'Hide' : 'Show'} evidence required &amp; audit triggers
+        </button>
+      )}
+      {showEvidence && (
+        <div className="space-y-2 pt-1">
+          {(record.ai_required_evidence?.length ?? 0) > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Keep on file</p>
+              {record.ai_required_evidence!.map((e, i) => (
+                <div key={i} className="flex items-start gap-1.5 text-xs text-zinc-400">
+                  <span className="text-emerald-500 mt-0.5">•</span>{e}
+                </div>
+              ))}
+            </div>
+          )}
+          {(record.ai_audit_triggers?.length ?? 0) > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">SARS audit triggers</p>
+              {record.ai_audit_triggers!.map((t, i) => (
+                <div key={i} className="flex items-start gap-1.5 text-xs text-amber-400/80">
+                  <span className="mt-0.5">⚠</span>{t}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Accept / Reject */}
-      <div className="flex gap-2">
-        <button
-          onClick={onReject}
-          disabled={loading}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors disabled:opacity-50"
-        >
+      <div className="flex gap-2 pt-1">
+        <button onClick={onReject} disabled={loading}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors disabled:opacity-50">
           <X className="w-3.5 h-3.5" /> Not deductible
         </button>
-        <button
-          onClick={onAccept}
-          disabled={loading}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50"
-        >
+        <button onClick={onAccept} disabled={loading}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50">
           {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          Confirm claim
+          Confirm {recommended}% claim
         </button>
       </div>
     </div>

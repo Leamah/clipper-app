@@ -123,6 +123,14 @@ export interface KlippaExpenseRecord {
   ai_confidence:         ConfidenceLevel | null
   ai_reasoning:          string | null
   ai_audit_risk:         ConfidenceLevel | null
+  // Mixed-use intelligence fields
+  ai_is_mixed_use:       boolean | null
+  ai_conservative_pct:   number | null
+  ai_aggressive_pct:     number | null
+  ai_sars_rule:          string | null
+  ai_audit_triggers:     string[] | null
+  ai_required_evidence:  string[] | null
+  ai_behavioral_tip:     string | null
   capture_method:        string
   created_at:            string
 }
