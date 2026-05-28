@@ -107,16 +107,19 @@ export default function FilingPage() {
   const totalDeductible   = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
 
   const taxResult = calculateTax({
-    grossIncome:      totalIncome,
-    raContributions:  profile.has_ra ? Math.min(totalIncome * 0.275, 350_000) : 0,
-    homeofficePct:    profile.works_from_home ? profile.home_office_pct : 0,
-    homeExpenses:     0,
-    businessKm:       0,
-    totalKm:          0,
-    vehicleValue:     0,
-    otherDeductions:  totalDeductible,
-    age:              35,
-    employeesTaxPaid: 0,
+    grossIncome:          totalIncome,
+    raContributions:      profile.has_ra ? Math.min(totalIncome * 0.275, 350_000) : 0,
+    pensionContributions: profile.has_pension ? (profile.pension_contributions ?? 0) : 0,
+    homeofficePct:        profile.works_from_home ? profile.home_office_pct : 0,
+    homeExpenses:         0,
+    businessKm:           0,
+    totalKm:              0,
+    vehicleValue:         profile.vehicle_value ?? 0,
+    medicalAidMembers:    profile.has_medical ? (profile.medical_aid_members ?? 1) : 0,
+    interestIncome:       0,
+    otherDeductions:      totalDeductible,
+    age:                  35,
+    employeesTaxPaid:     0,
   })
 
   const deadline = getITR12Deadline(taxReturn.tax_year)

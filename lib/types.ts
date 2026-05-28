@@ -3,6 +3,7 @@
 // ============================================================
 
 export type EmploymentType = 'freelance' | 'employee' | 'mixed'
+export type WorkLocation   = 'home_only' | 'hybrid' | 'office_only'
 
 export type ReturnType = 'ITR12' | 'IRP6'
 
@@ -48,20 +49,29 @@ export type SubscriptionTier = 'free' | 'starter' | 'professional' | 'admin'
 // ── Database Row Types ─────────────────────────────────────
 
 export interface KlippaProfile {
-  id:                  string
-  full_name:           string | null
-  tax_number:          string | null
-  id_number:           string | null
-  employment_type:     EmploymentType
-  works_from_home:     boolean
-  home_office_pct:     number
-  has_vehicle:         boolean
-  has_ra:              boolean
-  tax_year:            number
-  subscription_tier:   SubscriptionTier
-  onboarding_complete: boolean
-  created_at:          string
-  updated_at:          string
+  id:                   string
+  full_name:            string | null
+  tax_number:           string | null
+  id_number:            string | null
+  employment_type:      EmploymentType
+  work_location:        WorkLocation          // home_only | hybrid | office_only
+  works_from_home:      boolean               // true when work_location !== 'office_only'
+  home_office_pct:      number
+  has_vehicle:          boolean
+  vehicle_value:        number                // for SARS fixed-cost table
+  has_ra:               boolean
+  has_pension:          boolean
+  pension_contributions: number
+  has_medical:          boolean
+  medical_aid_members:  number               // incl. main member
+  has_tfsa:             boolean
+  has_interest_savings: boolean
+  date_of_birth:        string | null        // ISO date — for age-based rebates & interest exemption
+  tax_year:             number
+  subscription_tier:    SubscriptionTier
+  onboarding_complete:  boolean
+  created_at:           string
+  updated_at:           string
 }
 
 export interface KlippaTaxReturn {
@@ -122,6 +132,7 @@ export interface KlippaDocument {
   user_id:           string
   tax_return_id:     string | null
   document_type:     DocumentType
+  expense_category:  ExpenseCategory | null   // for receipt grouping by spend type
   original_filename: string | null
   storage_path:      string | null
   file_size_bytes:   number | null
@@ -151,34 +162,39 @@ export interface KlippaMileageTrip {
 // ── Tax Engine Types ───────────────────────────────────────
 
 export interface TaxCalculationInput {
-  grossIncome:       number
-  raContributions:   number
-  homeofficePct:     number
-  homeExpenses:      number  // annual rent + rates + elec + levies
-  businessKm:        number
-  totalKm:           number
-  vehicleValue:      number  // for SARS fixed cost table lookup
-  otherDeductions:   number  // sum of confirmed expense deductible_amount
-  age:               number  // for rebate tier
-  employeesTaxPaid:  number  // PAYE already deducted (IRP5 code 4102)
+  grossIncome:          number
+  raContributions:      number
+  pensionContributions: number    // combined with RA under Section 11F
+  homeofficePct:        number
+  homeExpenses:         number    // annual rent + rates + elec + levies
+  businessKm:           number
+  totalKm:              number
+  vehicleValue:         number    // for SARS fixed cost table lookup
+  medicalAidMembers:    number    // 0 = no medical aid; 1+ = members incl. main
+  interestIncome:       number    // for annual exemption calc
+  otherDeductions:      number    // sum of confirmed expense deductible_amount
+  age:                  number    // for rebate tier + interest exemption threshold
+  employeesTaxPaid:     number    // PAYE already deducted (IRP5 code 4102)
 }
 
 export interface TaxCalculationResult {
-  grossIncome:      number
-  section11fRa:     number  // RA deduction (Section 11F)
-  homeOffice:       number
-  travel:           number
-  otherDeductions:  number
-  totalDeductions:  number
-  taxableIncome:    number
-  grossTax:         number
-  primaryRebate:    number
-  secondaryRebate:  number
-  tertiaryRebate:   number
-  totalRebates:     number
-  taxPayable:       number
-  employeesTaxPaid: number
-  netTaxPayable:    number  // positive = owe SARS, negative = refund
+  grossIncome:          number
+  section11fRa:         number    // RA + pension deduction (Section 11F)
+  homeOffice:           number
+  travel:               number
+  interestExemption:    number    // exempt portion of interest income
+  otherDeductions:      number
+  totalDeductions:      number
+  taxableIncome:        number
+  grossTax:             number
+  primaryRebate:        number
+  secondaryRebate:      number
+  tertiaryRebate:       number
+  totalRebates:         number
+  medicalAidCredits:    number    // Section 6A — reduces tax payable directly
+  taxPayable:           number    // after rebates + medical credits
+  employeesTaxPaid:     number
+  netTaxPayable:        number    // positive = owe SARS, negative = refund
 }
 
 // ── AI Classification Types ────────────────────────────────
@@ -190,6 +206,17 @@ export interface ClassificationResult {
   reasoning:             string
   audit_risk:            ConfidenceLevel
   suggested_claim:       number
+}
+
+// ── OCR Extraction Result ─────────────────────────────────
+
+export interface OcrExtractedReceipt {
+  merchant_name: string | null
+  amount:        number | null
+  expense_date:  string | null
+  description:   string | null
+  vat_amount:    number | null
+  confidence:    number          // 0–1
 }
 
 // ── Plain-English Category Labels ─────────────────────────
@@ -219,14 +246,20 @@ export const INCOME_TYPE_LABELS: Record<IncomeType, string> = {
   other:      'Other Income',
 }
 
+export const WORK_LOCATION_LABELS: Record<WorkLocation, string> = {
+  home_only:   'Fully Remote (Home Only)',
+  hybrid:      'Hybrid (Home + Office)',
+  office_only: 'Office / On-site Only',
+}
+
 // Client entertainment is only 50% deductible per SARS
 export const CATEGORY_DEFAULT_DEDUCTIBLE_PCT: Record<ExpenseCategory, number> = {
-  phone_internet:         65,  // typical business usage estimate
+  phone_internet:         65,   // typical business usage estimate
   home_office:            100,
   vehicle_travel:         100,
   equipment:              100,
   software_subscriptions: 100,
-  client_entertainment:   50,  // SARS rule: max 50%
+  client_entertainment:   50,   // SARS rule: max 50%
   professional_fees:      100,
   training:               100,
   marketing:              100,

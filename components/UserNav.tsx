@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { LogOut, Shield, User } from 'lucide-react'
+import { LogOut, Shield, User, Car } from 'lucide-react'
 import type { KlippaProfile } from '@/lib/types'
 
 export default function UserNav() {
@@ -80,6 +80,14 @@ export default function UserNav() {
                   Admin panel
                 </Link>
               )}
+              <Link
+                href="/mileage"
+                onClick={() => setOpen(false)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                <Car className="w-3.5 h-3.5 text-zinc-500" />
+                Mileage logbook
+              </Link>
               <Link
                 href="/settings"
                 onClick={() => setOpen(false)}

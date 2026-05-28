@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 import UserNav from '@/components/UserNav'
 import {
   ShieldCheck, Plus, FileSpreadsheet, Trash2, Loader2,
-  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert
+  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, Camera
 } from 'lucide-react'
 import type { KlippaExpenseRecord, KlippaTaxReturn, ExpenseCategory, IncomeType } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS, CATEGORY_DEFAULT_DEDUCTIBLE_PCT } from '@/lib/types'
@@ -114,9 +114,46 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
     description:   '',
     category:      'other' as ExpenseCategory,
   })
-  const [doClassify, setDoClassify] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError]   = useState<string | null>(null)
+  const [doClassify,  setDoClassify]  = useState(true)
+  const [scanning,    setScanning]    = useState(false)
+  const [scanStatus,  setScanStatus]  = useState<'idle' | 'scanning' | 'done' | 'failed'>('idle')
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // ── Receipt scan via OCR ──────────────────────────────────
+  const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setScanning(true)
+    setScanStatus('scanning')
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      if (taxReturnId) fd.append('tax_return_id', taxReturnId)
+      const res  = await fetch('/api/documents/ocr', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'OCR failed')
+
+      const ext = data.extracted
+      // Pre-fill whatever was extracted — user can correct
+      setForm((f) => ({
+        ...f,
+        merchant_name: ext.merchant_name ?? f.merchant_name,
+        amount:        ext.amount != null ? String(ext.amount) : f.amount,
+        expense_date:  ext.expense_date ?? f.expense_date,
+      }))
+      setScanStatus('done')
+      setDoClassify(true)   // auto-enable AI classify after scan
+    } catch (e: unknown) {
+      setScanStatus('failed')
+      setError(e instanceof Error ? e.message : 'Receipt scan failed')
+    } finally {
+      setScanning(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -144,8 +181,37 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
       <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-white">Add expense</h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+          <div className="flex items-center gap-2">
+            {/* Scan receipt button */}
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleScan} />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={scanning}
+              title="Scan receipt"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                scanStatus === 'done'
+                  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300'
+                  : scanStatus === 'failed'
+                  ? 'border-red-500/50 text-red-400'
+                  : 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+              }`}
+            >
+              {scanning
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Camera className="w-3.5 h-3.5" />
+              }
+              {scanning ? 'Scanning…' : scanStatus === 'done' ? 'Receipt scanned ✓' : 'Scan receipt'}
+            </button>
+            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+          </div>
         </div>
+
+        {scanStatus === 'done' && (
+          <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+            Receipt scanned — fields pre-filled. Check and confirm below.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Merchant / Description">
@@ -191,7 +257,6 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
             />
           </Field>
 
-          {/* Category — shown only when not using AI */}
           {!doClassify && (
             <Field label="Category">
               <select
@@ -206,7 +271,6 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
             </Field>
           )}
 
-          {/* AI classify toggle */}
           <button
             type="button"
             onClick={() => setDoClassify((v) => !v)}
