@@ -57,11 +57,15 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // Admin routes: require subscription_tier === 'admin' (or set via profile)
+    const isAdmin = profile?.subscription_tier === 'admin'
+
+    // Admin routes: require subscription_tier === 'admin'
     if (isAdminRoute || isApiAdminRoute) {
-      if (profile?.subscription_tier !== 'admin') {
-        return NextResponse.redirect(new URL('/', request.url))
+      if (!isAdmin) {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
       }
+      // Admin users can always access /admin regardless of onboarding state
+      return response
     }
 
     // Redirect to onboarding if profile not complete (except when already there)

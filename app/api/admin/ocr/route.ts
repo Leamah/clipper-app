@@ -4,7 +4,7 @@ import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 
 export async function GET() {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
 
   const anon = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,12 +30,14 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) {
+    return NextResponse.json({ error: 'Service role key not configured' }, { status: 500 })
+  }
 
-  const { data: docs, error } = await admin
+  const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
+
+  const { data: docs, error } = await adminClient
     .from('klippa_documents')
     .select('id, user_id, document_type, original_filename, ocr_status, created_at')
     .order('created_at', { ascending: false })
