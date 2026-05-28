@@ -25,21 +25,21 @@ const PAIN_POINTS = [
   'Am I leaving deductions on the table?',
 ]
 
-// Outcome-focused features — no tool names
+// Outcome-focused features (no tool names)
 const FEATURES = [
-  'Live "Tax to Save" meter — always know what to set aside each month',
-  'Snap a receipt — know if it\'s deductible, and exactly how much',
-  'Mixed-use intelligence — right percentage for phone, laptop, home office',
+  'Live "Tax to Save" meter so you always know what to set aside',
+  'Snap a receipt to see what is deductible and exactly how much',
+  'Mixed-use intelligence: the right percentage for phone, laptop, home office',
   'Auto-generated mileage logbook, SARS-compliant',
   'Step-by-step eFiling guide with exact SARS line numbers',
-  'Audit-ready evidence list — know what to keep before SARS asks',
+  'Audit-ready evidence list so you know what to keep before SARS asks',
 ]
 
-// Mixed-use proof points — the hard questions Klippa answers
+// Mixed-use proof points: the hard questions Klippa answers
 const MIXED_USE_EXAMPLES = [
   {
     icon:    <Smartphone className="w-4 h-4 text-emerald-400" />,
-    q:       'My phone contract — personal and work. What do I claim?',
+    q:       'My phone contract, personal and work. What do I claim?',
     answer:  'Klippa looks at your work setup and says: 65%. Here\'s why, and here\'s what to keep.',
   },
   {
@@ -49,18 +49,18 @@ const MIXED_USE_EXAMPLES = [
   },
   {
     icon:    <Coffee className="w-4 h-4 text-emerald-400" />,
-    q:       'That restaurant receipt — was it a business meal?',
+    q:       'That restaurant receipt: was it a business meal?',
     answer:  'Client present: 50% max under SARS rules. Solo lunch: 0%. Klippa knows the difference.',
   },
   {
     icon:    <Car className="w-4 h-4 text-emerald-400" />,
     q:       'Do I need a logbook or just my fuel receipts?',
-    answer:  'Logbook is mandatory — fuel receipts alone get disallowed. Klippa builds the logbook for you.',
+    answer:  'A logbook is mandatory. Fuel receipts alone get disallowed. Klippa builds the logbook for you.',
   },
   {
     icon:    <Home className="w-4 h-4 text-emerald-400" />,
     q:       'My home office is also my living room. Can I still claim?',
-    answer:  'Yes — with conditions. Klippa calculates the deductible percentage from your floor plan percentage.',
+    answer:  'Yes, with conditions. Klippa calculates the deductible percentage based on your floor plan.',
   },
 ]
 
@@ -69,7 +69,7 @@ const HOW_IT_WORKS = [
     icon:  <TrendingUp className="w-5 h-5 text-emerald-400" />,
     step:  '01',
     title: 'Tell Klippa how you work',
-    body:  'Two minutes to set up. Employment type, home office, vehicle, RA — we tailor everything to your situation.',
+    body:  'Two minutes to set up. Employment type, home office, vehicle, RA: we tailor everything to your situation.',
   },
   {
     icon:  <ShieldCheck className="w-5 h-5 text-emerald-400" />,
@@ -81,11 +81,11 @@ const HOW_IT_WORKS = [
     icon:  <FileCheck className="w-5 h-5 text-emerald-400" />,
     step:  '03',
     title: 'File with confidence',
-    body:  'Get a personalised eFiling guide — exact rand values, exact SARS line numbers. You fill the form in 20 minutes. We did the hard part.',
+    body:  'Get a personalised eFiling guide with exact rand values and SARS line numbers. Fill it in under 10 minutes.',
   },
 ]
 
-// Who Klippa is for — explicit and broad
+// Who Klippa is for (explicit and broad)
 const WHO_ITS_FOR = [
   'Freelancers',
   'Contractors',
@@ -156,8 +156,7 @@ export default function LandingPage() {
 
           <p className="text-lg sm:text-xl text-zinc-400 leading-relaxed max-w-lg">
             Klippa tracks your income, figures out exactly what you can
-            deduct — and how much — then walks you through eFiling step by step.
-            No accountant required.
+            deduct and how much, then walks you through eFiling step by step.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3">
@@ -204,7 +203,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Mixed-use intelligence — the hard questions */}
+      {/* Mixed-use intelligence */}
       <section className="relative z-10 border-t border-zinc-800/50">
         <div className="max-w-5xl mx-auto px-6 py-20">
           <div className="space-y-3 mb-14">
@@ -215,7 +214,7 @@ export default function LandingPage() {
             </h2>
             <p className="text-sm text-zinc-500 leading-relaxed max-w-lg">
               Most deductions are partially claimable. SARS has specific rules for each.
-              Klippa knows them — and tells you the defensible range so you can claim with confidence, not guesswork.
+              Klippa knows them and gives you a defensible range, so you can claim with confidence.
             </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -231,7 +230,7 @@ export default function LandingPage() {
                 <p className="text-xs text-zinc-500 leading-relaxed">{ex.answer}</p>
               </div>
             ))}
-            {/* Sixth card — open invite */}
+            {/* Sixth card */}
             <div className="rounded-2xl border border-emerald-700/30 bg-emerald-950/20 p-5 flex flex-col justify-between gap-4">
               <p className="text-sm font-medium text-emerald-300 leading-snug">
                 Got an expense you&apos;re not sure about?
@@ -282,8 +281,8 @@ export default function LandingPage() {
                 <span className="text-zinc-600">Nothing they don&apos;t.</span>
               </h2>
               <p className="text-sm text-zinc-500 leading-relaxed">
-                Built specifically for the South African tax system — ITR12, SARS deduction rules, and
-                real eFiling workflows. Not generic accounting software.
+                Built specifically for the South African tax system: ITR12, SARS deduction rules,
+                and real eFiling workflows.
               </p>
             </div>
             <ul className="space-y-3 pt-1">
@@ -305,10 +304,10 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-6 py-20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="space-y-1">
             <p className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Stop guessing what SARS wants.
+              Know what you owe. File with confidence.
             </p>
             <p className="text-sm text-zinc-500">
-              Join South Africans who work for themselves and file with confidence.
+              Join South Africans who work for themselves and take control of their tax.
             </p>
           </div>
           <Link
