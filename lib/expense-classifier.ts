@@ -1,14 +1,18 @@
 // ============================================================
-// Klippa Expense Classifier — Claude API
+// Klippa Expense Classifier — OpenAI API
 // CRITICAL: Only classifies individual expenses.
 //           Never generates tax totals or tax advice.
 // ============================================================
 
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import type { ClassificationResult, ExpenseCategory, ConfidenceLevel, KlippaProfile } from './types'
 import { CATEGORY_DEFAULT_DEDUCTIBLE_PCT } from './types'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+let _openai: OpenAI | null = null
+function getOpenAI() {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
 
 interface ExpenseInput {
   merchant_name: string
@@ -58,14 +62,18 @@ Return JSON with these exact fields:
   "audit_risk": "high" | "medium" | "low"
 }`
 
-  const response = await client.messages.create({
-    model:      'claude-haiku-4-5-20251001',
-    max_tokens: 512,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: userPrompt }],
+  const response = await getOpenAI().chat.completions.create({
+    model:       'gpt-4o-mini',
+    max_tokens:  512,
+    temperature: 0,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user',   content: userPrompt },
+    ],
   })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const text = response.choices[0]?.message?.content ?? ''
 
   let parsed: {
     category:              string
@@ -76,11 +84,8 @@ Return JSON with these exact fields:
   }
 
   try {
-    // Strip markdown fences if present
-    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    parsed = JSON.parse(clean)
+    parsed = JSON.parse(text)
   } catch {
-    // Fallback: unclassified
     return {
       category:              'other',
       deductible_percentage: 0,
@@ -106,12 +111,11 @@ Return JSON with these exact fields:
   }
 }
 
-// Batch classify for CSV import
+// Batch classify for CSV import (max 5 concurrent)
 export async function classifyExpenses(
   expenses: ExpenseInput[],
   profile: Pick<KlippaProfile, 'employment_type' | 'works_from_home' | 'has_vehicle'>
 ): Promise<ClassificationResult[]> {
-  // Process in parallel with concurrency limit of 5
   const results: ClassificationResult[] = []
   const batchSize = 5
 
