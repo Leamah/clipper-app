@@ -177,7 +177,11 @@ export default function Dashboard() {
   const deadline = getITR12Deadline(taxYear)
   const daysLeft = daysUntilDeadline(deadline)
 
-  // ── Completion % ─────────────────────────────────────────
+  // ── Profile completion ───────────────────────────────────
+
+  const profileCompletion = profile ? calcProfileCompletion(profile) : null
+
+  // ── Return completion % ──────────────────────────────────
 
   const hasIncome   = incomeRecords.length > 0
   const hasExpenses = expenseRecords.length > 0
@@ -258,6 +262,11 @@ export default function Dashboard() {
             highlight
           />
         </div>
+
+        {/* Profile completion */}
+        {profileCompletion && (
+          <ProfileCompletionCard completion={profileCompletion} />
+        )}
 
         {/* Progress + next action */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -396,6 +405,114 @@ export default function Dashboard() {
 
       </main>
     </div>
+  )
+}
+
+// ── Profile completion helpers ────────────────────────────
+
+interface ProfileCompletionResult {
+  pct:     number
+  done:    number
+  total:   number
+  missing: string[]
+}
+
+function calcProfileCompletion(profile: KlippaProfile): ProfileCompletionResult {
+  const checks: Array<{ label: string; done: boolean; applicable: boolean }> = [
+    { label: 'Full name',              done: !!profile.full_name?.trim(),             applicable: true },
+    { label: 'Date of birth',          done: !!profile.date_of_birth,                  applicable: true },
+    { label: 'SARS tax number',        done: !!profile.tax_number?.trim(),             applicable: true },
+    { label: 'ID / passport number',   done: !!profile.id_number?.trim(),              applicable: true },
+    { label: 'Home office %',          done: (profile.home_office_pct   ?? 0) > 0,    applicable: profile.works_from_home },
+    { label: 'Annual home costs',      done: (profile.home_expenses_annual ?? 0) > 0, applicable: profile.works_from_home },
+    { label: 'Vehicle value',          done: (profile.vehicle_value     ?? 0) > 0,    applicable: profile.has_vehicle },
+    { label: 'Daily commute (km)',     done: (profile.commute_km        ?? 0) > 0,    applicable: profile.has_vehicle },
+    { label: 'RA contributions',       done: (profile.ra_contributions  ?? 0) > 0,    applicable: profile.has_ra },
+    { label: 'Pension contributions',  done: (profile.pension_contributions ?? 0) > 0,applicable: profile.has_pension },
+    { label: 'Medical aid members',    done: (profile.medical_aid_members ?? 0) > 0,  applicable: profile.has_medical },
+  ]
+
+  const applicable = checks.filter(c => c.applicable)
+  const done       = applicable.filter(c => c.done).length
+  const total      = applicable.length
+  const pct        = total === 0 ? 100 : Math.round((done / total) * 100)
+  const missing    = applicable.filter(c => !c.done).map(c => c.label)
+
+  return { pct, done, total, missing }
+}
+
+function ProfileCompletionCard({ completion }: { completion: ProfileCompletionResult }) {
+  const { pct, done, total, missing } = completion
+  const complete = pct === 100
+
+  // SVG donut ring — circumference ≈ 100 with r = 15.915
+  const r   = 15.915
+  const circ = 2 * Math.PI * r  // ≈ 100
+
+  return (
+    <Link
+      href="/settings"
+      className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all ${
+        complete
+          ? 'border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10'
+          : 'border-zinc-800 bg-zinc-900/40 hover:border-emerald-500/30 hover:bg-zinc-900/60'
+      }`}
+    >
+      {/* Donut progress ring */}
+      <div className="relative flex-shrink-0 w-14 h-14">
+        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+          <circle
+            cx="18" cy="18" r={r}
+            fill="none" stroke="#27272a" strokeWidth="2.5"
+          />
+          <circle
+            cx="18" cy="18" r={r}
+            fill="none"
+            stroke={complete ? '#10b981' : '#10b981'}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={`${(pct / 100) * circ} ${circ}`}
+            className="transition-all duration-700"
+          />
+        </svg>
+        <span className={`absolute inset-0 flex items-center justify-center text-sm font-bold ${complete ? 'text-emerald-400' : 'text-white'}`}>
+          {pct}%
+        </span>
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-zinc-100">
+            {complete ? 'Tax profile complete' : 'Tax profile setup'}
+          </p>
+          <span className="text-xs text-zinc-500 flex-shrink-0">{done}/{total} items</span>
+        </div>
+
+        {complete ? (
+          <p className="text-xs text-emerald-400">All details filled in — your tax calculations are accurate</p>
+        ) : (
+          <>
+            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            {missing.length > 0 && (
+              <p className="text-xs text-zinc-500 leading-snug">
+                <span className="text-zinc-400">Still needed: </span>
+                {missing.slice(0, 2).join(', ')}
+                {missing.length > 2 && <span className="text-zinc-600"> +{missing.length - 2} more</span>}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Arrow */}
+      <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${complete ? 'text-emerald-500/50 group-hover:text-emerald-400' : 'text-zinc-600 group-hover:text-emerald-400'}`} />
+    </Link>
   )
 }
 
