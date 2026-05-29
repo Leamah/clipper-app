@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { LogOut, Shield, User, Car } from 'lucide-react'
+import { LogOut, Shield, User, Car, Settings } from 'lucide-react'
 import type { KlippaProfile } from '@/lib/types'
 
 export default function UserNav() {
@@ -32,15 +32,6 @@ export default function UserNav() {
 
   return (
     <div className="flex items-center gap-2">
-      <a
-        href="/auth/signout"
-        className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-red-400 hover:bg-red-900/10 transition-colors"
-        title="Sign out"
-      >
-        <LogOut className="w-3.5 h-3.5" />
-        Sign out
-      </a>
-
       <div className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
@@ -60,48 +51,55 @@ export default function UserNav() {
         {open && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-            <div className="absolute right-0 top-full mt-2 z-50 w-52 rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl shadow-black/40 overflow-hidden">
-              <div className="px-3 py-3 border-b border-zinc-800">
+            <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl shadow-black/40 overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800">
                 <p className="text-xs text-zinc-400 truncate">{email}</p>
-                <p className="text-xs font-medium text-zinc-200 mt-0.5 capitalize flex items-center gap-1">
+                <p className="text-xs font-medium text-zinc-200 mt-0.5 capitalize flex items-center gap-1.5">
                   {isAdmin || isPro
-                    ? <Shield className="w-3 h-3 text-emerald-400" />
-                    : <User className="w-3 h-3 text-zinc-500" />}
+                    ? <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                    : <User className="w-3.5 h-3.5 text-zinc-500" />}
                   {isAdmin ? 'Admin' : isPro ? 'Professional' : 'Free plan'}
                 </p>
               </div>
-              {isAdmin && (
+
+              <div className="py-1">
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                  >
+                    <Shield className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    Admin panel
+                  </Link>
+                )}
                 <Link
-                  href="/admin"
+                  href="/mileage"
                   onClick={() => setOpen(false)}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                 >
-                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                  Admin panel
+                  <Car className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                  Mileage logbook
                 </Link>
-              )}
-              <Link
-                href="/mileage"
-                onClick={() => setOpen(false)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
-              >
-                <Car className="w-3.5 h-3.5 text-zinc-500" />
-                Mileage logbook
-              </Link>
-              <Link
-                href="/settings"
-                onClick={() => setOpen(false)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
-              >
-                Tax profile settings
-              </Link>
-              <a
-                href="/auth/signout"
-                className="sm:hidden w-full flex items-center gap-2 px-3 py-2.5 text-xs text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Sign out
-              </a>
+                <Link
+                  href="/settings"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                >
+                  <Settings className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                  Tax profile settings
+                </Link>
+              </div>
+
+              <div className="border-t border-zinc-800 py-1">
+                <a
+                  href="/auth/signout"
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-colors"
+                >
+                  <LogOut className="w-4 h-4 flex-shrink-0" />
+                  Sign out
+                </a>
+              </div>
             </div>
           </>
         )}
