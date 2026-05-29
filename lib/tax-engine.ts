@@ -372,6 +372,7 @@ export const SARS_DEDUCTION_CODES: Record<string, { code: string; label: string 
   medical:         { code: '4116', label: 'Medical aid contributions (Section 6A credits)' },
   other_biz:       { code: '4018', label: 'Other deductions' },
   interest_exempt: { code: '4201', label: 'Local interest — exempt portion' },
+  employees_tax:   { code: '4102', label: 'Employees\' tax (PAYE) already deducted (IRP5)' },
 }
 
 // backward-compat re-export

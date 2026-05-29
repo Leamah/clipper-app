@@ -8,8 +8,8 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import UserNav from '@/components/UserNav'
-import { ShieldCheck, Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check } from 'lucide-react'
-import type { KlippaIncomeRecord, KlippaTaxReturn, IncomeType } from '@/lib/types'
+import { ShieldCheck, Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase } from 'lucide-react'
+import type { KlippaProfile, KlippaIncomeRecord, KlippaTaxReturn, IncomeType } from '@/lib/types'
 import { INCOME_TYPE_LABELS } from '@/lib/types'
 import Papa from 'papaparse'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
@@ -150,6 +150,7 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
 }) {
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([])
   const [selected,     setSelected]     = useState<Set<number>>(new Set())
+  const [rowTypes,     setRowTypes]     = useState<Record<number, IncomeType>>({})
   const [bankName,     setBankName]     = useState<string | null>(null)
   const [errors,       setErrors]       = useState<string[]>([])
   const [saving,       setSaving]       = useState(false)
@@ -168,6 +169,10 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
       setBankName(result.bank)
       setErrors(result.errors)
       setSelected(new Set(credits.map((_, i) => i)))
+      // Default every row to 'freelance' — user can change per row before importing
+      const types: Record<number, IncomeType> = {}
+      credits.forEach((_, i) => { types[i] = 'freelance' })
+      setRowTypes(types)
     }
     reader.readAsText(file)
   }
@@ -178,23 +183,26 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
     return next
   })
 
+  const setRowType = (i: number, t: IncomeType) =>
+    setRowTypes((prev) => ({ ...prev, [i]: t }))
+
   const handleImport = async () => {
     if (selected.size === 0) return
     setSaving(true)
     setSaveError(null)
     try {
-      const toImport = [...selected].map((i) => transactions[i])
+      const toImport = [...selected].map((i) => ({ idx: i, tx: transactions[i] }))
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      const rows = toImport.map((t) => ({
+      const rows = toImport.map(({ idx, tx }) => ({
         user_id:        user.id,
         tax_return_id:  taxReturnId ?? null,
-        source_name:    t.description || 'Bank credit',
-        income_type:    'freelance' as IncomeType,
-        amount:         t.amount,
-        received_date:  t.date,
-        description:    t.description,
+        source_name:    tx.description || 'Bank credit',
+        income_type:    rowTypes[idx] ?? 'freelance',
+        amount:         tx.amount,
+        received_date:  tx.date,
+        description:    tx.description,
         capture_method: 'csv_import',
       }))
 
@@ -211,7 +219,7 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5 max-h-[80vh] flex flex-col">
+      <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5 max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between flex-shrink-0">
           <h3 className="font-semibold text-white">Import from bank statement</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
@@ -234,16 +242,25 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
           <>
             <div className="flex-shrink-0 space-y-1">
               <p className="text-xs text-zinc-500">{bankName && `Detected: ${bankName} · `}{transactions.length} credit transactions found</p>
-              <p className="text-xs text-zinc-600">Select the ones to import as income. Deselect personal transfers.</p>
+              <p className="text-xs text-zinc-600">Check or uncheck rows to include. Set the income type for each row before importing.</p>
             </div>
+
+            {/* Column headers */}
+            <div className="flex items-center gap-3 px-3 flex-shrink-0">
+              <div className="w-4 flex-shrink-0" />
+              <span className="flex-1 text-xs font-medium text-zinc-500 uppercase tracking-wider">Description</span>
+              <span className="w-32 text-xs font-medium text-zinc-500 uppercase tracking-wider flex-shrink-0">Type</span>
+              <span className="w-24 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider flex-shrink-0">Amount</span>
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
               {transactions.map((t, i) => (
-                <button
+                <div
                   key={i}
-                  onClick={() => toggle(i)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer ${
                     selected.has(i) ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-zinc-800/50 border border-transparent'
                   }`}
+                  onClick={() => toggle(i)}
                 >
                   <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${selected.has(i) ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'}`}>
                     {selected.has(i) && <Check className="w-2.5 h-2.5 text-white" />}
@@ -252,8 +269,19 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
                     <p className="truncate text-zinc-200">{t.description}</p>
                     <p className="text-xs text-zinc-500">{formatDate(t.date)}</p>
                   </div>
-                  <span className="text-emerald-400 font-medium tabular-nums flex-shrink-0">{formatRand(t.amount)}</span>
-                </button>
+                  {/* Per-row income type selector — stop click propagation so it doesn't toggle the row */}
+                  <select
+                    value={rowTypes[i] ?? 'freelance'}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setRowType(i, e.target.value as IncomeType)}
+                    className="w-32 flex-shrink-0 bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  >
+                    {(Object.entries(INCOME_TYPE_LABELS) as [IncomeType, string][]).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                  <span className="w-24 text-right text-emerald-400 font-medium tabular-nums flex-shrink-0">{formatRand(t.amount)}</span>
+                </div>
               ))}
             </div>
             {saveError && <p className="text-xs text-red-400 flex-shrink-0">{saveError}</p>}
@@ -271,12 +299,77 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
   )
 }
 
+// ── PAYE Card ─────────────────────────────────────────────
+
+function PayeCard({ taxReturn, onSaved }: {
+  taxReturn: KlippaTaxReturn
+  onSaved:   (amount: number) => void
+}) {
+  const [raw,     setRaw]     = useState(String(taxReturn.employees_tax_paid ?? 0))
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
+
+  const handleSave = async () => {
+    const amount = parseFloat(raw) || 0
+    setSaving(true)
+    setError(null)
+    const { error: err } = await supabase
+      .from('klippa_tax_returns')
+      .update({ employees_tax_paid: amount })
+      .eq('id', taxReturn.id)
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    onSaved(amount)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Briefcase className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+        <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">PAYE deducted by employer</p>
+      </div>
+      <p className="text-sm text-zinc-500 leading-relaxed">
+        If you also received a salary and your employer deducted PAYE (Employees&apos; Tax), enter the total
+        for the year here. This reduces your net tax payable on assessment (IRP5 source code 4102).
+      </p>
+      <div className="flex items-end gap-3">
+        <div className="flex-1 space-y-1.5">
+          <label className="text-xs font-medium text-zinc-400">Annual PAYE deducted (R)</label>
+          <input
+            type="number"
+            min="0"
+            step="100"
+            value={raw}
+            onChange={(e) => { setRaw(e.target.value); setSaved(false) }}
+            onFocus={(e) => e.target.select()}
+            placeholder="e.g. 45000"
+            className="input w-full font-mono"
+          />
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors flex-shrink-0"
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : null}
+          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────
 
 function IncomePage() {
   const searchParams = useSearchParams()
   const [records,      setRecords]      = useState<KlippaIncomeRecord[]>([])
   const [taxReturn,    setTaxReturn]    = useState<KlippaTaxReturn | null>(null)
+  const [profile,      setProfile]      = useState<KlippaProfile | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [showAdd,      setShowAdd]      = useState(searchParams.get('add') === '1')
   const [showCSV,      setShowCSV]      = useState(false)
@@ -286,15 +379,13 @@ function IncomePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: ret } = await supabase
-      .from('klippa_tax_returns')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('tax_year', { ascending: false })
-      .limit(1)
-      .single()
+    const [retRes, profileRes] = await Promise.all([
+      supabase.from('klippa_tax_returns').select('*').eq('user_id', user.id).order('tax_year', { ascending: false }).limit(1).single(),
+      supabase.from('klippa_profiles').select('*').eq('id', user.id).single(),
+    ])
 
-    setTaxReturn(ret as KlippaTaxReturn | null)
+    setTaxReturn(retRes.data as KlippaTaxReturn | null)
+    setProfile(profileRes.data as KlippaProfile | null)
 
     const { data } = await supabase
       .from('klippa_income_records')
@@ -332,6 +423,7 @@ function IncomePage() {
             <span className="px-3 py-1.5 rounded-lg text-xs text-emerald-300 bg-emerald-500/10 font-medium">Income</span>
             <Link href="/expenses"   className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Expenses</Link>
             <Link href="/documents"  className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
+            <Link href="/provisional" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Provisional</Link>
             <Link href="/filing"     className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">File Return</Link>
           </nav>
           <div className="ml-auto"><UserNav /></div>
@@ -362,6 +454,14 @@ function IncomePage() {
             </button>
           </div>
         </div>
+
+        {/* PAYE card — only shown for employee / mixed employment users */}
+        {!loading && profile && profile.employment_type !== 'freelance' && taxReturn && (
+          <PayeCard
+            taxReturn={taxReturn}
+            onSaved={(amount) => setTaxReturn((prev) => prev ? { ...prev, employees_tax_paid: amount } : prev)}
+          />
+        )}
 
         {/* Records table */}
         {loading ? (

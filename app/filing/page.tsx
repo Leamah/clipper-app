@@ -110,6 +110,7 @@ export default function FilingPage() {
   const totalDeductible   = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
   const businessKm        = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
   const totalKm           = mileageTrips.reduce((s, t) => s + t.distance_km, 0)
+  const interestIncome    = incomeRecords.filter(r => r.income_type === 'interest').reduce((s, r) => s + r.amount, 0)
 
   const taxResult = calculateTax({
     grossIncome:          totalIncome,
@@ -121,10 +122,10 @@ export default function FilingPage() {
     totalKm,
     vehicleValue:         profile.vehicle_value ?? 0,
     medicalAidMembers:    profile.has_medical ? (profile.medical_aid_members ?? 1) : 0,
-    interestIncome:       0,
+    interestIncome,
     otherDeductions:      totalDeductible,
     age:                  ageFromDob(profile.date_of_birth ?? null),
-    employeesTaxPaid:     0,
+    employeesTaxPaid:     taxReturn.employees_tax_paid ?? 0,
     taxYear:              taxReturn.tax_year,
   })
 
@@ -254,8 +255,20 @@ export default function FilingPage() {
               {taxResult.travel > 0 && (
                 <CheatRow code={SARS_DEDUCTION_CODES.travel.code} label={SARS_DEDUCTION_CODES.travel.label} value={formatRand(taxResult.travel)} />
               )}
+              {taxResult.interestExemption > 0 && (
+                <CheatRow code={SARS_DEDUCTION_CODES.interest_exempt.code} label={SARS_DEDUCTION_CODES.interest_exempt.label} value={formatRand(taxResult.interestExemption)} />
+              )}
               {taxResult.otherDeductions > 0 && (
                 <CheatRow code={SARS_DEDUCTION_CODES.other_biz.code} label={SARS_DEDUCTION_CODES.other_biz.label} value={formatRand(taxResult.otherDeductions)} />
+              )}
+
+              {taxResult.employeesTaxPaid > 0 && (
+                <>
+                  <div className="px-4 py-3 bg-zinc-900/60 border-t border-b border-zinc-800 mt-2">
+                    <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Credits</p>
+                  </div>
+                  <CheatRow code={SARS_DEDUCTION_CODES.employees_tax.code} label={SARS_DEDUCTION_CODES.employees_tax.label} value={`− ${formatRand(taxResult.employeesTaxPaid)}`} />
+                </>
               )}
 
               <div className="px-4 py-3 bg-zinc-800/60 border-t border-zinc-700">

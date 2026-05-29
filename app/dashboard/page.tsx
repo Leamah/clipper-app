@@ -145,8 +145,9 @@ export default function Dashboard() {
   const totalIncome        = incomeRecords.reduce((s, r) => s + r.amount, 0)
   const totalExpDeductible = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
 
-  const dashBusinessKm = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
-  const dashTotalKm    = mileageTrips.reduce((s, t) => s + t.distance_km, 0)
+  const dashBusinessKm  = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
+  const dashTotalKm     = mileageTrips.reduce((s, t) => s + t.distance_km, 0)
+  const dashInterest    = incomeRecords.filter(r => r.income_type === 'interest').reduce((s, r) => s + r.amount, 0)
 
   const taxResult = profile
     ? calculateTax({
@@ -159,10 +160,10 @@ export default function Dashboard() {
         totalKm:              dashTotalKm,
         vehicleValue:         profile.vehicle_value ?? 0,
         medicalAidMembers:    profile.has_medical ? (profile.medical_aid_members ?? 1) : 0,
-        interestIncome:       0,
+        interestIncome:       dashInterest,
         otherDeductions:      totalExpDeductible,
         age:                  ageFromDob(profile.date_of_birth ?? null),
-        employeesTaxPaid:     0,
+        employeesTaxPaid:     taxReturn?.employees_tax_paid ?? 0,
         taxYear:              taxReturn?.tax_year,
       })
     : null
@@ -362,22 +363,31 @@ export default function Dashboard() {
               >
                 <div className="space-y-2 text-sm">
                   <BreakdownRow label="Gross income"    value={formatRand(taxResult.grossIncome)} />
-                  {taxResult.section11fRa > 0     && <BreakdownRow label="RA deduction (Section 11F)"     value={`− ${formatRand(taxResult.section11fRa)}`}     muted />}
-                  {taxResult.homeOffice > 0       && <BreakdownRow label="Home office deduction"          value={`− ${formatRand(taxResult.homeOffice)}`}       muted />}
-                  {taxResult.travel > 0           && <BreakdownRow label="Travel deduction (fixed cost)"  value={`− ${formatRand(taxResult.travel)}`}           muted />}
-                  {taxResult.otherDeductions > 0  && <BreakdownRow label="Business expense deductions"    value={`− ${formatRand(taxResult.otherDeductions)}`}  muted />}
+                  {taxResult.section11fRa > 0      && <BreakdownRow label="RA deduction (Section 11F)"     value={`− ${formatRand(taxResult.section11fRa)}`}     muted />}
+                  {taxResult.homeOffice > 0        && <BreakdownRow label="Home office deduction"          value={`− ${formatRand(taxResult.homeOffice)}`}       muted />}
+                  {taxResult.travel > 0            && <BreakdownRow label="Travel deduction (fixed cost)"  value={`− ${formatRand(taxResult.travel)}`}           muted />}
+                  {taxResult.interestExemption > 0 && <BreakdownRow label="Interest exemption"             value={`− ${formatRand(taxResult.interestExemption)}`} muted />}
+                  {taxResult.otherDeductions > 0   && <BreakdownRow label="Business expense deductions"    value={`− ${formatRand(taxResult.otherDeductions)}`}  muted />}
                   <div className="border-t border-zinc-800 pt-2">
                     <BreakdownRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} bold />
                   </div>
                   <BreakdownRow label="Tax on taxable income" value={formatRand(taxResult.grossTax)} />
                   <BreakdownRow label="Primary rebate"        value={`− ${formatRand(taxResult.primaryRebate)}`} muted />
+                  {taxResult.secondaryRebate > 0   && <BreakdownRow label="Secondary rebate (age 65+)"    value={`− ${formatRand(taxResult.secondaryRebate)}`}  muted />}
+                  {taxResult.tertiaryRebate > 0    && <BreakdownRow label="Tertiary rebate (age 75+)"     value={`− ${formatRand(taxResult.tertiaryRebate)}`}   muted />}
                   {taxResult.medicalAidCredits > 0 && <BreakdownRow label="Medical aid credits (Section 6A)" value={`− ${formatRand(taxResult.medicalAidCredits)}`} muted />}
                   <div className="border-t border-zinc-800 pt-2">
                     <BreakdownRow label="Tax payable" value={formatRand(taxResult.taxPayable)} bold />
                   </div>
+                  {taxResult.employeesTaxPaid > 0  && <BreakdownRow label="PAYE already deducted (IRP5)"  value={`− ${formatRand(taxResult.employeesTaxPaid)}`} muted />}
+                  {taxResult.employeesTaxPaid > 0  && (
+                    <div className="border-t border-zinc-800 pt-2">
+                      <BreakdownRow label="Net tax payable / refund" value={taxResult.netTaxPayable >= 0 ? formatRand(taxResult.netTaxPayable) : `Refund ${formatRand(Math.abs(taxResult.netTaxPayable))}`} bold />
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-zinc-600">
-                  Estimate only. Based on 2024/2025 SARS tables. Final figure on your eFiling return may differ.
+                  Estimate only · {taxReturn?.tax_year ? `${taxReturn.tax_year - 1}/${taxReturn.tax_year} SARS tables` : 'SARS tables'}. Final figure on your eFiling return may differ.
                 </p>
               </motion.div>
             )}

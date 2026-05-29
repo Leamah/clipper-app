@@ -104,12 +104,13 @@ export interface KlippaTaxReturn {
   tax_payable:      number
   rebates:          number
   net_tax_payable:  number
-  sars_reference:   string | null
-  submitted_at:     string | null
-  assessed_at:      string | null
-  refund_amount:    number | null
-  created_at:       string
-  updated_at:       string
+  sars_reference:    string | null
+  submitted_at:      string | null
+  assessed_at:       string | null
+  refund_amount:     number | null
+  employees_tax_paid: number        // PAYE already deducted by employer (IRP5 code 4102)
+  created_at:        string
+  updated_at:        string
 }
 
 export interface KlippaIncomeRecord {
