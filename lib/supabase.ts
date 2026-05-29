@@ -10,8 +10,8 @@ function getClient(): SupabaseClient {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         auth: {
-          flowType:           'implicit',
-          detectSessionInUrl: true,
+          flowType:           'pkce',   // server-safe; callback route exchanges the code
+          detectSessionInUrl: false,    // server handles exchange — client must not re-exchange
           persistSession:     true,
           autoRefreshToken:   true,
         },

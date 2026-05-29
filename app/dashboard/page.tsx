@@ -12,6 +12,7 @@ import {
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
+import { useRouter } from 'next/navigation'
 import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline, VAT_THRESHOLD, VAT_WARNING_THRESHOLD } from '@/lib/tax-engine'
 import { startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear } from 'date-fns'
 
@@ -69,6 +70,7 @@ function NavBar({ logbookPending }: { logbookPending: number }) {
 }
 
 export default function Dashboard() {
+  const router = useRouter()
   const [profile,        setProfile]        = useState<KlippaProfile | null>(null)
   const [taxReturn,      setTaxReturn]      = useState<KlippaTaxReturn | null>(null)
   const [incomeRecords,  setIncomeRecords]  = useState<KlippaIncomeRecord[]>([])
@@ -112,11 +114,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!user) { router.replace('/login'); return }
       setUserId(user.id)
-      loadData(user.id)
+      // Belt-and-suspenders onboarding guard — catches the rare case where
+      // the middleware couldn't check the profile (e.g. session not yet in cookies).
+      supabase
+        .from('klippa_profiles')
+        .select('onboarding_complete')
+        .eq('id', user.id)
+        .single()
+        .then(({ data: p }) => {
+          if (!p || !p.onboarding_complete) { router.replace('/onboarding'); return }
+          loadData(user.id)
+        })
     })
-  }, [loadData])
+  }, [loadData, router])
 
   useEffect(() => {
     if (!userId || !taxReturn) return
