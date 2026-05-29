@@ -12,7 +12,7 @@ import {
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
-import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline } from '@/lib/tax-engine'
+import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline, VAT_THRESHOLD, VAT_WARNING_THRESHOLD } from '@/lib/tax-engine'
 import { startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear } from 'date-fns'
 
 function countPendingLogbookWeeks(taxYear: number, reviewedWeekKeys: string[]): number {
@@ -45,10 +45,11 @@ function NavBar({ logbookPending }: { logbookPending: number }) {
         </Link>
         <nav className="flex items-center gap-1 ml-4">
           <span className="px-3 py-1.5 rounded-lg text-xs text-emerald-300 bg-emerald-500/10 font-medium">Dashboard</span>
-          <Link href="/income"    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Income</Link>
-          <Link href="/expenses"  className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Expenses</Link>
-          <Link href="/documents" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
-          <Link href="/filing"    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">File Return</Link>
+          <Link href="/income"      className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Income</Link>
+          <Link href="/expenses"    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Expenses</Link>
+          <Link href="/documents"   className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
+          <Link href="/provisional" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Provisional</Link>
+          <Link href="/filing"      className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">File Return</Link>
         </nav>
         <div className="ml-auto flex items-center gap-2">
           {logbookPending > 0 && (
@@ -150,6 +151,7 @@ export default function Dashboard() {
         otherDeductions:      totalExpDeductible,
         age:                  ageFromDob(profile.date_of_birth ?? null),
         employeesTaxPaid:     0,
+        taxYear:              taxReturn?.tax_year,
       })
     : null
 
@@ -302,6 +304,30 @@ export default function Dashboard() {
             </motion.div>
           ))}
         </div>
+
+        {/* VAT threshold alert */}
+        {totalIncome >= VAT_WARNING_THRESHOLD && (
+          <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
+            totalIncome >= VAT_THRESHOLD
+              ? 'bg-red-500/10 border-red-500/30 text-red-300'
+              : 'bg-amber-500/10 border-amber-500/25 text-amber-300'
+          }`}>
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div className="space-y-0.5">
+              {totalIncome >= VAT_THRESHOLD ? (
+                <>
+                  <p className="font-semibold">VAT registration required</p>
+                  <p className="text-xs opacity-80">Your income has exceeded the R1,000,000 VAT threshold. You are legally required to register for VAT within 21 days of exceeding it. <a href="https://www.sars.gov.za/businesses-and-employers/vat/how-to-register-for-vat/" target="_blank" rel="noopener noreferrer" className="underline">Register on SARS eFiling →</a></p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold">Approaching VAT threshold</p>
+                  <p className="text-xs opacity-80">You are {new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(VAT_THRESHOLD - totalIncome)} away from the R1,000,000 mandatory VAT registration threshold. Start preparing now.</p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tax breakdown — collapsed by default */}
         {taxResult && totalIncome > 0 && (

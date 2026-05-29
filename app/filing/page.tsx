@@ -125,6 +125,7 @@ export default function FilingPage() {
     otherDeductions:      totalDeductible,
     age:                  ageFromDob(profile.date_of_birth ?? null),
     employeesTaxPaid:     0,
+    taxYear:              taxReturn.tax_year,
   })
 
   const deadline = getITR12Deadline(taxReturn.tax_year)
@@ -146,9 +147,10 @@ export default function FilingPage() {
           </Link>
           <nav className="flex items-center gap-1 ml-4">
             <Link href="/dashboard"  className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Dashboard</Link>
-            <Link href="/income"     className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Income</Link>
-            <Link href="/expenses"   className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Expenses</Link>
-            <Link href="/documents"  className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
+            <Link href="/income"      className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Income</Link>
+            <Link href="/expenses"    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Expenses</Link>
+            <Link href="/documents"   className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
+            <Link href="/provisional" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Provisional</Link>
             <span className="px-3 py-1.5 rounded-lg text-xs text-emerald-300 bg-emerald-500/10 font-medium">File Return</span>
           </nav>
           <div className="ml-auto"><UserNav /></div>

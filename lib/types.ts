@@ -70,6 +70,7 @@ export interface KlippaProfile {
   office_thu:           boolean
   office_fri:           boolean
   opening_odometer:     number
+  closing_odometer:     number                // km at end of this tax year (for SARS logbook)
   vehicle_make:         string | null
   vehicle_model:        string | null
   vehicle_year:         number | null
@@ -210,6 +211,7 @@ export interface TaxCalculationInput {
   otherDeductions:      number    // sum of confirmed expense deductible_amount
   age:                  number    // for rebate tier + interest exemption threshold
   employeesTaxPaid:     number    // PAYE already deducted (IRP5 code 4102)
+  taxYear?:             number    // SARS tax year (e.g. 2025 = 2024/2025). Defaults to 2025.
 }
 
 export interface TaxCalculationResult {

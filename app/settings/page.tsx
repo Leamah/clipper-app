@@ -263,6 +263,7 @@ export default function SettingsPage() {
         office_thu:            profile.office_thu,
         office_fri:            profile.office_fri,
         opening_odometer:      profile.opening_odometer ?? 0,
+        closing_odometer:      profile.closing_odometer ?? 0,
         logbook_reminder:      profile.logbook_reminder ?? 'weekly',
         // Vehicle
         has_vehicle:           profile.has_vehicle,
@@ -487,6 +488,10 @@ export default function SettingsPage() {
 
           <Field label="Opening odometer (km at the start of this tax year)" hint="SARS needs this for your logbook. Check your vehicle's odometer on 1 March.">
             <NumInput value={profile.opening_odometer ?? 0} onChange={(v) => update('opening_odometer', v)} step={10} placeholder="e.g. 48250" />
+          </Field>
+
+          <Field label="Closing odometer (km at 28 February — end of tax year)" hint="Required for SARS logbook. Total km driven this tax year = closing − opening odometer.">
+            <NumInput value={profile.closing_odometer ?? 0} onChange={(v) => update('closing_odometer', v)} step={10} placeholder="e.g. 64500" />
           </Field>
 
           <Field label="Logbook review reminders">
