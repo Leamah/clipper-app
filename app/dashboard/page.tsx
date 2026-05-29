@@ -3,10 +3,14 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import UserNav from '@/components/UserNav'
-import { ShieldCheck, TrendingUp, AlertCircle, CheckCircle2, ChevronRight, Clock, Plus, FileText, Receipt, ArrowUpRight } from 'lucide-react'
+import {
+  ShieldCheck, TrendingUp, AlertCircle, CheckCircle2,
+  ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car,
+} from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord } from '@/lib/types'
 import { calculateTax, getITR12Deadline, daysUntilDeadline } from '@/lib/tax-engine'
 import { startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear } from 'date-fns'
@@ -29,7 +33,7 @@ function formatRand(n: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
 }
 
-function NavBar() {
+function NavBar({ logbookPending }: { logbookPending: number }) {
   return (
     <header className="relative z-10 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
@@ -46,7 +50,16 @@ function NavBar() {
           <Link href="/documents" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
           <Link href="/filing"    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">File Return</Link>
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {logbookPending > 0 && (
+            <Link
+              href="/mileage"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 transition-colors text-[11px] text-amber-300 font-medium"
+            >
+              <AlertCircle className="w-3 h-3" />
+              {logbookPending}w logbook
+            </Link>
+          )}
           <UserNav />
         </div>
       </div>
@@ -55,13 +68,14 @@ function NavBar() {
 }
 
 export default function Dashboard() {
-  const [profile,           setProfile]           = useState<KlippaProfile | null>(null)
-  const [taxReturn,         setTaxReturn]         = useState<KlippaTaxReturn | null>(null)
-  const [incomeRecords,     setIncomeRecords]     = useState<KlippaIncomeRecord[]>([])
-  const [expenseRecords,    setExpenseRecords]    = useState<KlippaExpenseRecord[]>([])
-  const [logbookPending,    setLogbookPending]    = useState(0)
-  const [userId,            setUserId]            = useState<string | null>(null)
-  const [loading,           setLoading]           = useState(true)
+  const [profile,        setProfile]        = useState<KlippaProfile | null>(null)
+  const [taxReturn,      setTaxReturn]      = useState<KlippaTaxReturn | null>(null)
+  const [incomeRecords,  setIncomeRecords]  = useState<KlippaIncomeRecord[]>([])
+  const [expenseRecords, setExpenseRecords] = useState<KlippaExpenseRecord[]>([])
+  const [logbookPending, setLogbookPending] = useState(0)
+  const [userId,         setUserId]         = useState<string | null>(null)
+  const [loading,        setLoading]        = useState(true)
+  const [showBreakdown,  setShowBreakdown]  = useState(false)
 
   const loadData = useCallback(async (uid: string) => {
     const [profileRes, returnRes, reviewsRes] = await Promise.all([
@@ -100,7 +114,6 @@ export default function Dashboard() {
     })
   }, [loadData])
 
-  // Realtime: re-fetch when income/expense records change
   useEffect(() => {
     if (!userId || !taxReturn) return
     const channel = supabase
@@ -111,9 +124,9 @@ export default function Dashboard() {
     return () => { supabase.removeChannel(channel) }
   }, [userId, taxReturn, loadData])
 
-  // ── Calculations ────────────────────────────────────────
+  // ── Calculations ──────────────────────────────────────────
 
-  const totalIncome  = incomeRecords.reduce((s, r) => s + r.amount, 0)
+  const totalIncome        = incomeRecords.reduce((s, r) => s + r.amount, 0)
   const totalExpDeductible = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
 
   const taxResult = profile
@@ -137,23 +150,23 @@ export default function Dashboard() {
   const taxToSave   = taxResult?.netTaxPayable ?? 0
   const safeToSpend = totalIncome - (taxToSave > 0 ? taxToSave : 0) - totalExpDeductible
 
-  // ── Deadline ────────────────────────────────────────────
+  // ── Deadline ──────────────────────────────────────────────
 
-  const taxYear   = taxReturn?.tax_year ?? new Date().getFullYear()
-  const deadline  = getITR12Deadline(taxYear)
-  const daysLeft  = daysUntilDeadline(deadline)
+  const taxYear  = taxReturn?.tax_year ?? new Date().getFullYear()
+  const deadline = getITR12Deadline(taxYear)
+  const daysLeft = daysUntilDeadline(deadline)
 
-  // ── Completion % ────────────────────────────────────────
+  // ── Completion % ─────────────────────────────────────────
 
   const hasIncome   = incomeRecords.length > 0
   const hasExpenses = expenseRecords.length > 0
   const completionPct = (hasIncome ? 50 : 0) + (hasExpenses ? 30 : 0) + (taxReturn?.status === 'submitted' ? 20 : 0)
 
-  // ── Next action ─────────────────────────────────────────
+  // ── Next action ──────────────────────────────────────────
 
   function getNextAction(): { label: string; href: string } {
-    if (!hasIncome)    return { label: 'Add your first income source',          href: '/income'    }
-    if (!hasExpenses)  return { label: 'Add and classify your business expenses', href: '/expenses'  }
+    if (!hasIncome)   return { label: 'Add your first income source',           href: '/income'   }
+    if (!hasExpenses) return { label: 'Add and classify your business expenses', href: '/expenses' }
     if (taxReturn?.status === 'draft') return { label: 'Review your return and file', href: '/filing' }
     return { label: 'View your filing status', href: '/filing' }
   }
@@ -163,7 +176,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950">
-        <NavBar />
+        <NavBar logbookPending={0} />
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -177,11 +190,11 @@ export default function Dashboard() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-600/[0.06] blur-[120px] rounded-full" />
       </div>
 
-      <NavBar />
+      <NavBar logbookPending={logbookPending} />
 
-      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
 
-        {/* Header */}
+        {/* Header row */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Tax year {taxYear}</h1>
@@ -195,13 +208,11 @@ export default function Dashboard() {
                 : 'bg-red-500/15 text-red-300 border border-red-500/30'
           }`}>
             <Clock className="w-3.5 h-3.5" />
-            {daysLeft > 0
-              ? `${daysLeft} days until filing deadline`
-              : 'Filing deadline passed'}
+            {daysLeft > 0 ? `${daysLeft} days until filing deadline` : 'Filing deadline passed'}
           </div>
         </div>
 
-        {/* The three primary metrics */}
+        {/* Three primary metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetricCard
             label="Total Earned"
@@ -223,6 +234,7 @@ export default function Dashboard() {
             sub="After tax &amp; business expenses"
             color="emerald"
             icon={<CheckCircle2 className="w-4 h-4" />}
+            highlight
           />
         </div>
 
@@ -232,8 +244,8 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
             <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Return completion</p>
             <div className="space-y-3">
-              <CompletionRow label="Income" done={hasIncome} pct={50} href="/income" />
-              <CompletionRow label="Expenses" done={hasExpenses} pct={30} href="/expenses" />
+              <CompletionRow label="Income"        done={hasIncome}   pct={50} href="/income"   />
+              <CompletionRow label="Expenses"      done={hasExpenses} pct={30} href="/expenses" />
               <CompletionRow label="Filed with SARS" done={taxReturn?.status === 'submitted'} pct={20} href="/filing" />
             </div>
             <div className="pt-1">
@@ -248,101 +260,118 @@ export default function Dashboard() {
           </div>
 
           {/* Next action */}
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 space-y-4 flex flex-col justify-between">
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 flex flex-col justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Next step</p>
               <p className="text-sm font-semibold text-zinc-100 leading-snug">{nextAction.label}</p>
             </div>
-            <Link
-              href={nextAction.href}
-              className="inline-flex items-center gap-2 self-start px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all"
-            >
-              Continue <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+            <motion.div whileTap={{ scale: 0.97 }}>
+              <Link
+                href={nextAction.href}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all"
+              >
+                Continue <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </motion.div>
           </div>
         </div>
 
-        {/* Quick add shortcuts */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Quick-add chips — compact single row */}
+        <div className="flex flex-wrap gap-2">
           {[
-            { label: 'Add income',    href: '/income?add=1',    icon: <Plus className="w-4 h-4" /> },
-            { label: 'Add expense',   href: '/expenses?add=1',  icon: <Receipt className="w-4 h-4" /> },
-            { label: 'Upload doc',    href: '/documents?add=1', icon: <FileText className="w-4 h-4" /> },
-            { label: 'View tax calc', href: '/filing',          icon: <ArrowUpRight className="w-4 h-4" /> },
+            { label: 'Add income',    href: '/income?add=1',    icon: <Plus      className="w-3.5 h-3.5" /> },
+            { label: 'Add expense',   href: '/expenses?add=1',  icon: <Receipt   className="w-3.5 h-3.5" /> },
+            { label: 'Upload doc',    href: '/documents?add=1', icon: <FileText  className="w-3.5 h-3.5" /> },
+            { label: 'Mileage',       href: '/mileage',         icon: <Car       className="w-3.5 h-3.5" /> },
+            { label: 'File return',   href: '/filing',          icon: <ArrowUpRight className="w-3.5 h-3.5" /> },
           ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-zinc-800 bg-zinc-900/40 hover:border-zinc-700 hover:bg-zinc-900 text-xs font-medium text-zinc-300 transition-all"
-            >
-              <span className="text-emerald-500">{item.icon}</span>
-              {item.label}
-            </Link>
+            <motion.div key={item.href} whileHover={{ y: -1 }} whileTap={{ scale: 0.96 }}>
+              <Link
+                href={item.href}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:border-emerald-500/30 hover:bg-zinc-900 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all"
+              >
+                <span className="text-emerald-500">{item.icon}</span>
+                {item.label}
+              </Link>
+            </motion.div>
           ))}
         </div>
 
-        {/* Logbook review prompt */}
-        {logbookPending > 0 && (
-          <Link href="/mileage"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 transition-colors">
-            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <p className="text-sm text-amber-200 flex-1">
-              <span className="font-semibold">{logbookPending} {logbookPending === 1 ? 'week' : 'weeks'} of logbook</span> {logbookPending === 1 ? 'needs' : 'need'} your review
-            </p>
-            <ChevronRight className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          </Link>
-        )}
-
-        {/* Tax breakdown (visible when there's data) */}
+        {/* Tax breakdown — collapsed by default */}
         {taxResult && totalIncome > 0 && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
-            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Tax breakdown estimate</p>
-            <div className="space-y-2 text-sm">
-              <BreakdownRow label="Gross income"    value={formatRand(taxResult.grossIncome)} />
-              {taxResult.section11fRa > 0 && <BreakdownRow label="RA deduction (Section 11F)" value={`− ${formatRand(taxResult.section11fRa)}`} muted />}
-              {taxResult.otherDeductions > 0 && <BreakdownRow label="Business expense deductions" value={`− ${formatRand(taxResult.otherDeductions)}`} muted />}
-              <div className="border-t border-zinc-800 pt-2">
-                <BreakdownRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} bold />
-              </div>
-              <BreakdownRow label="Tax on taxable income" value={formatRand(taxResult.grossTax)} />
-              <BreakdownRow label="Primary rebate" value={`− ${formatRand(taxResult.primaryRebate)}`} muted />
-              {taxResult.medicalAidCredits > 0 && <BreakdownRow label="Medical aid credits (Section 6A)" value={`− ${formatRand(taxResult.medicalAidCredits)}`} muted />}
-              <div className="border-t border-zinc-800 pt-2">
-                <BreakdownRow label="Tax payable" value={formatRand(taxResult.taxPayable)} bold />
-              </div>
-            </div>
-            <p className="text-xs text-zinc-600">Estimate only. Based on 2024/2025 SARS tables. Final figure on your eFiling return may differ.</p>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+            <button
+              onClick={() => setShowBreakdown(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-800/30 transition-colors"
+            >
+              <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Tax breakdown estimate</p>
+              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${showBreakdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showBreakdown && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="px-5 pb-5 space-y-4"
+              >
+                <div className="space-y-2 text-sm">
+                  <BreakdownRow label="Gross income"    value={formatRand(taxResult.grossIncome)} />
+                  {taxResult.section11fRa > 0     && <BreakdownRow label="RA deduction (Section 11F)"     value={`− ${formatRand(taxResult.section11fRa)}`}     muted />}
+                  {taxResult.otherDeductions > 0  && <BreakdownRow label="Business expense deductions"    value={`− ${formatRand(taxResult.otherDeductions)}`}  muted />}
+                  <div className="border-t border-zinc-800 pt-2">
+                    <BreakdownRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} bold />
+                  </div>
+                  <BreakdownRow label="Tax on taxable income" value={formatRand(taxResult.grossTax)} />
+                  <BreakdownRow label="Primary rebate"        value={`− ${formatRand(taxResult.primaryRebate)}`} muted />
+                  {taxResult.medicalAidCredits > 0 && <BreakdownRow label="Medical aid credits (Section 6A)" value={`− ${formatRand(taxResult.medicalAidCredits)}`} muted />}
+                  <div className="border-t border-zinc-800 pt-2">
+                    <BreakdownRow label="Tax payable" value={formatRand(taxResult.taxPayable)} bold />
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-600">
+                  Estimate only. Based on 2024/2025 SARS tables. Final figure on your eFiling return may differ.
+                </p>
+              </motion.div>
+            )}
           </div>
         )}
+
       </main>
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────
 
-function MetricCard({ label, value, sub, color, icon }: {
-  label: string; value: string; sub: string; color: 'zinc' | 'amber' | 'emerald'; icon: React.ReactNode
+function MetricCard({ label, value, sub, color, icon, highlight }: {
+  label: string; value: string; sub: string; color: 'zinc' | 'amber' | 'emerald'
+  icon: React.ReactNode; highlight?: boolean
 }) {
   const colors = {
-    zinc:    { border: 'border-zinc-800',          bg: 'bg-zinc-900/40',          icon: 'text-zinc-400' },
-    amber:   { border: 'border-amber-500/25',      bg: 'bg-amber-500/5',          icon: 'text-amber-400' },
-    emerald: { border: 'border-emerald-500/25',    bg: 'bg-emerald-500/5',        icon: 'text-emerald-400' },
+    zinc:    { border: 'border-zinc-800',       bg: 'bg-zinc-900/40',    icon: 'text-zinc-400'    },
+    amber:   { border: 'border-amber-500/25',   bg: 'bg-amber-500/5',    icon: 'text-amber-400'   },
+    emerald: { border: 'border-emerald-500/25', bg: 'bg-emerald-500/5',  icon: 'text-emerald-400' },
   }[color]
 
   return (
-    <div className={`rounded-2xl border ${colors.border} ${colors.bg} p-5 space-y-3`}>
+    <motion.div
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.15 }}
+      className={`rounded-2xl border ${colors.border} ${colors.bg} p-5 space-y-3 ${highlight ? 'ring-1 ring-emerald-500/20' : ''}`}
+    >
       <div className={`flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider ${colors.icon}`}>
         {icon}
         {label}
       </div>
       <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
       <p className="text-xs text-zinc-500" dangerouslySetInnerHTML={{ __html: sub }} />
-    </div>
+    </motion.div>
   )
 }
 
-function CompletionRow({ label, done, pct, href }: { label: string; done: boolean; pct: number; href: string }) {
+function CompletionRow({ label, done, pct, href }: { label: string; done?: boolean; pct: number; href: string }) {
   return (
     <Link href={href} className="flex items-center gap-3 text-sm hover:opacity-80 transition-opacity">
       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${done ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-700'}`}>
