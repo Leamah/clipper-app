@@ -17,7 +17,7 @@ export default function PricingPage() {
       </div>
 
       {/* Nav */}
-      <header className="relative z-10 border-b border-zinc-800/40">
+      <header className="relative z-30 border-b border-zinc-800/40">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-md shadow-emerald-900/40">

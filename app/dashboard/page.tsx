@@ -9,7 +9,7 @@ import Link from 'next/link'
 import UserNav from '@/components/UserNav'
 import {
   ShieldCheck, TrendingUp, AlertCircle, CheckCircle2,
-  ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car,
+  ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car, Zap,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
 import { useRouter } from 'next/navigation'
@@ -266,6 +266,27 @@ export default function Dashboard() {
         {/* Profile completion */}
         {profileCompletion && (
           <ProfileCompletionCard completion={profileCompletion} />
+        )}
+
+        {/* Upgrade nudge for free-tier users */}
+        {profile && !['starter', 'professional', 'admin'].includes(profile.subscription_tier ?? '') && (
+          <Link
+            href="/pricing"
+            className="flex items-center justify-between gap-4 rounded-2xl border border-emerald-600/30 bg-emerald-950/20 px-5 py-4 hover:bg-emerald-950/30 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600/20 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-emerald-300">You&apos;re on the free plan</p>
+                <p className="text-xs text-zinc-500 mt-0.5">Unlock unlimited expenses, the full filing wizard and audit-readiness tools from R149/mo.</p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap group-hover:translate-x-0.5 transition-transform">
+              View plans →
+            </span>
+          </Link>
         )}
 
         {/* Progress + next action */}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { LogOut, Shield, User, Car, Settings } from 'lucide-react'
+import { LogOut, Shield, User, Car, Settings, CreditCard, Zap } from 'lucide-react'
 import type { KlippaProfile } from '@/lib/types'
 
 export default function UserNav() {
@@ -29,6 +29,8 @@ export default function UserNav() {
   const initials  = email.slice(0, 2).toUpperCase()
   const isAdmin   = profile?.subscription_tier === 'admin'
   const isPro     = profile?.subscription_tier === 'professional'
+  const isStarter = profile?.subscription_tier === 'starter'
+  const isFree    = !isAdmin && !isPro && !isStarter
 
   return (
     <div className="flex items-center gap-2">
@@ -41,9 +43,9 @@ export default function UserNav() {
             {initials}
           </span>
           <span className="text-zinc-300 max-w-[120px] truncate hidden sm:block">{email}</span>
-          {(isAdmin || isPro) && (
+          {(isAdmin || isPro || isStarter) && (
             <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold uppercase tracking-wide">
-              {isAdmin ? 'Admin' : 'Pro'}
+              {isAdmin ? 'Admin' : isPro ? 'Pro' : 'Starter'}
             </span>
           )}
         </button>
@@ -55,10 +57,10 @@ export default function UserNav() {
               <div className="px-4 py-3 border-b border-zinc-800">
                 <p className="text-xs text-zinc-400 truncate">{email}</p>
                 <p className="text-xs font-medium text-zinc-200 mt-0.5 capitalize flex items-center gap-1.5">
-                  {isAdmin || isPro
+                  {isAdmin || isPro || isStarter
                     ? <Shield className="w-3.5 h-3.5 text-emerald-400" />
                     : <User className="w-3.5 h-3.5 text-zinc-500" />}
-                  {isAdmin ? 'Admin' : isPro ? 'Professional' : 'Free plan'}
+                  {isAdmin ? 'Admin' : isPro ? 'Professional' : isStarter ? 'Starter' : 'Free plan'}
                 </p>
               </div>
 
@@ -89,6 +91,25 @@ export default function UserNav() {
                   <Settings className="w-4 h-4 text-zinc-400 flex-shrink-0" />
                   Tax profile settings
                 </Link>
+                {isFree ? (
+                  <Link
+                    href="/pricing"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-emerald-300 hover:bg-emerald-950/40 hover:text-emerald-200 transition-colors"
+                  >
+                    <Zap className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    Upgrade plan
+                  </Link>
+                ) : (
+                  <Link
+                    href="/subscription"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                  >
+                    <CreditCard className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                    Subscription
+                  </Link>
+                )}
               </div>
 
               <div className="border-t border-zinc-800 py-1">
