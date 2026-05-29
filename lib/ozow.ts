@@ -2,12 +2,14 @@
 // Ozow Payment Integration — South African Instant EFT
 // ============================================================
 // Docs: https://developer.ozow.com
-// IsTest = true for sandbox; flip to false in production
+// Set OZOW_IS_TEST=false in Vercel env vars to go live.
+// Default (no var set) = sandbox / test mode.
 // ============================================================
 
 import crypto from 'crypto'
 
-export const OZOW_IS_TEST = true  // ← flip to false when going live
+// Server-side only (API routes). Client-side pages import PLANS/helpers only.
+export const OZOW_IS_TEST = process.env.OZOW_IS_TEST !== 'false'
 
 export const OZOW_PAY_URL = 'https://pay.ozow.com/'
 
