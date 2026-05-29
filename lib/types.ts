@@ -57,6 +57,7 @@ export interface KlippaProfile {
   work_location:        WorkLocation          // home_only | hybrid | office_only
   works_from_home:      boolean               // true when work_location !== 'office_only'
   home_office_pct:      number
+  home_expenses_annual: number                // annual home costs (rent/bond interest + rates + elec + levies)
   has_vehicle:          boolean
   vehicle_value:        number                // for SARS fixed-cost table
   // Commute & logbook setup

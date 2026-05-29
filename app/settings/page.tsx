@@ -3,10 +3,8 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import UserNav from '@/components/UserNav'
-import { ShieldCheck, Loader2, Check, Save, AlertCircle, ChevronRight, Info } from 'lucide-react'
+import { Loader2, Check, Save, AlertCircle, ChevronRight, Info } from 'lucide-react'
 import type { KlippaProfile, EmploymentType, WorkLocation } from '@/lib/types'
 import { WORK_LOCATION_LABELS } from '@/lib/types'
 
@@ -182,6 +180,9 @@ function ProfileNudges({ profile }: { profile: KlippaProfile }) {
   if (!profile.has_vehicle && profile.employment_type !== 'employee') {
     nudges.push({ type: 'tip', text: 'If you drive for work, enable vehicle travel — SARS allows a fixed-cost deduction based on your car value and km driven' })
   }
+  if (profile.works_from_home && (profile.home_expenses_annual ?? 0) === 0) {
+    nudges.push({ type: 'warn', text: 'Works from home is on but annual home running costs are R0 — your home office deduction will be R0. Enter your annual bond interest/rent + rates + electricity + levies below.' })
+  }
 
   if (nudges.length === 0) return null
 
@@ -251,6 +252,7 @@ export default function SettingsPage() {
         work_location:         profile.work_location,
         works_from_home,
         home_office_pct:       profile.home_office_pct,
+        home_expenses_annual:  profile.home_expenses_annual ?? 0,
         // Commute & logbook
         home_suburb:           profile.home_suburb || null,
         work_suburb:           profile.work_suburb || null,
@@ -288,7 +290,7 @@ export default function SettingsPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+    <div className="flex items-center justify-center py-24">
       <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
     </div>
   )
@@ -296,20 +298,7 @@ export default function SettingsPage() {
   if (!profile) return null
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
-              <ShieldCheck className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-semibold text-sm tracking-tight">Klippa</span>
-          </Link>
-          <div className="ml-auto"><UserNav /></div>
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-xl font-bold text-white">Tax profile</h1>
           <p className="text-sm text-zinc-500 mt-1">The more complete this is, the more accurate your tax calculation.</p>
@@ -356,16 +345,21 @@ export default function SettingsPage() {
           </Field>
 
           {profile.work_location !== 'office_only' && (
-            <div className="pl-2 space-y-2">
-              <label className="text-xs font-medium text-zinc-400">Home office % <span className="text-zinc-600">(floor area used for work)</span></label>
-              <div className="flex items-center gap-3">
-                <input type="range" min={5} max={50} step={5} value={profile.home_office_pct}
-                  onChange={(e) => update('home_office_pct', parseFloat(e.target.value))} className="flex-1 accent-emerald-500" />
-                <span className="text-sm font-bold text-zinc-100 w-10 text-right tabular-nums">{profile.home_office_pct}%</span>
+            <div className="pl-2 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-zinc-400">Home office % <span className="text-zinc-600">(floor area used for work)</span></label>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={5} max={50} step={5} value={profile.home_office_pct}
+                    onChange={(e) => update('home_office_pct', parseFloat(e.target.value))} className="flex-1 accent-emerald-500" />
+                  <span className="text-sm font-bold text-zinc-100 w-10 text-right tabular-nums">{profile.home_office_pct}%</span>
+                </div>
+                {profile.work_location === 'hybrid' && (
+                  <p className="text-xs text-amber-400/80">Hybrid workers: SARS requires the room to be used exclusively for work.</p>
+                )}
               </div>
-              {profile.work_location === 'hybrid' && (
-                <p className="text-xs text-amber-400/80">Hybrid workers: SARS requires the room to be used exclusively for work.</p>
-              )}
+              <Field label="Annual home running costs (R)" hint="Bond interest or rent + rates + electricity + levies for the full year. Klippa multiplies this by your home office % to calculate your deduction.">
+                <NumInput value={profile.home_expenses_annual ?? 0} onChange={(v) => update('home_expenses_annual', v)} step={1000} placeholder="e.g. 120000" />
+              </Field>
             </div>
           )}
         </Section>
@@ -547,7 +541,6 @@ export default function SettingsPage() {
             </span>
           )}
         </div>
-      </main>
     </div>
   )
 }

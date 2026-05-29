@@ -10,8 +10,8 @@ import {
   ShieldCheck, Check, ChevronRight, ChevronLeft, Loader2,
   FileText, ClipboardList, ExternalLink, Download, AlertCircle
 } from 'lucide-react'
-import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord } from '@/lib/types'
-import { calculateTax, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline } from '@/lib/tax-engine'
+import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
+import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 
 function formatRand(n: number) {
@@ -25,6 +25,7 @@ interface FilingData {
   taxReturn:     KlippaTaxReturn
   incomeRecords: KlippaIncomeRecord[]
   expenseRecords: KlippaExpenseRecord[]
+  mileageTrips:  KlippaMileageTrip[]
 }
 
 export default function FilingPage() {
@@ -49,9 +50,10 @@ export default function FilingPage() {
 
     if (!profile || !taxReturn) { setLoading(false); return }
 
-    const [incRes, expRes] = await Promise.all([
+    const [incRes, expRes, mileRes] = await Promise.all([
       supabase.from('klippa_income_records').select('*').eq('tax_return_id', taxReturn.id).order('received_date', { ascending: false }),
       supabase.from('klippa_expense_records').select('*').eq('tax_return_id', taxReturn.id).eq('classification_status', 'confirmed'),
+      supabase.from('klippa_mileage_trips').select('*').eq('tax_return_id', taxReturn.id),
     ])
 
     setData({
@@ -59,6 +61,7 @@ export default function FilingPage() {
       taxReturn,
       incomeRecords:  (incRes.data ?? []) as KlippaIncomeRecord[],
       expenseRecords: (expRes.data ?? []) as KlippaExpenseRecord[],
+      mileageTrips:   (mileRes.data ?? []) as KlippaMileageTrip[],
     })
     setSarsRef(taxReturn.sars_reference ?? '')
     setSubmitted(taxReturn.status === 'submitted')
@@ -102,23 +105,25 @@ export default function FilingPage() {
     )
   }
 
-  const { profile, taxReturn, incomeRecords, expenseRecords } = data
+  const { profile, taxReturn, incomeRecords, expenseRecords, mileageTrips } = data
   const totalIncome       = incomeRecords.reduce((s, r) => s + r.amount, 0)
   const totalDeductible   = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
+  const businessKm        = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
+  const totalKm           = mileageTrips.reduce((s, t) => s + t.distance_km, 0)
 
   const taxResult = calculateTax({
     grossIncome:          totalIncome,
     raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, totalIncome * 0.275, 350_000) : 0,
     pensionContributions: profile.has_pension ? (profile.pension_contributions ?? 0) : 0,
     homeofficePct:        profile.works_from_home ? profile.home_office_pct : 0,
-    homeExpenses:         0,
-    businessKm:           0,
-    totalKm:              0,
+    homeExpenses:         profile.works_from_home ? (profile.home_expenses_annual ?? 0) : 0,
+    businessKm,
+    totalKm,
     vehicleValue:         profile.vehicle_value ?? 0,
     medicalAidMembers:    profile.has_medical ? (profile.medical_aid_members ?? 1) : 0,
     interestIncome:       0,
     otherDeductions:      totalDeductible,
-    age:                  35,
+    age:                  ageFromDob(profile.date_of_birth ?? null),
     employeesTaxPaid:     0,
   })
 
@@ -244,6 +249,9 @@ export default function FilingPage() {
               {taxResult.homeOffice > 0 && (
                 <CheatRow code={SARS_DEDUCTION_CODES.home_office.code} label={SARS_DEDUCTION_CODES.home_office.label} value={formatRand(taxResult.homeOffice)} />
               )}
+              {taxResult.travel > 0 && (
+                <CheatRow code={SARS_DEDUCTION_CODES.travel.code} label={SARS_DEDUCTION_CODES.travel.label} value={formatRand(taxResult.travel)} />
+              )}
               {taxResult.otherDeductions > 0 && (
                 <CheatRow code={SARS_DEDUCTION_CODES.other_biz.code} label={SARS_DEDUCTION_CODES.other_biz.label} value={formatRand(taxResult.otherDeductions)} />
               )}
@@ -277,7 +285,7 @@ export default function FilingPage() {
                 { n: '01', title: 'Log in to SARS eFiling', body: 'Go to secure.sarsefiling.co.za and log in with your username and password. If you haven\'t registered, click "Register" and complete the process.', link: 'https://secure.sarsefiling.co.za/app/login', linkLabel: 'Open eFiling portal' },
                 { n: '02', title: 'Select "Returns" → "Returns Issued" → "Personal Income Tax (ITR12)"', body: 'From your dashboard, navigate to the Returns menu. Find the ITR12 for the current tax year and click "Open."' },
                 { n: '03', title: 'Enter your income', body: `In the "Income" section, find "Local income" and enter your freelance/consulting income. Use the values from your cheat sheet:\n• Code 3699 (Freelance): ${formatRand(totalIncome)}` },
-                { n: '04', title: 'Enter your deductions', body: `In the "Deductions" section, enter your business expense deductions:\n${taxResult.section11fRa > 0 ? `• Code 4001 (RA): ${formatRand(taxResult.section11fRa)}\n` : ''}${taxResult.otherDeductions > 0 ? `• Code 4018 (Other deductions): ${formatRand(taxResult.otherDeductions)}` : ''}` },
+                { n: '04', title: 'Enter your deductions', body: `In the "Deductions" section, enter your business expense deductions:\n${taxResult.section11fRa > 0 ? `• Code 4001 (RA / Section 11F): ${formatRand(taxResult.section11fRa)}\n` : ''}${taxResult.homeOffice > 0 ? `• Code 4011 (Home office): ${formatRand(taxResult.homeOffice)}\n` : ''}${taxResult.travel > 0 ? `• Code 4016 (Travel — fixed cost): ${formatRand(taxResult.travel)}\n` : ''}${taxResult.otherDeductions > 0 ? `• Code 4018 (Other business expenses): ${formatRand(taxResult.otherDeductions)}` : ''}` },
                 { n: '05', title: 'Review the calculated tax', body: 'SARS eFiling will automatically calculate your tax. Compare it against your cheat sheet. If the figures differ significantly, review your entries.' },
                 { n: '06', title: 'Submit your return', body: 'Once satisfied, click "File Return" and confirm. Save your SARS reference number — you\'ll need it in the next step.' },
               ].map((s) => (

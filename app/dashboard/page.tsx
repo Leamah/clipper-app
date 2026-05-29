@@ -11,8 +11,8 @@ import {
   ShieldCheck, TrendingUp, AlertCircle, CheckCircle2,
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car,
 } from 'lucide-react'
-import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord } from '@/lib/types'
-import { calculateTax, getITR12Deadline, daysUntilDeadline } from '@/lib/tax-engine'
+import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
+import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline } from '@/lib/tax-engine'
 import { startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear } from 'date-fns'
 
 function countPendingLogbookWeeks(taxYear: number, reviewedWeekKeys: string[]): number {
@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [taxReturn,      setTaxReturn]      = useState<KlippaTaxReturn | null>(null)
   const [incomeRecords,  setIncomeRecords]  = useState<KlippaIncomeRecord[]>([])
   const [expenseRecords, setExpenseRecords] = useState<KlippaExpenseRecord[]>([])
+  const [mileageTrips,   setMileageTrips]   = useState<KlippaMileageTrip[]>([])
   const [logbookPending, setLogbookPending] = useState(0)
   const [userId,         setUserId]         = useState<string | null>(null)
   const [loading,        setLoading]        = useState(true)
@@ -96,12 +97,14 @@ export default function Dashboard() {
     }
 
     if (ret) {
-      const [incRes, expRes] = await Promise.all([
+      const [incRes, expRes, mileRes] = await Promise.all([
         supabase.from('klippa_income_records').select('*').eq('tax_return_id', ret.id).order('created_at', { ascending: false }),
         supabase.from('klippa_expense_records').select('*').eq('tax_return_id', ret.id).eq('classification_status', 'confirmed'),
+        supabase.from('klippa_mileage_trips').select('*').eq('tax_return_id', ret.id),
       ])
       setIncomeRecords((incRes.data ?? []) as KlippaIncomeRecord[])
       setExpenseRecords((expRes.data ?? []) as KlippaExpenseRecord[])
+      setMileageTrips((mileRes.data ?? []) as KlippaMileageTrip[])
     }
     setLoading(false)
   }, [])
@@ -129,20 +132,23 @@ export default function Dashboard() {
   const totalIncome        = incomeRecords.reduce((s, r) => s + r.amount, 0)
   const totalExpDeductible = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
 
+  const dashBusinessKm = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
+  const dashTotalKm    = mileageTrips.reduce((s, t) => s + t.distance_km, 0)
+
   const taxResult = profile
     ? calculateTax({
         grossIncome:          totalIncome,
         raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, totalIncome * 0.275, 350_000) : 0,
         pensionContributions: profile.has_pension ? (profile.pension_contributions ?? 0) : 0,
         homeofficePct:        profile.works_from_home ? profile.home_office_pct : 0,
-        homeExpenses:         0,
-        businessKm:           0,
-        totalKm:              0,
+        homeExpenses:         profile.works_from_home ? (profile.home_expenses_annual ?? 0) : 0,
+        businessKm:           dashBusinessKm,
+        totalKm:              dashTotalKm,
         vehicleValue:         profile.vehicle_value ?? 0,
         medicalAidMembers:    profile.has_medical ? (profile.medical_aid_members ?? 1) : 0,
         interestIncome:       0,
         otherDeductions:      totalExpDeductible,
-        age:                  35,
+        age:                  ageFromDob(profile.date_of_birth ?? null),
         employeesTaxPaid:     0,
       })
     : null
@@ -319,6 +325,8 @@ export default function Dashboard() {
                 <div className="space-y-2 text-sm">
                   <BreakdownRow label="Gross income"    value={formatRand(taxResult.grossIncome)} />
                   {taxResult.section11fRa > 0     && <BreakdownRow label="RA deduction (Section 11F)"     value={`− ${formatRand(taxResult.section11fRa)}`}     muted />}
+                  {taxResult.homeOffice > 0       && <BreakdownRow label="Home office deduction"          value={`− ${formatRand(taxResult.homeOffice)}`}       muted />}
+                  {taxResult.travel > 0           && <BreakdownRow label="Travel deduction (fixed cost)"  value={`− ${formatRand(taxResult.travel)}`}           muted />}
                   {taxResult.otherDeductions > 0  && <BreakdownRow label="Business expense deductions"    value={`− ${formatRand(taxResult.otherDeductions)}`}  muted />}
                   <div className="border-t border-zinc-800 pt-2">
                     <BreakdownRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} bold />
