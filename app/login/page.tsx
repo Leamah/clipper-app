@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { ShieldCheck, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ShieldCheck, Mail, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
 
 const ERROR_MESSAGES: Record<string, string> = {
   auth_callback_failed: 'Sign-in link failed. Please request a new one.',
@@ -19,10 +19,15 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [sent,    setSent]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+  const [notice,  setNotice]  = useState<string | null>(null)
 
   useEffect(() => {
     const raw = searchParams.get('error')
     if (raw) setError(ERROR_MESSAGES[raw] ?? 'Something went wrong. Please try again.')
+
+    if (searchParams.get('reason') === 'idle') {
+      setNotice('You were signed out after 1 hour of inactivity. Sign in again to continue.')
+    }
 
     // If we just signed out, aggressively kill any leftover session state
     // before the Supabase client has a chance to silently refresh.
@@ -136,6 +141,13 @@ function LoginForm() {
                   />
                 </div>
               </div>
+
+              {notice && (
+                <div className="flex items-start gap-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2.5">
+                  <Clock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  {notice}
+                </div>
+              )}
 
               {error && (
                 <div className="flex items-start gap-2 text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2.5">
