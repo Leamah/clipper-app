@@ -78,10 +78,18 @@ export async function POST(request: Request) {
       .single()
 
     if (sub?.promo_code_used) {
-      await adminClient
+      // Read-then-write increment (PostgREST doesn't support server-side expressions)
+      const { data: promo } = await adminClient
         .from('klippa_promotions')
-        .update({ used_count: adminClient.rpc('increment', { x: 1 }) as unknown as number })
+        .select('used_count')
         .eq('code', sub.promo_code_used)
+        .single()
+      if (promo) {
+        await adminClient
+          .from('klippa_promotions')
+          .update({ used_count: (promo.used_count ?? 0) + 1 })
+          .eq('code', sub.promo_code_used)
+      }
     }
 
     console.log(`[ozow/notify] Payment complete: user=${userId} plan=${plan} amount=${Amount} txn=${TransactionId}`)
