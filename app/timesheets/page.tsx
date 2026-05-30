@@ -310,7 +310,7 @@ function DayCard({
   return (
     <button
       onClick={openEdit}
-      className="w-full text-left rounded-xl border border-edge/60 border-dashed hover:border-zinc-600 hover:bg-surface/50 p-2.5 min-h-[72px] transition-colors group"
+      className="w-full text-left rounded-xl border border-edge/60 border-dashed hover:border-edge hover:bg-surface/50 p-2.5 min-h-[72px] transition-colors group"
     >
       <div className="text-[10px] text-ink-3 font-medium">{dayLabel}</div>
       <div className="text-lg font-semibold text-ink-2">{dayNum}</div>
@@ -906,7 +906,7 @@ export default function TimesheetsPage() {
             {billable !== null && (
               <div>
                 <div className="text-[10px] text-ink-2 uppercase tracking-wide">Billable</div>
-                <div className="text-lg font-bold text-white">{fmtRand(billable)}</div>
+                <div className="text-lg font-bold text-ink-1">{fmtRand(billable)}</div>
               </div>
             )}
           </div>
@@ -917,7 +917,7 @@ export default function TimesheetsPage() {
             )}
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-edge hover:border-zinc-500 text-ink-2 hover:text-ink-1 text-sm transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-edge hover:border-raised text-ink-2 hover:text-ink-1 text-sm transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Export PDF

@@ -262,7 +262,7 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
                   }`}
                   onClick={() => toggle(i)}
                 >
-                  <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${selected.has(i) ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'}`}>
+                  <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${selected.has(i) ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
                     {selected.has(i) && <Check className="w-2.5 h-2.5 text-white" />}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -416,7 +416,7 @@ function IncomePage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Income</h1>
+            <h1 className="text-xl font-bold text-ink-1">Income</h1>
             <p className="text-sm text-ink-2 mt-0.5">
               {records.length > 0 ? `${records.length} records · Total ${formatRand(totalIncome)}` : 'No income records yet'}
             </p>

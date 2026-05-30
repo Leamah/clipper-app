@@ -254,11 +254,11 @@ export default function MileagePage() {
           <div className="max-w-5xl mx-auto px-4 sm:px-6 h-11 flex items-center gap-2">
             <span className="text-xs text-ink-2 mr-auto">Mileage Logbook — Tax Year {taxYear}</span>
             <button onClick={exportLogbook} disabled={trips.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:border-zinc-600 hover:text-ink-1 disabled:opacity-40 transition-all">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:border-edge hover:text-ink-1 disabled:opacity-40 transition-all">
               <Download className="w-3 h-3" /> CSV
             </button>
             <button onClick={handleExportSARSPDF} disabled={trips.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:border-zinc-600 hover:text-ink-1 disabled:opacity-40 transition-all">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:border-edge hover:text-ink-1 disabled:opacity-40 transition-all">
               <FileText className="w-3 h-3" /> SARS Logbook PDF
             </button>
             <button onClick={() => setShowAddTrip(true)}
@@ -474,7 +474,7 @@ function WeekReviewCard({
     <div className="rounded-2xl border border-edge bg-surface/40 overflow-hidden">
       {/* Header — click to expand */}
       <button onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-raised/30 transition-colors text-left">
-        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${open ? 'border-emerald-500' : 'border-zinc-600'}`}>
+        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${open ? 'border-emerald-500' : 'border-edge'}`}>
           {open && <div className="w-full h-full rounded-full bg-emerald-500/50" />}
         </div>
         <div className="flex-1">
@@ -505,7 +505,7 @@ function WeekReviewCard({
                 {/* Day toggle */}
                 <button onClick={() => toggleDay(i)}
                   className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                    d.selected ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'
+                    d.selected ? 'border-emerald-500 bg-emerald-500' : 'border-edge'
                   }`}>
                   {d.selected && <Check className="w-3 h-3 text-white" />}
                 </button>
@@ -652,7 +652,7 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-white flex items-center gap-2">
+          <h3 className="font-semibold text-ink-1 flex items-center gap-2">
             <Car className="w-4 h-4 text-emerald-400" /> Add trip
           </h3>
           <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>

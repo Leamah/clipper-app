@@ -113,7 +113,7 @@ function ToggleRow({ label, sub, value, onChange, impact }: {
     <button type="button" onClick={() => onChange(!value)}
       className="w-full flex items-center justify-between gap-4 py-3 text-left group">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-ink-1 group-hover:text-white transition-colors">{label}</p>
+        <p className="text-sm text-ink-1 group-hover:text-ink-1 transition-colors">{label}</p>
         <p className="text-xs text-ink-2 mt-0.5 leading-snug">{sub}</p>
         {impact && !value && (
           <p className="text-xs text-emerald-500/70 mt-1">{impact}</p>
@@ -307,7 +307,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Tax profile</h1>
+          <h1 className="text-xl font-bold text-ink-1">Tax profile</h1>
           <p className="text-sm text-ink-2 mt-1">The more complete this is, the more accurate your tax calculation.</p>
         </div>
 
@@ -344,7 +344,7 @@ export default function SettingsPage() {
               {(Object.entries(WORK_LOCATION_LABELS) as [WorkLocation, string][]).map(([k, v]) => (
                 <button key={k} type="button" onClick={() => update('work_location', k)}
                   className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl border text-sm transition-all ${profile.work_location === k ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300' : 'border-edge text-ink-2 hover:border-edge hover:text-ink-1'}`}>
-                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${profile.work_location === k ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'}`} />
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${profile.work_location === k ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`} />
                   {v}
                 </button>
               ))}

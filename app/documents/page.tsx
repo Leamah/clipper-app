@@ -244,7 +244,7 @@ function DocumentsPage() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Documents</h1>
+            <h1 className="text-xl font-bold text-ink-1">Documents</h1>
             <p className="text-sm text-ink-2 mt-0.5">{docs.length} documents uploaded</p>
           </div>
           <button onClick={() => setShowUpload(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
