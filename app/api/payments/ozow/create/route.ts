@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     {
       transactionRef,
       amount,
-      bankReference: `Klippa ${plan} (${billingCycle})`,
+      bankReference: `Klippa ${plan}`,   // max 20 chars, alphanumeric + spaces only
       successUrl:    `${origin}/payments/success?ref=${transactionRef}`,
       cancelUrl:     `${origin}/payments/cancel?ref=${transactionRef}`,
       errorUrl:      `${origin}/payments/cancel?ref=${transactionRef}&error=1`,

@@ -95,32 +95,43 @@ export function buildOzowRequest(
   siteCode:   string,
   privateKey: string,
 ): OzowRequestPayload {
-  // Field order MUST match Ozow's documented hash input order
-  const fields: Record<string, string> = {
+  // Field order follows the Ozow post variables table exactly (v3.5 docs, Feb 2023).
+  // Rules confirmed from the hash example on page 6:
+  //  1. Required fields always included
+  //  2. Optional fields included ONLY when non-empty (empty optionals corrupt the hash)
+  //  3. Language is NOT a documented field — excluded entirely
+  //  4. IsTest comes AFTER the URLs (table order: CancelUrl=13, ErrorUrl=14,
+  //     SuccessUrl=15, NotifyUrl=16, IsTest=17)
+
+  // Build hash fields in exact table order
+  const hashFields: Record<string, string> = {
     SiteCode:             siteCode,
     CountryCode:          'ZA',
     CurrencyCode:         'ZAR',
     Amount:               params.amount.toFixed(2),
     TransactionReference: params.transactionRef,
     BankReference:        params.bankReference,
-    Optional1:            params.userId,
-    Optional2:            params.plan,
-    Optional3:            params.billingCycle,
-    Optional4:            '',
-    Optional5:            '',
-    Language:             'en',
-    IsTest:               String(OZOW_IS_TEST),
-    CancelUrl:            params.cancelUrl,
-    ErrorUrl:             params.errorUrl,
-    SuccessUrl:           params.successUrl,
-    NotifyUrl:            params.notifyUrl,
   }
 
-  // Hash input: all values in order above + private key
-  const hashValues = Object.values(fields)
-  fields.HashCheck = buildOzowHash(hashValues, privateKey)
+  // Optional1-5: only include when non-empty (table positions 7-11)
+  if (params.userId)       hashFields.Optional1 = params.userId
+  if (params.plan)         hashFields.Optional2 = params.plan
+  if (params.billingCycle) hashFields.Optional3 = params.billingCycle
+  // Optional4 and Optional5 not used — omitted
 
-  return { url: OZOW_PAY_URL, fields }
+  // URLs then IsTest (table positions 13-17)
+  hashFields.CancelUrl  = params.cancelUrl
+  hashFields.ErrorUrl   = params.errorUrl
+  hashFields.SuccessUrl = params.successUrl
+  hashFields.NotifyUrl  = params.notifyUrl
+  hashFields.IsTest     = String(OZOW_IS_TEST)
+
+  const hashCheck = buildOzowHash(Object.values(hashFields), privateKey)
+
+  return {
+    url:    OZOW_PAY_URL,
+    fields: { ...hashFields, HashCheck: hashCheck },
+  }
 }
 
 // ── Webhook verification ──────────────────────────────────
