@@ -9,38 +9,187 @@ import { supabase } from '@/lib/supabase'
 import {
   ShieldCheck, Users, Plus, Loader2, ArrowLeft,
   Mail, Check, X, Trash2, AlertCircle, Clock,
-  UserRound,
+  UserRound, ChevronDown, ChevronUp, Shield,
+  FileText, CreditCard, IdCard, CheckCircle2,
 } from 'lucide-react'
-import type { KlippaOrganisation, KlippaOrgInvite } from '@/lib/types'
-
-interface MemberRow {
-  id:               string
-  email:            string
-  full_name:        string | null
-  org_role:         string | null
-  latest_timesheet: { status: string; month: string } | null
-}
+import type {
+  KlippaOrganisation, KlippaOrgInvite,
+  KlippaConsultantContract, KlippaConsultantCompliance,
+  OrgConsultantRow,
+} from '@/lib/types'
 
 const STATUS_PILL: Record<string, string> = {
-  pending:  'bg-amber-500/15 text-amber-300',
-  accepted: 'bg-emerald-500/15 text-emerald-300',
-  declined: 'bg-red-500/15 text-red-300',
+  pending:  'bg-amber-500/15 text-amber-600 dark:text-amber-300',
+  accepted: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  declined: 'bg-red-500/15 text-red-400',
 }
 
+const CONTRACT_TYPE_LABELS: Record<string, string> = {
+  fixed_term: 'Fixed term', permanent: 'Permanent',
+  freelance: 'Freelance', retainer: 'Retainer',
+}
+const RATE_TYPE_LABELS: Record<string, string> = {
+  hourly: '/hr', daily: '/day', monthly: '/mo', project: ' flat',
+}
+
+function formatDate(s: string | null) {
+  if (!s) return '—'
+  return new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s))
+}
+
+function formatRand(n: number | null) {
+  if (n == null) return '—'
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
+}
+
+// ── Compliance checklist panel ───────────────────────────────
+
+function CompliancePanel({ consultant, onUpdate }: {
+  consultant: OrgConsultantRow
+  onUpdate:   (userId: string, field: string, value: boolean) => Promise<void>
+}) {
+  const c = consultant.compliance
+  const items: { key: string; label: string; icon: React.ElementType; value: boolean }[] = [
+    { key: 'tax_profile_complete', label: 'Tax profile complete', icon: FileText,    value: c?.tax_profile_complete ?? false },
+    { key: 'id_verified',          label: 'ID verified',          icon: IdCard,      value: c?.id_verified          ?? false },
+    { key: 'banking_verified',     label: 'Banking verified',     icon: CreditCard,  value: c?.banking_verified     ?? false },
+    { key: 'popia_consent',        label: 'POPIA consent',        icon: Shield,      value: c?.popia_consent        ?? false },
+    { key: 'signed_agreement_at',  label: 'Agreement signed',     icon: CheckCircle2, value: !!(c?.signed_agreement_at) },
+  ]
+
+  return (
+    <div className="px-5 py-4 bg-raised/30 border-t border-edge/40 space-y-3">
+      <p className="text-xs font-semibold text-ink-2 uppercase tracking-wider">Compliance checklist</p>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {items.map(item => (
+          <button
+            key={item.key}
+            onClick={() => onUpdate(consultant.id, item.key, !item.value)}
+            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${
+              item.value
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                : 'border-edge bg-surface text-ink-2 hover:border-ink-2'
+            }`}
+          >
+            <item.icon className="w-4 h-4" />
+            <span className="text-center leading-tight">{item.label}</span>
+            {item.value ? <Check className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full border border-current opacity-40" />}
+          </button>
+        ))}
+      </div>
+      {c?.signed_agreement_at && (
+        <p className="text-xs text-ink-3">Agreement signed {formatDate(c.signed_agreement_at)}</p>
+      )}
+    </div>
+  )
+}
+
+// ── Contract form ───────────────────────────────────────────
+
+function ContractForm({ userId, existing, onSaved, onCancel }: {
+  userId:   string
+  existing: KlippaConsultantContract | null
+  onSaved:  (c: KlippaConsultantContract) => void
+  onCancel: () => void
+}) {
+  const [form, setForm] = useState({
+    contract_type: existing?.contract_type ?? 'fixed_term',
+    start_date:    existing?.start_date    ?? '',
+    end_date:      existing?.end_date      ?? '',
+    rate:          existing?.rate?.toString() ?? '',
+    rate_type:     existing?.rate_type     ?? 'monthly',
+    notes:         existing?.notes         ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState<string | null>(null)
+
+  const handleSave = async () => {
+    setSaving(true); setError(null)
+    try {
+      const body = existing?.id
+        ? { id: existing.id, ...form, rate: form.rate ? parseFloat(form.rate) : null }
+        : { user_id: userId, ...form, rate: form.rate ? parseFloat(form.rate) : null }
+
+      const res  = await fetch('/api/org/contracts', {
+        method:  existing?.id ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      onSaved(json.contract)
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
+    finally { setSaving(false) }
+  }
+
+  const f = (field: string, value: string) => setForm(p => ({ ...p, [field]: value }))
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-ink-2">Type</label>
+          <select value={form.contract_type} onChange={e => f('contract_type', e.target.value)} className="input">
+            {Object.entries(CONTRACT_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-ink-2">Rate type</label>
+          <select value={form.rate_type} onChange={e => f('rate_type', e.target.value)} className="input">
+            {Object.entries(RATE_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{k.charAt(0).toUpperCase() + k.slice(1)}{v}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-ink-2">Start date</label>
+          <input type="date" value={form.start_date} onChange={e => f('start_date', e.target.value)} className="input" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-ink-2">End date (blank = open)</label>
+          <input type="date" value={form.end_date} onChange={e => f('end_date', e.target.value)} className="input" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-ink-2">Rate (R)</label>
+          <input type="number" min="0" value={form.rate} onChange={e => f('rate', e.target.value)} placeholder="0" className="input" />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-ink-2">Notes</label>
+        <input type="text" value={form.notes} onChange={e => f('notes', e.target.value)} placeholder="Optional notes" className="input" />
+      </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={onCancel} className="flex-1 py-2 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">Cancel</button>
+        <button onClick={handleSave} disabled={saving}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors">
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+          {saving ? 'Saving…' : 'Save contract'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Main page ───────────────────────────────────────────────
+
 export default function ConsultantsPage() {
-  const router   = useRouter()
-  const [org,          setOrg]          = useState<KlippaOrganisation | null>(null)
-  const [members,      setMembers]      = useState<MemberRow[]>([])
-  const [invites,      setInvites]      = useState<KlippaOrgInvite[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState<string | null>(null)
-  const [inviteEmail,  setInviteEmail]  = useState('')
-  const [sending,      setSending]      = useState(false)
-  const [inviteMsg,    setInviteMsg]    = useState<string | null>(null)
-  const [acceptUrl,    setAcceptUrl]    = useState<string | null>(null)
-  const [deletingId,   setDeletingId]   = useState<string | null>(null)
-  const [removingId,   setRemovingId]   = useState<string | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const router = useRouter()
+  const [org,            setOrg]            = useState<KlippaOrganisation | null>(null)
+  const [consultants,    setConsultants]    = useState<OrgConsultantRow[]>([])
+  const [invites,        setInvites]        = useState<KlippaOrgInvite[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [error,          setError]          = useState<string | null>(null)
+  const [inviteEmail,    setInviteEmail]    = useState('')
+  const [sending,        setSending]        = useState(false)
+  const [inviteMsg,      setInviteMsg]      = useState<string | null>(null)
+  const [acceptUrl,      setAcceptUrl]      = useState<string | null>(null)
+  const [deletingId,     setDeletingId]     = useState<string | null>(null)
+  const [removingId,     setRemovingId]     = useState<string | null>(null)
+  const [currentUserId,  setCurrentUserId]  = useState<string | null>(null)
+  const [isOwner,        setIsOwner]        = useState(false)
+  const [expandedId,     setExpandedId]     = useState<string | null>(null)
+  const [contractFormId, setContractFormId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -54,6 +203,7 @@ export default function ConsultantsPage() {
       .single()
 
     if (!profile?.organisation_id) { router.replace('/dashboard'); return }
+    setIsOwner(profile.org_role === 'owner')
 
     const { data: orgData } = await supabase
       .from('klippa_organisations')
@@ -63,12 +213,12 @@ export default function ConsultantsPage() {
 
     setOrg(orgData as KlippaOrganisation | null)
 
-    const [membRes, invRes] = await Promise.all([
-      fetch('/api/org/members'),
+    const [intelRes, invRes] = await Promise.all([
+      fetch('/api/org/intelligence'),
       fetch('/api/org/invite'),
     ])
-    const [membJson, invJson] = await Promise.all([membRes.json(), invRes.json()])
-    setMembers(membJson.members ?? [])
+    const [intelJson, invJson] = await Promise.all([intelRes.json(), invRes.json()])
+    setConsultants(intelJson.consultants ?? [])
     setInvites(invJson.invites ?? [])
     setLoading(false)
   }, [router])
@@ -80,13 +230,12 @@ export default function ConsultantsPage() {
     setSending(true); setError(null); setInviteMsg(null); setAcceptUrl(null)
     try {
       const res  = await fetch('/api/org/invite', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: inviteEmail.trim() }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
       })
       const json = await res.json()
       if (json.error) throw new Error(json.error)
-      setInvites((prev) => [json.invite, ...prev])
+      setInvites(prev => [json.invite, ...prev])
       setInviteEmail('')
       setInviteMsg(`Invite created for ${inviteEmail.trim()}`)
       setAcceptUrl(json.acceptUrl ?? null)
@@ -96,47 +245,52 @@ export default function ConsultantsPage() {
 
   const cancelInvite = async (id: string) => {
     setDeletingId(id)
-    try {
-      await fetch('/api/org/invite', {
-        method:  'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ id }),
-      })
-      setInvites((prev) => prev.filter((i) => i.id !== id))
-    } finally { setDeletingId(null) }
+    await fetch('/api/org/invite', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    setInvites(prev => prev.filter(i => i.id !== id))
+    setDeletingId(null)
   }
 
   const removeMember = async (memberId: string) => {
-    if (!confirm('Remove this consultant from your organisation? They will lose access to the team workspace.')) return
+    if (!confirm('Remove this consultant from your organisation?')) return
     setRemovingId(memberId)
-    try {
-      const res  = await fetch('/api/org/members', {
-        method:  'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ memberId }),
-      })
-      const json = await res.json()
-      if (json.error) { setError(json.error); return }
-      setMembers((prev) => prev.filter((m) => m.id !== memberId))
-    } catch { setError('Failed to remove member') }
-    finally { setRemovingId(null) }
+    const res  = await fetch('/api/org/members', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId }) })
+    const json = await res.json()
+    if (json.error) { setError(json.error); setRemovingId(null); return }
+    setConsultants(prev => prev.filter(c => c.id !== memberId))
+    setRemovingId(null)
+  }
+
+  const updateCompliance = async (userId: string, field: string, value: boolean) => {
+    const res  = await fetch('/api/org/compliance', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, [field]: value }),
+    })
+    const json = await res.json()
+    if (!json.error) {
+      setConsultants(prev => prev.map(c => {
+        if (c.id !== userId) return c
+        const newComp = json.compliance as KlippaConsultantCompliance
+        const score   = [newComp.tax_profile_complete, newComp.banking_verified, newComp.id_verified, newComp.popia_consent, !!newComp.signed_agreement_at].filter(Boolean).length
+        return { ...c, compliance: newComp, compliance_score: score }
+      }))
+    }
+  }
+
+  const onContractSaved = (userId: string, contract: KlippaConsultantContract) => {
+    setConsultants(prev => prev.map(c => c.id === userId ? { ...c, contract } : c))
+    setContractFormId(null)
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-base flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
-      </div>
-    )
+    return <div className="min-h-screen bg-base flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-ink-3" /></div>
   }
 
-  const pendingInvites = invites.filter((i) => i.status === 'pending')
+  const pendingInvites = invites.filter(i => i.status === 'pending')
 
   return (
     <div className="min-h-screen bg-base text-ink-1">
-      {/* Header */}
       <header className="border-b border-edge/60 bg-surface/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
               <ShieldCheck className="w-3.5 h-3.5 text-white" />
@@ -148,15 +302,14 @@ export default function ConsultantsPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
 
-        {/* Back + title */}
         <div className="flex items-center gap-4">
           <Link href="/org/dashboard" className="flex items-center gap-1.5 text-xs text-ink-2 hover:text-ink-1 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
           </Link>
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-emerald-400" />
+            <Users className="w-5 h-5 text-emerald-500" />
             <h1 className="text-lg font-semibold">Consultants</h1>
           </div>
         </div>
@@ -167,76 +320,63 @@ export default function ConsultantsPage() {
           </div>
         )}
 
-        {/* ── Invite form ─────────────────────────────────────────────── */}
-        <div className="rounded-2xl border border-edge bg-surface/40 p-6 space-y-4">
-          <div>
-            <p className="text-sm font-semibold text-ink-1">Invite a consultant</p>
-            <p className="text-xs text-ink-2 mt-0.5">They'll receive a magic link to join your workspace on Klippa.</p>
-          </div>
-
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-3" />
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendInvite()}
-                placeholder="consultant@example.com"
-                className="input pl-9 py-2.5"
-              />
+        {/* ── Invite form ──────────────────────────────────────────── */}
+        {isOwner && (
+          <div className="rounded-2xl border border-edge bg-surface/40 p-6 space-y-4">
+            <div>
+              <p className="text-sm font-semibold">Invite a consultant</p>
+              <p className="text-xs text-ink-2 mt-0.5">They'll receive a link to join your workspace on Klippa.</p>
             </div>
-            <button
-              onClick={sendInvite}
-              disabled={sending || !inviteEmail.trim()}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-xs font-semibold text-white transition-colors"
-            >
-              {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-              Send invite
-            </button>
-          </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-3" />
+                <input type="email" value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendInvite()}
+                  placeholder="consultant@example.com"
+                  className="input pl-9 py-2.5" />
+              </div>
+              <button onClick={sendInvite} disabled={sending || !inviteEmail.trim()}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-xs font-semibold text-white transition-colors">
+                {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Send invite
+              </button>
+            </div>
 
-          {acceptUrl && (
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-emerald-400">
-                  <Check className="w-3.5 h-3.5" /> {inviteMsg}
+            {acceptUrl && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                    <Check className="w-3.5 h-3.5" /> {inviteMsg}
+                  </div>
+                  <button onClick={() => { setAcceptUrl(null); setInviteMsg(null) }} className="text-ink-3 hover:text-ink-1 transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => { setAcceptUrl(null); setInviteMsg(null) }}
-                  className="text-ink-3 hover:text-ink-1 transition-colors"
-                  title="Dismiss"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <p className="text-xs text-ink-2">Copy and share this link with the consultant:</p>
+                <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono break-all">{acceptUrl}</div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => navigator.clipboard.writeText(acceptUrl)}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-edge hover:border-emerald-500/50 bg-raised hover:bg-emerald-500/10 text-ink-1 transition-colors">
+                    Copy link
+                  </button>
+                  <p className="text-[10px] text-ink-3">Expires in 7 days.</p>
+                </div>
               </div>
-              <p className="text-xs text-ink-2">Copy this link and share it with the consultant (WhatsApp, email, etc.):</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-[11px] text-emerald-300 font-mono break-all">{acceptUrl}</code>
-              </div>
-              <div className="flex items-center gap-2 pt-0.5">
-                <button
-                  onClick={() => { navigator.clipboard.writeText(acceptUrl) }}
-                  className="flex items-center gap-1.5 text-xs font-medium text-ink-1 hover:text-white px-3 py-1.5 rounded-lg border border-edge hover:border-emerald-500/50 bg-raised hover:bg-emerald-500/10 transition-colors"
-                >
-                  Copy link
-                </button>
-                <p className="text-[10px] text-ink-3">Expires in 7 days.</p>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
-        {/* ── Pending invites ─────────────────────────────────────────── */}
+        {/* ── Pending invites ──────────────────────────────────────── */}
         {pendingInvites.length > 0 && (
           <div className="rounded-2xl border border-edge overflow-hidden">
             <div className="px-5 py-4 border-b border-edge bg-surface/60">
               <p className="text-sm font-semibold">Pending invites
-                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-300">{pendingInvites.length}</span>
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-600 dark:text-amber-300">{pendingInvites.length}</span>
               </p>
             </div>
             <div className="divide-y divide-edge/50">
-              {pendingInvites.map((inv) => (
+              {pendingInvites.map(inv => (
                 <div key={inv.id} className="px-5 py-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Mail className="w-4 h-4 text-ink-3 flex-shrink-0" />
@@ -250,16 +390,14 @@ export default function ConsultantsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_PILL[inv.status]}`}>
-                      {inv.status === 'pending' ? <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Pending</span> : inv.status}
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Pending</span>
                     </span>
-                    <button
-                      onClick={() => cancelInvite(inv.id)}
-                      disabled={deletingId === inv.id}
-                      className="text-ink-3 hover:text-red-400 transition-colors"
-                      title="Cancel invite"
-                    >
-                      {deletingId === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                    </button>
+                    {isOwner && (
+                      <button onClick={() => cancelInvite(inv.id)} disabled={deletingId === inv.id}
+                        className="text-ink-3 hover:text-red-400 transition-colors">
+                        {deletingId === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -267,90 +405,136 @@ export default function ConsultantsPage() {
           </div>
         )}
 
-        {/* ── Active members ──────────────────────────────────────────── */}
+        {/* ── Active consultants ───────────────────────────────────── */}
         <div className="rounded-2xl border border-edge overflow-hidden">
           <div className="px-5 py-4 border-b border-edge bg-surface/60">
-            <p className="text-sm font-semibold">Active members
-              <span className="ml-2 text-xs text-ink-2">({members.length})</span>
+            <p className="text-sm font-semibold">Active consultants
+              <span className="ml-2 text-xs text-ink-2">({consultants.length})</span>
             </p>
           </div>
 
-          {members.length === 0 ? (
+          {consultants.length === 0 ? (
             <div className="px-5 py-12 text-center space-y-2">
               <UserRound className="w-8 h-8 text-edge mx-auto" />
-              <p className="text-sm text-ink-2">No active members yet</p>
+              <p className="text-sm text-ink-2">No active consultants yet</p>
               <p className="text-xs text-ink-3">Consultants will appear here after accepting their invite.</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-edge/50">
-                  {['Name / Email', 'Role', 'Latest timesheet', 'Status', ''].map((h) => (
-                    <th key={h} className="text-left px-5 py-3 text-xs font-medium text-ink-2">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m) => {
-                  const ts    = m.latest_timesheet
-                  const month = ts ? new Date(ts.month + 'T00:00:00').toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }) : null
-                  const pill  = ts
-                    ? { draft: 'bg-edge text-ink-2', submitted: 'bg-amber-500/15 text-amber-300', approved: 'bg-emerald-500/15 text-emerald-300' }[ts.status] ?? 'bg-edge text-ink-2'
-                    : null
-                  return (
-                    <tr key={m.id} className="border-b border-edge/40 last:border-0 hover:bg-surface/60 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <p className="text-sm font-medium">{m.full_name ?? m.email}</p>
-                        {m.full_name && <p className="text-xs text-ink-3">{m.email}</p>}
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-ink-2 capitalize">{m.org_role ?? 'member'}</td>
-                      <td className="px-5 py-3.5 text-xs text-ink-2">{month ?? '—'}</td>
-                      <td className="px-5 py-3.5">
-                        {pill ? (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${pill}`}>
-                            {ts!.status}
+            <div className="divide-y divide-edge/40">
+              {consultants.map(c => {
+                const expanded     = expandedId === c.id
+                const showContract = contractFormId === c.id
+
+                return (
+                  <div key={c.id}>
+                    {/* Main row */}
+                    <div className="px-5 py-4 flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-ink-1">{c.full_name ?? c.email}</p>
+                        {c.full_name && <p className="text-xs text-ink-3">{c.email}</p>}
+                      </div>
+
+                      {/* Contract status */}
+                      <div className="flex-shrink-0 hidden sm:block">
+                        {c.contract ? (
+                          <div className="text-right">
+                            <p className="text-xs font-medium text-ink-1">
+                              {CONTRACT_TYPE_LABELS[c.contract.contract_type]}
+                              {c.contract.rate ? ` · ${formatRand(c.contract.rate)}${RATE_TYPE_LABELS[c.contract.rate_type]}` : ''}
+                            </p>
+                            <p className="text-xs text-ink-3 mt-0.5">
+                              {c.contract.end_date ? `Ends ${formatDate(c.contract.end_date)}` : 'Open-ended'}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-3">No contract</span>
+                        )}
+                      </div>
+
+                      {/* Compliance dots */}
+                      <div className="flex-shrink-0 flex items-center gap-1.5">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className={`w-2 h-2 rounded-full ${i < c.compliance_score ? 'bg-emerald-500' : 'bg-edge'}`} />
+                          ))}
+                        </div>
+                        <span className="text-xs text-ink-3 hidden sm:inline">{c.compliance_score}/5</span>
+                      </div>
+
+                      {/* Latest TS */}
+                      <div className="flex-shrink-0 hidden md:block w-24 text-right">
+                        {c.latest_timesheet ? (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            { draft: 'bg-edge text-ink-2', submitted: 'bg-amber-500/15 text-amber-600 dark:text-amber-300', approved: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' }[c.latest_timesheet.status] ?? 'bg-edge text-ink-2'
+                          }`}>
+                            {c.latest_timesheet.status}
                           </span>
                         ) : (
-                          <span className="text-xs text-ink-3">No timesheets</span>
+                          <span className="text-xs text-ink-3">No TS</span>
                         )}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        {m.id !== currentUserId && (
-                          <button
-                            onClick={() => removeMember(m.id)}
-                            disabled={removingId === m.id}
-                            className="text-ink-3 hover:text-red-400 transition-colors disabled:opacity-40"
-                            title="Remove from org"
-                          >
-                            {removingId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {isOwner && (
+                          <button onClick={() => setContractFormId(showContract ? null : c.id)}
+                            className="text-xs text-ink-2 hover:text-ink-1 px-2 py-1 rounded border border-edge hover:border-ink-2 transition-colors flex-shrink-0">
+                            {c.contract ? 'Edit contract' : '+ Contract'}
                           </button>
                         )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        <button onClick={() => setExpandedId(expanded ? null : c.id)}
+                          className="p-1.5 text-ink-3 hover:text-ink-1 transition-colors">
+                          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                        {isOwner && c.id !== currentUserId && (
+                          <button onClick={() => removeMember(c.id)} disabled={removingId === c.id}
+                            className="p-1.5 text-ink-3 hover:text-red-400 transition-colors">
+                            {removingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Contract form */}
+                    {showContract && isOwner && (
+                      <div className="px-5 py-4 bg-raised/30 border-t border-edge/40">
+                        <p className="text-xs font-semibold text-ink-2 uppercase tracking-wider mb-3">
+                          {c.contract ? 'Update contract' : 'Add contract'}
+                        </p>
+                        <ContractForm
+                          userId={c.id}
+                          existing={c.contract}
+                          onSaved={contract => onContractSaved(c.id, contract)}
+                          onCancel={() => setContractFormId(null)}
+                        />
+                      </div>
+                    )}
+
+                    {/* Compliance checklist */}
+                    {expanded && isOwner && (
+                      <CompliancePanel consultant={c} onUpdate={updateCompliance} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
 
-        {/* Past invites (non-pending) */}
-        {invites.filter((i) => i.status !== 'pending').length > 0 && (
-          <div className="space-y-3">
+        {/* Past invites */}
+        {invites.filter(i => i.status !== 'pending').length > 0 && (
+          <div className="space-y-2">
             <p className="text-xs font-medium text-ink-2 px-1">Past invites</p>
             <div className="rounded-xl border border-edge divide-y divide-edge/40 overflow-hidden">
-              {invites.filter((i) => i.status !== 'pending').map((inv) => (
+              {invites.filter(i => i.status !== 'pending').map(inv => (
                 <div key={inv.id} className="px-5 py-3 flex items-center justify-between">
                   <p className="text-xs text-ink-2">{inv.invited_email}</p>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_PILL[inv.status] ?? ''}`}>
-                    {inv.status}
-                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_PILL[inv.status] ?? ''}`}>{inv.status}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
-
       </main>
     </div>
   )

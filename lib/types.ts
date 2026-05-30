@@ -264,6 +264,77 @@ export interface KlippaOrgInvite {
   created_at:      string
 }
 
+// ── B2B Intelligence Types ─────────────────────────────────
+
+export type PayrollStatus   = 'open' | 'closed' | 'processing'
+export type ContractType    = 'fixed_term' | 'permanent' | 'freelance' | 'retainer'
+export type ContractStatus  = 'active' | 'expired' | 'terminated'
+export type RateType        = 'hourly' | 'daily' | 'monthly' | 'project'
+
+export interface KlippaPayrollPeriod {
+  id:              string
+  organisation_id: string
+  name:            string        // e.g. "June 2026"
+  period_start:    string        // ISO date
+  period_end:      string
+  deadline:        string        // submission deadline
+  status:          PayrollStatus
+  created_at:      string
+  updated_at:      string
+}
+
+export interface KlippaConsultantContract {
+  id:              string
+  organisation_id: string
+  user_id:         string
+  contract_type:   ContractType
+  start_date:      string | null
+  end_date:        string | null  // null = open-ended
+  rate:            number | null
+  rate_type:       RateType
+  status:          ContractStatus
+  notes:           string | null
+  created_at:      string
+  updated_at:      string
+}
+
+export interface KlippaConsultantCompliance {
+  id:                   string
+  organisation_id:      string
+  user_id:              string
+  tax_profile_complete: boolean
+  banking_verified:     boolean
+  id_verified:          boolean
+  popia_consent:        boolean
+  signed_agreement_at:  string | null
+  notes:                string | null
+  created_at:           string
+  updated_at:           string
+}
+
+// Aggregated per-consultant view for the org dashboard
+export interface OrgConsultantRow {
+  id:               string
+  email:            string
+  full_name:        string | null
+  org_role:         string | null
+  latest_timesheet: { status: string; month: string } | null
+  contract:         KlippaConsultantContract | null
+  compliance:       KlippaConsultantCompliance | null
+  compliance_score: number   // 0-5 checks passed
+}
+
+// Dashboard intelligence snapshot
+export interface OrgIntelligence {
+  active_consultants:  number
+  submission_rate:     number       // 0-100
+  missing_timesheets:  { id: string; name: string; email: string }[]
+  expiring_contracts:  { id: string; name: string; email: string; end_date: string; days_left: number }[]
+  current_period:      KlippaPayrollPeriod | null
+  days_until_deadline: number | null
+  consultants:         OrgConsultantRow[]
+}
+
 // ── Tier Feature Config ────────────────────────────────────
 
 export interface KlippaTierFeature {
