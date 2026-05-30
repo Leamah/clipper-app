@@ -5,9 +5,9 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import UserNav from '@/components/UserNav'
+import AppNav from '@/components/AppNav'
 import {
-  ShieldCheck, AlertCircle, Clock, ChevronRight, ExternalLink,
+  AlertCircle, Clock, ChevronRight, ExternalLink,
   CheckCircle2, Info, Calculator
 } from 'lucide-react'
 import type { KlippaProfile } from '@/lib/types'
@@ -89,12 +89,13 @@ function DeadlineCard({
 }
 
 export default function ProvisionalPage() {
-  const [profile,      setProfile]      = useState<KlippaProfile | null>(null)
-  const [loading,      setLoading]      = useState(true)
+  const [profile,         setProfile]         = useState<KlippaProfile | null>(null)
+  const [loading,         setLoading]         = useState(true)
   const [estimatedIncome, setEstimatedIncome] = useState(0)
-  const [rawEstimate,  setRawEstimate]  = useState('')
-  const [firstPaid,    setFirstPaid]    = useState(false)
-  const [secondPaid,   setSecondPaid]   = useState(false)
+  const [rawEstimate,     setRawEstimate]     = useState('')
+  const [firstPaid,       setFirstPaid]       = useState(false)
+  const [secondPaid,      setSecondPaid]       = useState(false)
+  const [taxReturnId,     setTaxReturnId]     = useState<string | null>(null)
 
   const runningYear = currentRunningTaxYear()
 
@@ -102,27 +103,28 @@ export default function ProvisionalPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Load profile
     const { data: profileData } = await supabase
       .from('klippa_profiles')
       .select('*')
       .eq('id', user.id)
       .single()
 
-    if (profileData) {
-      setProfile(profileData as KlippaProfile)
-    }
+    if (profileData) setProfile(profileData as KlippaProfile)
 
-    // Pre-populate estimate from the most recent year's income
+    // Load tax return — including payment status
     const { data: returnData } = await supabase
       .from('klippa_tax_returns')
-      .select('id, tax_year')
+      .select('id, tax_year, payment1_status, payment2_status')
       .eq('user_id', user.id)
       .order('tax_year', { ascending: false })
       .limit(1)
       .single()
 
     if (returnData) {
+      setTaxReturnId(returnData.id)
+      setFirstPaid(returnData.payment1_status === 'paid')
+      setSecondPaid(returnData.payment2_status === 'paid')
+
       const { data: incomeData } = await supabase
         .from('klippa_income_records')
         .select('amount')
@@ -137,6 +139,25 @@ export default function ProvisionalPage() {
 
     setLoading(false)
   }, [])
+
+  async function togglePayment(which: 1 | 2) {
+    const newStatus = which === 1 ? !firstPaid : !secondPaid
+    if (which === 1) setFirstPaid(newStatus)
+    else             setSecondPaid(newStatus)
+
+    if (taxReturnId) {
+      const field     = which === 1 ? 'payment1_status'  : 'payment2_status'
+      const fieldTime = which === 1 ? 'payment1_paid_at' : 'payment2_paid_at'
+      await supabase
+        .from('klippa_tax_returns')
+        .update({
+          [field]:     newStatus ? 'paid' : 'unpaid',
+          [fieldTime]: newStatus ? new Date().toISOString() : null,
+          updated_at:  new Date().toISOString(),
+        })
+        .eq('id', taxReturnId)
+    }
+  }
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -171,10 +192,16 @@ export default function ProvisionalPage() {
     profile.employment_type !== 'employee' &&
     estimatedIncome > PROVISIONAL_TAX_THRESHOLD
 
+  const featureFlags = {
+    timesheets:  profile?.feature_timesheets  ?? false,
+    logbook:     profile?.feature_logbook     ?? true,
+    provisional: profile?.feature_provisional ?? false,
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950">
-        <ProvisionalNav active />
+        <AppNav activePage="provisional" featureFlags={featureFlags} />
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -188,7 +215,7 @@ export default function ProvisionalPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/[0.04] blur-[100px] rounded-full" />
       </div>
 
-      <ProvisionalNav active />
+      <AppNav activePage="provisional" featureFlags={featureFlags} />
 
       <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-8">
 
@@ -292,7 +319,7 @@ export default function ProvisionalPage() {
                 amount={firstPayment}
                 sub={`50% of your estimated annual tax of ${formatRand(annualTax)}`}
                 paid={firstPaid}
-                onTogglePaid={() => setFirstPaid(v => !v)}
+                onTogglePaid={() => togglePayment(1)}
               />
               <DeadlineCard
                 label="Second provisional payment"
@@ -300,7 +327,7 @@ export default function ProvisionalPage() {
                 amount={secondPayment}
                 sub={firstPaid ? 'Remaining balance after first payment' : 'Remaining balance (mark first payment as paid to update)'}
                 paid={secondPaid}
-                onTogglePaid={() => setSecondPaid(v => !v)}
+                onTogglePaid={() => togglePayment(2)}
               />
             </div>
             <div className="flex items-start gap-2 text-xs text-zinc-600 px-1">
@@ -373,28 +400,3 @@ export default function ProvisionalPage() {
   )
 }
 
-// ── Nav ───────────────────────────────────────────────────
-
-function ProvisionalNav({ active }: { active?: boolean }) {
-  return (
-    <header className="relative z-30 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
-            <ShieldCheck className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-semibold text-sm tracking-tight">Klippa</span>
-        </Link>
-        <nav className="flex items-center gap-1 ml-4">
-          <Link href="/dashboard"   className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Dashboard</Link>
-          <Link href="/income"      className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Income</Link>
-          <Link href="/expenses"    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Expenses</Link>
-          <Link href="/documents"   className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
-          <span className="px-3 py-1.5 rounded-lg text-xs text-emerald-300 bg-emerald-500/10 font-medium">Provisional</span>
-          <Link href="/filing"      className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">File Return</Link>
-        </nav>
-        <div className="ml-auto"><UserNav /></div>
-      </div>
-    </header>
-  )
-}

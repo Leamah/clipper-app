@@ -5,9 +5,9 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import UserNav from '@/components/UserNav'
+import AppNav from '@/components/AppNav'
 import {
-  ShieldCheck, Car, Plus, Trash2, Loader2, X, Check,
+  Car, Plus, Trash2, Loader2, X, Check,
   Download, FileText, AlertCircle, ChevronRight, ChevronDown,
   Calendar, CheckCircle2, Clock, MapPin
 } from 'lucide-react'
@@ -232,35 +232,42 @@ export default function MileagePage() {
     )
   }
 
+  const featureFlags = {
+    timesheets:  profile?.feature_timesheets  ?? false,
+    logbook:     profile?.feature_logbook     ?? true,
+    provisional: profile?.feature_provisional ?? false,
+  }
+
+  async function handleExportSARSPDF() {
+    if (!profile) return
+    const { exportLogbookPDF } = await import('@/lib/pdf-export')
+    exportLogbookPDF(profile, trips, taxYear)
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
-              <ShieldCheck className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-semibold text-sm tracking-tight">Klippa</span>
-          </Link>
-          <span className="text-zinc-700 text-sm">/</span>
-          <span className="text-sm text-zinc-400">Logbook</span>
-          <div className="ml-auto flex items-center gap-2">
-            {isConfigured && (
-              <button onClick={exportLogbook} disabled={trips.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40 transition-all">
-                <Download className="w-3.5 h-3.5" /> Export CSV
-              </button>
-            )}
-            {isConfigured && (
-              <button onClick={() => setShowAddTrip(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Add trip
-              </button>
-            )}
-            <UserNav />
+      <AppNav activePage="mileage" featureFlags={featureFlags} logbookPending={pendingWeeks.length} />
+
+      {/* Action bar below nav */}
+      {isConfigured && (
+        <div className="border-b border-zinc-800/40 bg-zinc-950/60">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-11 flex items-center gap-2">
+            <span className="text-xs text-zinc-500 mr-auto">Mileage Logbook — Tax Year {taxYear}</span>
+            <button onClick={exportLogbook} disabled={trips.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40 transition-all">
+              <Download className="w-3 h-3" /> CSV
+            </button>
+            <button onClick={handleExportSARSPDF} disabled={trips.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40 transition-all">
+              <FileText className="w-3 h-3" /> SARS Logbook PDF
+            </button>
+            <button onClick={() => setShowAddTrip(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Add trip
+            </button>
           </div>
         </div>
-      </header>
+      )}
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
@@ -429,6 +436,7 @@ export default function MileagePage() {
 
       {showAddTrip && profile && (
         <AddTripModal
+          lastOdometerEnd={trips.find(t => t.odometer_end != null)?.odometer_end ?? profile.opening_odometer ?? undefined}
           taxReturnId={taxReturnId}
           profile={profile}
           onClose={() => setShowAddTrip(false)}
@@ -562,25 +570,47 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
 
 // ── Add trip modal (for ad-hoc client visits) ─────────────
 
-function AddTripModal({ taxReturnId, profile, onClose, onSaved }: {
-  taxReturnId: string | null
-  profile:     KlippaProfile
-  onClose:     () => void
-  onSaved:     (trip: KlippaMileageTrip) => void
+function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd }: {
+  taxReturnId:      string | null
+  profile:          KlippaProfile
+  onClose:          () => void
+  onSaved:          (trip: KlippaMileageTrip) => void
+  lastOdometerEnd?: number
 }) {
   const [form, setForm] = useState({
-    trip_date:      format(new Date(), 'yyyy-MM-dd'),
-    start_location: profile.home_suburb ?? '',
-    end_location:   '',
-    distance_km:    '',
-    purpose:        '',
-    trip_type:      'business' as 'business' | 'private',
+    trip_date:       format(new Date(), 'yyyy-MM-dd'),
+    start_location:  profile.home_suburb ?? '',
+    end_location:    '',
+    odometer_start:  lastOdometerEnd != null ? String(lastOdometerEnd) : '',
+    odometer_end:    '',
+    distance_km:     '',
+    purpose:         '',
+    trip_type:       'business' as 'business' | 'private',
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Auto-calculate distance when odometer fields are both filled
+  const odoStart = parseInt(form.odometer_start)
+  const odoEnd   = parseInt(form.odometer_end)
+  const odoKm    = !isNaN(odoStart) && !isNaN(odoEnd) && odoEnd > odoStart
+    ? String(odoEnd - odoStart)
+    : null
+
+  function handleOdoChange(field: 'odometer_start' | 'odometer_end', val: string) {
+    setForm(f => {
+      const updated = { ...f, [field]: val }
+      const s = parseInt(field === 'odometer_start' ? val : f.odometer_start)
+      const e = parseInt(field === 'odometer_end'   ? val : f.odometer_end)
+      if (!isNaN(s) && !isNaN(e) && e > s) {
+        updated.distance_km = String(e - s)
+      }
+      return updated
+    })
+  }
+
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault()
     const km = parseFloat(form.distance_km)
     if (isNaN(km) || km <= 0) { setError('Enter a valid distance'); return }
     setSaving(true)
@@ -588,6 +618,9 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved }: {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
+
+      const oStart = form.odometer_start ? parseInt(form.odometer_start) : null
+      const oEnd   = form.odometer_end   ? parseInt(form.odometer_end)   : null
 
       const { data, error: err } = await supabase
         .from('klippa_mileage_trips')
@@ -597,6 +630,8 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved }: {
           trip_date:      form.trip_date,
           start_location: form.start_location || null,
           end_location:   form.end_location   || null,
+          odometer_start: oStart,
+          odometer_end:   oEnd,
           distance_km:    km,
           purpose:        form.purpose,
           trip_type:      form.trip_type,
@@ -618,11 +653,10 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved }: {
       <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-white flex items-center gap-2">
-            <Car className="w-4 h-4 text-emerald-400" /> Add business trip
+            <Car className="w-4 h-4 text-emerald-400" /> Add trip
           </h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
         </div>
-        <p className="text-xs text-zinc-500">For client visits, deliveries, or any trip not in your regular schedule.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
@@ -641,24 +675,62 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved }: {
               <input type="date" value={form.trip_date} onChange={(e) => setForm((f) => ({ ...f, trip_date: e.target.value }))} className="input" required />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Distance (km)</label>
-              <input type="number" min="0.1" step="0.1" value={form.distance_km} onChange={(e) => setForm((f) => ({ ...f, distance_km: e.target.value }))} placeholder="0.0" className="input" required />
+              <label className="text-xs font-medium text-zinc-400">
+                Distance (km)
+                {odoKm && <span className="text-zinc-600 font-normal"> — auto from odometer</span>}
+              </label>
+              <input
+                type="number" min="0.1" step="0.1"
+                value={form.distance_km}
+                onChange={(e) => setForm((f) => ({ ...f, distance_km: e.target.value }))}
+                placeholder="0.0" className="input" required
+              />
             </div>
+          </div>
+
+          {/* Odometer fields — SARS compliance */}
+          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 px-3 py-3 space-y-2">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Odometer readings (SARS-compliant)</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Opening KM</label>
+                <input
+                  type="number" min="0" step="1"
+                  value={form.odometer_start}
+                  onChange={(e) => handleOdoChange('odometer_start', e.target.value)}
+                  placeholder={lastOdometerEnd != null ? String(lastOdometerEnd) : 'e.g. 48250'}
+                  className="input w-full"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Closing KM</label>
+                <input
+                  type="number" min="0" step="1"
+                  value={form.odometer_end}
+                  onChange={(e) => handleOdoChange('odometer_end', e.target.value)}
+                  placeholder="e.g. 48368"
+                  className="input w-full"
+                />
+              </div>
+            </div>
+            {lastOdometerEnd != null && !form.odometer_start && (
+              <p className="text-[10px] text-emerald-500/70">Opening KM pre-filled from last trip</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">From</label>
-              <input type="text" value={form.start_location} onChange={(e) => setForm((f) => ({ ...f, start_location: e.target.value }))} placeholder="Starting point" className="input" />
+              <label className="text-xs font-medium text-zinc-400">From (suburb)</label>
+              <input type="text" value={form.start_location} onChange={(e) => setForm((f) => ({ ...f, start_location: e.target.value }))} placeholder="e.g. Midrand" className="input" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">To</label>
-              <input type="text" value={form.end_location} onChange={(e) => setForm((f) => ({ ...f, end_location: e.target.value }))} placeholder="Destination" className="input" />
+              <label className="text-xs font-medium text-zinc-400">To (suburb)</label>
+              <input type="text" value={form.end_location} onChange={(e) => setForm((f) => ({ ...f, end_location: e.target.value }))} placeholder="e.g. Rosebank" className="input" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Business purpose <span className="text-zinc-600">(required by SARS)</span></label>
+            <label className="text-xs font-medium text-zinc-400">Reason for travel <span className="text-zinc-600">(required by SARS)</span></label>
             <input type="text" value={form.purpose} onChange={(e) => setForm((f) => ({ ...f, purpose: e.target.value }))} placeholder="e.g. Client meeting, site visit, courier run" className="input" required />
           </div>
 

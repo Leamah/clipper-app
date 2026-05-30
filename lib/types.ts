@@ -71,10 +71,16 @@ export interface KlippaProfile {
   office_fri:           boolean
   opening_odometer:     number
   closing_odometer:     number                // km at end of this tax year (for SARS logbook)
-  vehicle_make:         string | null
-  vehicle_model:        string | null
-  vehicle_year:         number | null
-  logbook_reminder:     'weekly' | 'monthly' | 'none'
+  vehicle_make:           string | null
+  vehicle_model:          string | null
+  vehicle_year:           number | null
+  vehicle_registration:   string | null       // e.g. 'GP 123-456'
+  vehicle_purchase_date:  string | null       // ISO date — for SARS logbook header
+  logbook_reminder:       'weekly' | 'monthly' | 'none'
+  // Feature flags — opt-in modules
+  feature_timesheets:   boolean
+  feature_logbook:      boolean
+  feature_provisional:  boolean
   // Retirement savings
   has_ra:               boolean
   ra_contributions:     number
@@ -109,6 +115,11 @@ export interface KlippaTaxReturn {
   assessed_at:       string | null
   refund_amount:     number | null
   employees_tax_paid: number        // PAYE already deducted by employer (IRP5 code 4102)
+  // IRP6 provisional tax payment tracking
+  payment1_status:   'unpaid' | 'paid'
+  payment2_status:   'unpaid' | 'paid'
+  payment1_paid_at:  string | null
+  payment2_paid_at:  string | null
   created_at:        string
   updated_at:        string
 }
@@ -179,12 +190,50 @@ export interface KlippaMileageTrip {
   trip_date:        string
   start_location:   string | null
   end_location:     string | null
+  odometer_start:   number | null  // opening KM — SARS requires per-trip odometer reading
+  odometer_end:     number | null  // closing KM
   distance_km:      number
   purpose:          string
   trip_type:        'business' | 'private'
   deductible_amount: number | null
   review_week:      string | null   // e.g. '2025-W22'
   created_at:       string
+}
+
+// ── Timesheet Types ────────────────────────────────────────
+
+export interface KlippaClient {
+  id:          string
+  user_id:     string
+  name:        string          // "Client company"
+  contact:     string | null   // contact person
+  hourly_rate: number | null
+  position:    string | null   // user's role at this client
+  is_active:   boolean
+  created_at:  string
+}
+
+export interface KlippaTimesheet {
+  id:              string
+  user_id:         string
+  client_id:       string | null
+  month:           string       // ISO date: first day of month 'YYYY-MM-01'
+  consultant_name: string | null
+  position:        string | null
+  hourly_rate:     number | null
+  status:          'draft' | 'submitted'
+  created_at:      string
+  updated_at:      string
+}
+
+export interface KlippaTimesheetEntry {
+  id:           string
+  user_id:      string
+  timesheet_id: string
+  entry_date:   string       // ISO date
+  hours:        number
+  comment:      string | null
+  created_at:   string
 }
 
 export interface KlippaLogbookReview {

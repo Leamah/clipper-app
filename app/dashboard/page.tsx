@@ -6,9 +6,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import UserNav from '@/components/UserNav'
+import AppNav from '@/components/AppNav'
 import {
-  ShieldCheck, TrendingUp, AlertCircle, CheckCircle2,
+  TrendingUp, AlertCircle, CheckCircle2,
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car, Zap,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
@@ -34,40 +34,6 @@ function formatRand(n: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
 }
 
-function NavBar({ logbookPending }: { logbookPending: number }) {
-  return (
-    <header className="relative z-30 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
-            <ShieldCheck className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-semibold text-sm tracking-tight">Klippa</span>
-        </Link>
-        <nav className="flex items-center gap-1 ml-4">
-          <span className="px-3 py-1.5 rounded-lg text-xs text-emerald-300 bg-emerald-500/10 font-medium">Dashboard</span>
-          <Link href="/income"      className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Income</Link>
-          <Link href="/expenses"    className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Expenses</Link>
-          <Link href="/documents"   className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
-          <Link href="/provisional" className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Provisional</Link>
-          <Link href="/filing"      className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">File Return</Link>
-        </nav>
-        <div className="ml-auto flex items-center gap-2">
-          {logbookPending > 0 && (
-            <Link
-              href="/mileage"
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 transition-colors text-[11px] text-amber-300 font-medium"
-            >
-              <AlertCircle className="w-3 h-3" />
-              {logbookPending}w logbook
-            </Link>
-          )}
-          <UserNav />
-        </div>
-      </div>
-    </header>
-  )
-}
 
 export default function Dashboard() {
   const router = useRouter()
@@ -198,10 +164,16 @@ export default function Dashboard() {
 
   const nextAction = getNextAction()
 
+  const featureFlags = {
+    timesheets:  profile?.feature_timesheets  ?? false,
+    logbook:     profile?.feature_logbook     ?? true,
+    provisional: profile?.feature_provisional ?? false,
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950">
-        <NavBar logbookPending={0} />
+        <AppNav activePage="dashboard" featureFlags={featureFlags} />
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -215,7 +187,7 @@ export default function Dashboard() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-600/[0.06] blur-[120px] rounded-full" />
       </div>
 
-      <NavBar logbookPending={logbookPending} />
+      <AppNav activePage="dashboard" featureFlags={featureFlags} logbookPending={logbookPending} />
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
 

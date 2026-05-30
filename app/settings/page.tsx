@@ -266,11 +266,17 @@ export default function SettingsPage() {
         closing_odometer:      profile.closing_odometer ?? 0,
         logbook_reminder:      profile.logbook_reminder ?? 'weekly',
         // Vehicle
-        has_vehicle:           profile.has_vehicle,
-        vehicle_make:          profile.vehicle_make || null,
-        vehicle_model:         profile.vehicle_model || null,
-        vehicle_year:          profile.vehicle_year || null,
-        vehicle_value:         profile.vehicle_value ?? 0,
+        has_vehicle:              profile.has_vehicle,
+        vehicle_make:             profile.vehicle_make || null,
+        vehicle_model:            profile.vehicle_model || null,
+        vehicle_year:             profile.vehicle_year || null,
+        vehicle_value:            profile.vehicle_value ?? 0,
+        vehicle_registration:     profile.vehicle_registration || null,
+        vehicle_purchase_date:    profile.vehicle_purchase_date || null,
+        // Feature flags
+        feature_timesheets:       profile.feature_timesheets ?? false,
+        feature_logbook:          profile.feature_logbook ?? true,
+        feature_provisional:      profile.feature_provisional ?? false,
         // Retirement
         has_ra:                profile.has_ra,
         ra_contributions:      profile.ra_contributions ?? 0,
@@ -447,6 +453,25 @@ export default function SettingsPage() {
               <Field label="Purchase price (incl. VAT)" hint="Used to look up the SARS fixed-cost rate table. Check your registration papers.">
                 <NumInput value={profile.vehicle_value ?? 0} onChange={(v) => update('vehicle_value', v)} step={5000} placeholder="e.g. 350000" />
               </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Registration number" hint="e.g. GP 123-456 — printed on your logbook PDF.">
+                  <input
+                    type="text"
+                    value={profile.vehicle_registration ?? ''}
+                    onChange={(e) => update('vehicle_registration', e.target.value || null)}
+                    placeholder="e.g. GP 123-456"
+                    className="input w-full"
+                  />
+                </Field>
+                <Field label="Purchase date" hint="From your registration certificate.">
+                  <input
+                    type="date"
+                    value={profile.vehicle_purchase_date ?? ''}
+                    onChange={(e) => update('vehicle_purchase_date', e.target.value || null)}
+                    className="input w-full"
+                  />
+                </Field>
+              </div>
             </div>
           )}
         </Section>
@@ -518,6 +543,30 @@ export default function SettingsPage() {
             label="Interest-bearing savings / fixed deposit"
             sub="Exemption: R23,800/yr under 65, or R34,500/yr if 65 or older"
             value={profile.has_interest_savings} onChange={(v) => update('has_interest_savings', v)}
+          />
+        </Section>
+
+        {/* ── Features ── */}
+        <Section title="Features" hint="Enable the modules that apply to your work. Unused features stay out of your navigation.">
+          <ToggleRow
+            label="Timesheets"
+            sub="Track billable hours per client and export professional timecards to PDF"
+            impact="Useful if you bill clients by the hour — consultants, contractors, developers"
+            value={profile.feature_timesheets ?? false}
+            onChange={(v) => update('feature_timesheets', v)}
+          />
+          <ToggleRow
+            label="Mileage Logbook"
+            sub="Maintain a SARS-compliant vehicle logbook with auto-generated weekly entries"
+            value={profile.feature_logbook ?? true}
+            onChange={(v) => update('feature_logbook', v)}
+          />
+          <ToggleRow
+            label="Provisional Tax (IRP6)"
+            sub="Track your bi-annual IRP6 payment deadlines and amounts"
+            impact="Recommended if you are freelance or self-employed and earn more than R30,000/year after deductions"
+            value={profile.feature_provisional ?? false}
+            onChange={(v) => update('feature_provisional', v)}
           />
         </Section>
 

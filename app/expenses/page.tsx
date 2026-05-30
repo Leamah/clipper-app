@@ -6,9 +6,9 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import UserNav from '@/components/UserNav'
+import AppNav from '@/components/AppNav'
 import {
-  ShieldCheck, Plus, FileSpreadsheet, Trash2, Loader2,
+  Plus, FileSpreadsheet, Trash2, Loader2,
   X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, Camera
 } from 'lucide-react'
 import type { KlippaExpenseRecord, KlippaTaxReturn, ExpenseCategory, IncomeType } from '@/lib/types'
@@ -552,24 +552,7 @@ function ExpensesPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="relative z-30 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
-              <ShieldCheck className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-semibold text-sm tracking-tight">Klippa</span>
-          </Link>
-          <nav className="flex items-center gap-1 ml-4">
-            <Link href="/dashboard"  className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Dashboard</Link>
-            <Link href="/income"     className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Income</Link>
-            <span className="px-3 py-1.5 rounded-lg text-xs text-emerald-300 bg-emerald-500/10 font-medium">Expenses</span>
-            <Link href="/documents"  className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Documents</Link>
-            <Link href="/filing"     className="px-3 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors">File Return</Link>
-          </nav>
-          <div className="ml-auto"><UserNav /></div>
-        </div>
-      </header>
+      <AppNav activePage="expenses" />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         {/* Header */}
