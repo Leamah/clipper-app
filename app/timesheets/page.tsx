@@ -36,18 +36,19 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 // ── New Client Panel ──────────────────────────────────────
 
 function NewClientPanel({
+  userId,
   onSave,
   onClose,
 }: {
-  onSave: (c: KlippaClient) => void
+  userId:  string
+  onSave:  (c: KlippaClient) => void
   onClose: () => void
 }) {
-  const [name,        setName]        = useState('')
-  const [contact,     setContact]     = useState('')
-  const [position,    setPosition]    = useState('')
-  const [hourlyRate,  setHourlyRate]  = useState('')
-  const [saving,      setSaving]      = useState(false)
-  const [err,         setErr]         = useState('')
+  const [name,     setName]     = useState('')
+  const [contact,  setContact]  = useState('')
+  const [position, setPosition] = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [err,      setErr]      = useState('')
 
   async function handleSave() {
     if (!name.trim()) { setErr('Client name is required'); return }
@@ -55,10 +56,10 @@ function NewClientPanel({
     const { data, error } = await supabase
       .from('klippa_clients')
       .insert({
-        name:        name.trim(),
-        contact:     contact.trim() || null,
-        position:    position.trim() || null,
-        hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
+        user_id:  userId,
+        name:     name.trim(),
+        contact:  contact.trim() || null,
+        position: position.trim() || null,
       })
       .select()
       .single()
@@ -108,17 +109,6 @@ function NewClientPanel({
               placeholder="e.g. Jane Smith"
               value={contact}
               onChange={e => setContact(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Default hourly rate (ZAR)</label>
-            <input
-              type="number"
-              min="0"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-              placeholder="e.g. 850"
-              value={hourlyRate}
-              onChange={e => setHourlyRate(e.target.value)}
             />
           </div>
           {err && <p className="text-xs text-red-400">{err}</p>}
@@ -573,7 +563,7 @@ export default function TimesheetsPage() {
           </button>
         </div>
         {showNewClient && (
-          <NewClientPanel onSave={handleNewClient} onClose={() => setShowNewClient(false)} />
+          <NewClientPanel userId={profile!.id} onSave={handleNewClient} onClose={() => setShowNewClient(false)} />
         )}
       </div>
     )
@@ -759,7 +749,7 @@ export default function TimesheetsPage() {
 
       {/* New client panel */}
       {showNewClient && (
-        <NewClientPanel onSave={handleNewClient} onClose={() => setShowNewClient(false)} />
+        <NewClientPanel userId={profile!.id} onSave={handleNewClient} onClose={() => setShowNewClient(false)} />
       )}
     </div>
   )
