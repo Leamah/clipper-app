@@ -18,8 +18,8 @@ export const OZOW_PAY_URL = 'https://pay.ozow.com/'
 export const PLANS = {
   starter: {
     name:         'Starter',
-    monthlyPrice: 149,
-    annualPrice:  1490,   // ~2 months free
+    monthlyPrice: 20,
+    annualPrice:  200,    // ~2 months free
     description:  'For anyone who works for themselves and needs to stay SARS-compliant.',
     features: [
       'Unlimited income & expense tracking',
