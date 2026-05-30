@@ -200,7 +200,7 @@ export default function ProvisionalPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen bg-zinc-950 pl-52">
         <AppNav activePage="provisional" featureFlags={featureFlags} />
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -210,7 +210,7 @@ export default function ProvisionalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/[0.04] blur-[100px] rounded-full" />
       </div>

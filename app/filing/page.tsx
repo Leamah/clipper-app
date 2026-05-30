@@ -132,7 +132,7 @@ export default function FilingPage() {
   const deadline = getITR12Deadline(taxReturn.tax_year)
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/[0.05] blur-[100px] rounded-full" />
       </div>

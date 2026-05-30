@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { LogOut, Shield, User, Car, Settings, CreditCard, Zap } from 'lucide-react'
 import type { KlippaProfile } from '@/lib/types'
 
-export default function UserNav() {
+export default function UserNav({ sidebar = false }: { sidebar?: boolean }) {
   const [email,   setEmail]   = useState<string | null>(null)
   const [profile, setProfile] = useState<Pick<KlippaProfile, 'subscription_tier'> | null>(null)
   const [open,    setOpen]    = useState(false)
@@ -53,7 +53,10 @@ export default function UserNav() {
         {open && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-            <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl shadow-black/40 overflow-hidden">
+            <div className={sidebar
+              ? 'fixed left-52 bottom-4 z-50 w-56 rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl shadow-black/40 overflow-hidden'
+              : 'absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl shadow-black/40 overflow-hidden'
+            }>
               <div className="px-4 py-3 border-b border-zinc-800">
                 <p className="text-xs text-zinc-400 truncate">{email}</p>
                 <p className="text-xs font-medium text-zinc-200 mt-0.5 capitalize flex items-center gap-1.5">

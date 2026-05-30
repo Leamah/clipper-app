@@ -236,7 +236,7 @@ function DocumentsPage() {
   const years = [...new Set(docs.map((d) => d.tax_year).filter(Boolean))] as number[]
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
       <AppNav activePage="documents" />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
