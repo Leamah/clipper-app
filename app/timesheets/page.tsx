@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,19 +75,19 @@ function NewClientPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl">
+      <div className="w-full max-w-md bg-surface border border-edge rounded-2xl p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-semibold text-base">New client</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300">
+          <button onClick={onClose} className="text-ink-2 hover:text-ink-1">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Client company *</label>
+            <label className="block text-xs text-ink-2 mb-1">Client company *</label>
             <input
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+              className="w-full bg-raised border border-edge rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
               placeholder="e.g. Acme Corp"
               value={name}
               onChange={e => setName(e.target.value)}
@@ -95,18 +95,18 @@ function NewClientPanel({
             />
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Your role / position</label>
+            <label className="block text-xs text-ink-2 mb-1">Your role / position</label>
             <input
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+              className="w-full bg-raised border border-edge rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
               placeholder="e.g. Senior Developer"
               value={position}
               onChange={e => setPosition(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Contact person</label>
+            <label className="block text-xs text-ink-2 mb-1">Contact person</label>
             <input
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+              className="w-full bg-raised border border-edge rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
               placeholder="e.g. Jane Smith"
               value={contact}
               onChange={e => setContact(e.target.value)}
@@ -118,7 +118,7 @@ function NewClientPanel({
         <div className="mt-6 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-zinc-700 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+            className="flex-1 px-4 py-2 rounded-lg border border-edge text-sm text-ink-2 hover:text-ink-1 transition-colors"
           >
             Cancel
           </button>
@@ -139,7 +139,7 @@ function NewClientPanel({
 
 function StatusBadge({ status }: { status: KlippaTimesheet['status'] }) {
   const map = {
-    draft:     { label: 'Draft',                    cls: 'text-zinc-400 bg-zinc-800' },
+    draft:     { label: 'Draft',                    cls: 'text-ink-2 bg-raised' },
     submitted: { label: 'Awaiting client sign-off', cls: 'text-amber-300 bg-amber-500/15' },
     approved:  { label: 'Approved',                 cls: 'text-emerald-300 bg-emerald-500/15' },
   }
@@ -216,10 +216,10 @@ function DayCard({
   // ── Editing state ─────────────────────────────────────
   if (editing) {
     return (
-      <div className="rounded-xl border border-emerald-500/50 bg-zinc-900 p-2.5 min-h-[72px] shadow-lg shadow-emerald-900/20">
+      <div className="rounded-xl border border-emerald-500/50 bg-surface p-2.5 min-h-[72px] shadow-lg shadow-emerald-900/20">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] text-zinc-400 font-medium">{dayLabel} {dayNum}</span>
-          <button onClick={() => setEditing(false)} className="text-zinc-600 hover:text-zinc-400">
+          <span className="text-[10px] text-ink-2 font-medium">{dayLabel} {dayNum}</span>
+          <button onClick={() => setEditing(false)} className="text-ink-3 hover:text-ink-2">
             <X className="w-3 h-3" />
           </button>
         </div>
@@ -233,17 +233,17 @@ function DayCard({
             value={hours}
             onChange={e => setHours(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-16 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-sm text-center focus:outline-none focus:border-emerald-500"
+            className="w-16 bg-raised border border-edge rounded-md px-2 py-1 text-sm text-center focus:outline-none focus:border-emerald-500"
             placeholder="hrs"
           />
-          <span className="text-xs text-zinc-500">hrs</span>
+          <span className="text-xs text-ink-2">hrs</span>
         </div>
         <input
           type="text"
           value={comment}
           onChange={e => setComment(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-emerald-500"
+          className="w-full bg-raised border border-edge rounded-md px-2 py-1 text-xs focus:outline-none focus:border-emerald-500"
           placeholder="Note (optional)"
         />
         <div className="flex gap-1.5 mt-1.5">
@@ -258,7 +258,7 @@ function DayCard({
             <button
               onClick={handleDelete}
               disabled={saving}
-              className="px-2 py-1 rounded-md bg-zinc-800 hover:bg-red-900/40 text-zinc-400 hover:text-red-400 text-xs transition-colors"
+              className="px-2 py-1 rounded-md bg-raised hover:bg-red-900/40 text-ink-2 hover:text-red-400 text-xs transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
@@ -277,16 +277,16 @@ function DayCard({
         className="w-full text-left rounded-xl border border-emerald-500/30 bg-emerald-950/20 hover:border-emerald-500/50 p-2.5 min-h-[72px] transition-colors group disabled:cursor-default disabled:hover:border-emerald-500/30"
       >
         <div className="flex items-center justify-between mb-0.5">
-          <span className="text-[10px] text-zinc-500 font-medium">{dayLabel}</span>
+          <span className="text-[10px] text-ink-2 font-medium">{dayLabel}</span>
           {locked
-            ? <Lock className="w-2.5 h-2.5 text-zinc-700" />
-            : <Pencil className="w-2.5 h-2.5 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity" />
+            ? <Lock className="w-2.5 h-2.5 text-ink-3" />
+            : <Pencil className="w-2.5 h-2.5 text-ink-3 opacity-0 group-hover:opacity-100 transition-opacity" />
           }
         </div>
         <div className="text-xl font-bold text-emerald-300">{entry!.hours}</div>
-        <div className="text-[10px] text-zinc-500">hrs</div>
+        <div className="text-[10px] text-ink-2">hrs</div>
         {entry!.comment && (
-          <div className="text-[10px] text-zinc-600 mt-0.5 truncate">{entry!.comment}</div>
+          <div className="text-[10px] text-ink-3 mt-0.5 truncate">{entry!.comment}</div>
         )}
       </button>
     )
@@ -299,8 +299,8 @@ function DayCard({
         onClick={openEdit}
         className="w-full text-left rounded-xl border border-amber-500/20 bg-amber-950/10 hover:border-amber-500/40 p-2.5 min-h-[72px] transition-colors"
       >
-        <div className="text-[10px] text-zinc-500 font-medium">{dayLabel}</div>
-        <div className="text-lg font-semibold text-zinc-300">{dayNum}</div>
+        <div className="text-[10px] text-ink-2 font-medium">{dayLabel}</div>
+        <div className="text-lg font-semibold text-ink-1">{dayNum}</div>
         <div className="text-[9px] text-amber-400/80 mt-0.5 leading-tight">{holiday}</div>
       </button>
     )
@@ -310,12 +310,12 @@ function DayCard({
   return (
     <button
       onClick={openEdit}
-      className="w-full text-left rounded-xl border border-zinc-800/60 border-dashed hover:border-zinc-600 hover:bg-zinc-900/50 p-2.5 min-h-[72px] transition-colors group"
+      className="w-full text-left rounded-xl border border-edge/60 border-dashed hover:border-zinc-600 hover:bg-surface/50 p-2.5 min-h-[72px] transition-colors group"
     >
-      <div className="text-[10px] text-zinc-600 font-medium">{dayLabel}</div>
-      <div className="text-lg font-semibold text-zinc-500">{dayNum}</div>
+      <div className="text-[10px] text-ink-3 font-medium">{dayLabel}</div>
+      <div className="text-lg font-semibold text-ink-2">{dayNum}</div>
       <div className="opacity-0 group-hover:opacity-100 transition-opacity mt-1">
-        <Plus className="w-3 h-3 text-zinc-600" />
+        <Plus className="w-3 h-3 text-ink-3" />
       </div>
     </button>
   )
@@ -617,7 +617,7 @@ export default function TimesheetsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen bg-base flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -626,14 +626,14 @@ export default function TimesheetsPage() {
   // ── Feature not enabled ───────────────────────────────
   if (!profile?.feature_timesheets) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
+      <div className="min-h-screen bg-base text-ink-1 pl-52">
         <AppNav activePage="timesheets" featureFlags={featureFlags} />
         <div className="max-w-lg mx-auto px-6 py-24 text-center">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
             <Clock className="w-5 h-5 text-emerald-400" />
           </div>
           <h2 className="text-xl font-semibold mb-2">Timesheets not enabled</h2>
-          <p className="text-sm text-zinc-400 mb-6">
+          <p className="text-sm text-ink-2 mb-6">
             Enable Timesheets in Settings to track billable hours per client and export professional timecards.
           </p>
           <a
@@ -650,14 +650,14 @@ export default function TimesheetsPage() {
   // ── No clients ────────────────────────────────────────
   if (clients.length === 0) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
+      <div className="min-h-screen bg-base text-ink-1 pl-52">
         <AppNav activePage="timesheets" featureFlags={featureFlags} />
         <div className="max-w-lg mx-auto px-6 py-24 text-center">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
             <Users className="w-5 h-5 text-emerald-400" />
           </div>
           <h2 className="text-xl font-semibold mb-2">No clients yet</h2>
-          <p className="text-sm text-zinc-400 mb-6">
+          <p className="text-sm text-ink-2 mb-6">
             Add your first client to start tracking billable hours.
           </p>
           <button
@@ -677,7 +677,7 @@ export default function TimesheetsPage() {
 
   // ── Main view ─────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52 pb-32">
+    <div className="min-h-screen bg-base text-ink-1 pl-52 pb-32">
       <AppNav activePage="timesheets" featureFlags={featureFlags} />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
@@ -692,7 +692,7 @@ export default function TimesheetsPage() {
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   activeClient?.id === c.id
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    : 'bg-raised text-ink-2 hover:text-ink-1'
                 }`}
               >
                 {c.name}
@@ -700,7 +700,7 @@ export default function TimesheetsPage() {
             ))}
             <button
               onClick={() => setShowNewClient(true)}
-              className="px-2.5 py-1.5 rounded-full bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-xs transition-colors flex items-center gap-1"
+              className="px-2.5 py-1.5 rounded-full bg-raised text-ink-2 hover:text-ink-1 text-xs transition-colors flex items-center gap-1"
             >
               <Plus className="w-3 h-3" /> New client
             </button>
@@ -710,7 +710,7 @@ export default function TimesheetsPage() {
           <div className="ml-auto flex items-center gap-1.5">
             <button
               onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors"
+              className="w-8 h-8 rounded-lg bg-raised hover:bg-edge flex items-center justify-center text-ink-2 hover:text-ink-1 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -719,7 +719,7 @@ export default function TimesheetsPage() {
             </span>
             <button
               onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors"
+              className="w-8 h-8 rounded-lg bg-raised hover:bg-edge flex items-center justify-center text-ink-2 hover:text-ink-1 transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -728,7 +728,7 @@ export default function TimesheetsPage() {
 
         {/* Timesheet meta */}
         {timesheet && (
-          <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-ink-2">
             <span className="flex items-center gap-1">
               <Briefcase className="w-3 h-3" />
               {timesheet.position || activeClient?.position || '—'}
@@ -741,8 +741,8 @@ export default function TimesheetsPage() {
         )}
 
         {/* Smart fill bar */}
-        <div className="mb-5 flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
-            <span className="text-sm text-zinc-400 flex-1">Fill all working days with</span>
+        <div className="mb-5 flex items-center gap-3 bg-surface border border-edge rounded-xl px-4 py-3">
+            <span className="text-sm text-ink-2 flex-1">Fill all working days with</span>
             <input
               type="number"
               min="0.5"
@@ -750,9 +750,9 @@ export default function TimesheetsPage() {
               step="0.5"
               value={smartFillHrs}
               onChange={e => setSmartFillHrs(e.target.value)}
-              className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-emerald-500"
+              className="w-16 bg-raised border border-edge rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-emerald-500"
             />
-            <span className="text-sm text-zinc-400">hours</span>
+            <span className="text-sm text-ink-2">hours</span>
             <button
               onClick={handleSmartFill}
               className="px-4 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-medium transition-colors"
@@ -762,7 +762,7 @@ export default function TimesheetsPage() {
           </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 mb-4 text-[11px] text-zinc-600">
+        <div className="flex items-center gap-4 mb-4 text-[11px] text-ink-3">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-emerald-950/40 border border-emerald-500/30 inline-block" />
             Hours logged
@@ -776,7 +776,7 @@ export default function TimesheetsPage() {
         {/* Calendar header */}
         <div className="grid grid-cols-7 gap-1.5 mb-1.5">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-            <div key={d} className="text-center text-[10px] text-zinc-600 font-medium py-1">{d}</div>
+            <div key={d} className="text-center text-[10px] text-ink-3 font-medium py-1">{d}</div>
           ))}
         </div>
 
@@ -805,10 +805,10 @@ export default function TimesheetsPage() {
 
         {/* Sign-off card */}
         {timesheet && (
-          <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+          <div className="mt-8 rounded-2xl border border-edge bg-surface/60 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-                <PenLine className="w-4 h-4 text-zinc-400" />
+              <h3 className="text-sm font-semibold text-ink-1 flex items-center gap-2">
+                <PenLine className="w-4 h-4 text-ink-2" />
                 Sign-off
               </h3>
               <StatusBadge status={timesheet.status} />
@@ -816,12 +816,12 @@ export default function TimesheetsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               {/* Consultant */}
-              <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-3">Consultant</div>
-                <div className="text-sm text-zinc-200 font-medium truncate">
+              <div className="rounded-xl border border-edge bg-base/50 p-4">
+                <div className="text-[10px] uppercase tracking-wider text-ink-2 font-semibold mb-3">Consultant</div>
+                <div className="text-sm text-ink-1 font-medium truncate">
                   {timesheet.consultant_name || profile?.full_name || '—'}
                 </div>
-                <div className="text-xs text-zinc-500 mb-4">
+                <div className="text-xs text-ink-2 mb-4">
                   {timesheet.position || activeClient?.position || '—'}
                 </div>
                 {timesheet.consultant_signed_at ? (
@@ -832,7 +832,7 @@ export default function TimesheetsPage() {
                     </div>
                     <button
                       onClick={unsignConsultant}
-                      className="text-xs text-zinc-600 hover:text-zinc-400 underline underline-offset-2 transition-colors"
+                      className="text-xs text-ink-3 hover:text-ink-2 underline underline-offset-2 transition-colors"
                     >
                       Undo signature
                     </button>
@@ -850,12 +850,12 @@ export default function TimesheetsPage() {
               </div>
 
               {/* Client */}
-              <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-3">Client</div>
-                <div className="text-sm text-zinc-200 font-medium truncate">
+              <div className="rounded-xl border border-edge bg-base/50 p-4">
+                <div className="text-[10px] uppercase tracking-wider text-ink-2 font-semibold mb-3">Client</div>
+                <div className="text-sm text-ink-1 font-medium truncate">
                   {activeClient?.contact || '—'}
                 </div>
-                <div className="text-xs text-zinc-500 mb-4">{activeClient?.name || '—'}</div>
+                <div className="text-xs text-ink-2 mb-4">{activeClient?.name || '—'}</div>
                 {timesheet.client_signed_at ? (
                   <div className="flex items-center gap-1.5 text-emerald-400 text-xs">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
@@ -863,20 +863,20 @@ export default function TimesheetsPage() {
                   </div>
                 ) : timesheet.consultant_signed_at ? (
                   <div className="space-y-2">
-                    <p className="text-xs text-zinc-500 leading-relaxed">
+                    <p className="text-xs text-ink-2 leading-relaxed">
                       Export the PDF for physical or DocuSign signature, then mark confirmed here.
                     </p>
                     <button
                       onClick={signClient}
                       disabled={signingClient}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-zinc-700 hover:border-emerald-600 text-zinc-300 hover:text-emerald-300 text-xs font-medium transition-colors disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-edge hover:border-emerald-600 text-ink-1 hover:text-emerald-300 text-xs font-medium transition-colors disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       {signingClient ? 'Marking…' : 'Mark client signed'}
                     </button>
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-600">Sign the consultant section first.</p>
+                  <p className="text-xs text-ink-3">Sign the consultant section first.</p>
                 )}
               </div>
             </div>
@@ -895,17 +895,17 @@ export default function TimesheetsPage() {
       </div>
 
       {/* Sticky footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800/60 bg-zinc-950/90 backdrop-blur-sm">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-edge/60 bg-base/90 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
           {/* Totals */}
           <div className="flex items-center gap-4">
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wide">Total hours</div>
+              <div className="text-[10px] text-ink-2 uppercase tracking-wide">Total hours</div>
               <div className="text-lg font-bold text-emerald-300">{totalHours}</div>
             </div>
             {billable !== null && (
               <div>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wide">Billable</div>
+                <div className="text-[10px] text-ink-2 uppercase tracking-wide">Billable</div>
                 <div className="text-lg font-bold text-white">{fmtRand(billable)}</div>
               </div>
             )}
@@ -917,7 +917,7 @@ export default function TimesheetsPage() {
             )}
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200 text-sm transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-edge hover:border-zinc-500 text-ink-2 hover:text-ink-1 text-sm transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Export PDF
@@ -925,7 +925,7 @@ export default function TimesheetsPage() {
             <button
               onClick={handleSavePDF}
               disabled={savingPdf}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-700 hover:border-emerald-600 text-zinc-400 hover:text-emerald-300 text-sm transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-edge hover:border-emerald-600 text-ink-2 hover:text-emerald-300 text-sm transition-colors disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
               {savingPdf ? 'Saving…' : 'Save to Docs'}

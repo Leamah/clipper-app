@@ -6,9 +6,22 @@ const config: Config = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        // ── Semantic surface tokens (light/dark via CSS vars) ──────────
+        base:    'rgb(var(--color-base)    / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        raised:  'rgb(var(--color-raised)  / <alpha-value>)',
+        edge:    'rgb(var(--color-edge)    / <alpha-value>)',
+        // ── Semantic text tokens ──────────────────────────────────────
+        ink: {
+          1: 'rgb(var(--color-ink-1) / <alpha-value>)',
+          2: 'rgb(var(--color-ink-2) / <alpha-value>)',
+          3: 'rgb(var(--color-ink-3) / <alpha-value>)',
+        },
+        // ── Legacy brand palette (kept for any remaining uses) ─────────
         brand: {
           50:  '#f5f3ff',
           100: '#ede9fe',

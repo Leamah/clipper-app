@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,7 +79,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-base flex items-center justify-center p-4">
       {/* Glow */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/10 blur-[100px] rounded-full" />
@@ -93,28 +93,28 @@ function LoginForm() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Klippa</h1>
-            <p className="text-sm text-zinc-500 mt-1">Tax made simple for South African freelancers</p>
+            <p className="text-sm text-ink-2 mt-1">Tax made simple for South African freelancers</p>
           </div>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-6 shadow-xl">
+        <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-6 shadow-xl">
           {sent ? (
             <div className="text-center space-y-3 py-4">
               <div className="inline-flex w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 items-center justify-center mx-auto">
                 <CheckCircle2 className="w-7 h-7 text-emerald-400" />
               </div>
               <p className="font-semibold text-white text-lg">Check your inbox</p>
-              <p className="text-sm text-zinc-400 leading-relaxed">
+              <p className="text-sm text-ink-2 leading-relaxed">
                 We sent a magic link to{' '}
                 <span className="text-emerald-300 font-medium">{email}</span>.
                 <br />
                 Click the link to sign in. No password needed.
               </p>
-              <p className="text-xs text-zinc-600 pt-1">The link expires in 60 minutes.</p>
+              <p className="text-xs text-ink-3 pt-1">The link expires in 60 minutes.</p>
               <button
                 onClick={() => { setSent(false); setEmail('') }}
-                className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 mt-2 transition-colors"
+                className="text-xs text-ink-2 hover:text-ink-1 underline underline-offset-2 mt-2 transition-colors"
               >
                 Use a different email
               </button>
@@ -122,14 +122,14 @@ function LoginForm() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-zinc-200">Sign in</p>
-                <p className="text-xs text-zinc-500">Enter your email and we'll send a magic link.</p>
+                <p className="text-sm font-semibold text-ink-1">Sign in</p>
+                <p className="text-xs text-ink-2">Enter your email and we'll send a magic link.</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Email address</label>
+                <label className="text-xs font-medium text-ink-2">Email address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-2" />
                   <input
                     type="email"
                     value={email}
@@ -137,7 +137,7 @@ function LoginForm() {
                     placeholder="you@example.com"
                     required
                     disabled={loading}
-                    className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60 transition-colors disabled:opacity-60"
+                    className="w-full bg-raised/60 border border-edge rounded-xl pl-9 pr-4 py-2.5 text-sm text-ink-1 placeholder:text-ink-3 outline-none focus:border-emerald-500/60 transition-colors disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -168,7 +168,7 @@ function LoginForm() {
           )}
         </div>
 
-        <p className="text-center text-xs text-zinc-600">
+        <p className="text-center text-xs text-ink-3">
           Free to start. Built for South African freelancers &amp; consultants.
         </p>
       </div>

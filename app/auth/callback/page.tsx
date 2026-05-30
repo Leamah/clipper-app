@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * Auth Callback — implicit flow
@@ -82,10 +82,10 @@ export default function AuthCallback() {
   }, [router])
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+    <div className="min-h-screen bg-base flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-        <p className="text-sm text-zinc-500">Signing you in…</p>
+        <p className="text-sm text-ink-2">Signing you in…</p>
       </div>
     </div>
   )

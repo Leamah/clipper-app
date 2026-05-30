@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,10 +83,10 @@ export default function FilingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen bg-base">
         <FilingNav step={-1} totalSteps={5} onPrev={() => {}} onNext={() => {}} canNext={false} />
         <div className="flex items-center justify-center py-32">
-          <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
+          <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
         </div>
       </div>
     )
@@ -94,11 +94,11 @@ export default function FilingPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen bg-base">
         <FilingNav step={-1} totalSteps={5} onPrev={() => {}} onNext={() => {}} canNext={false} />
         <div className="max-w-2xl mx-auto px-6 py-16 text-center space-y-4">
           <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
-          <p className="text-zinc-300">No tax return found. Please complete onboarding first.</p>
+          <p className="text-ink-1">No tax return found. Please complete onboarding first.</p>
           <Link href="/onboarding" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold">Start onboarding</Link>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function FilingPage() {
   const deadline = getITR12Deadline(taxReturn.tax_year)
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
+    <div className="min-h-screen bg-base text-ink-1 pl-52">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/[0.05] blur-[100px] rounded-full" />
       </div>
@@ -150,14 +150,14 @@ export default function FilingPage() {
                   i === step
                     ? 'bg-emerald-600 text-white'
                     : i < step
-                      ? 'bg-zinc-800 text-emerald-400 cursor-pointer hover:bg-zinc-700'
-                      : 'bg-zinc-900 text-zinc-600 cursor-default'
+                      ? 'bg-raised text-emerald-400 cursor-pointer hover:bg-edge'
+                      : 'bg-surface text-ink-3 cursor-default'
                 }`}
               >
                 {i < step ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
                 <span className="hidden sm:inline">{s}</span>
               </button>
-              {i < STEPS.length - 1 && <div className={`w-6 h-px ${i < step ? 'bg-emerald-500' : 'bg-zinc-800'}`} />}
+              {i < STEPS.length - 1 && <div className={`w-6 h-px ${i < step ? 'bg-emerald-500' : 'bg-raised'}`} />}
             </div>
           ))}
         </div>
@@ -167,10 +167,10 @@ export default function FilingPage() {
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold text-white">Review your return</h1>
-              <p className="text-sm text-zinc-500 mt-1">Tax year {taxReturn.tax_year} · ITR12 · Filing deadline {deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              <p className="text-sm text-ink-2 mt-1">Tax year {taxReturn.tax_year} · ITR12 · Filing deadline {deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
 
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800">
+            <div className="rounded-2xl border border-edge bg-surface/40 divide-y divide-edge">
               <SectionRow label="Income records" value={`${incomeRecords.length} records`} sub={formatRand(totalIncome)} href="/income" />
               <SectionRow label="Confirmed expenses" value={`${expenseRecords.length} records`} sub={`${formatRand(totalDeductible)} deductible`} href="/expenses" />
               <SectionRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} />
@@ -200,12 +200,12 @@ export default function FilingPage() {
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold text-white">Your eFiling cheat sheet</h1>
-              <p className="text-sm text-zinc-500 mt-1">Enter these exact values on SARS eFiling. Copy each line into the corresponding field on your ITR12.</p>
+              <p className="text-sm text-ink-2 mt-1">Enter these exact values on SARS eFiling. Copy each line into the corresponding field on your ITR12.</p>
             </div>
 
-            <div className="rounded-2xl border border-zinc-800 overflow-hidden">
-              <div className="px-4 py-3 bg-zinc-900/60 border-b border-zinc-800">
-                <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Income (ITR12 — Local income)</p>
+            <div className="rounded-2xl border border-edge overflow-hidden">
+              <div className="px-4 py-3 bg-surface/60 border-b border-edge">
+                <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Income (ITR12 — Local income)</p>
               </div>
               {incomeRecords.reduce((groups, r) => {
                 const existing = groups.find((g) => g.type === r.income_type)
@@ -224,8 +224,8 @@ export default function FilingPage() {
                 )
               })}
 
-              <div className="px-4 py-3 bg-zinc-900/60 border-t border-b border-zinc-800 mt-2">
-                <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Deductions</p>
+              <div className="px-4 py-3 bg-surface/60 border-t border-b border-edge mt-2">
+                <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Deductions</p>
               </div>
               {taxResult.section11fRa > 0 && (
                 <CheatRow code={SARS_DEDUCTION_CODES.section11f.code} label={SARS_DEDUCTION_CODES.section11f.label} value={formatRand(taxResult.section11fRa)} />
@@ -245,14 +245,14 @@ export default function FilingPage() {
 
               {taxResult.employeesTaxPaid > 0 && (
                 <>
-                  <div className="px-4 py-3 bg-zinc-900/60 border-t border-b border-zinc-800 mt-2">
-                    <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Credits</p>
+                  <div className="px-4 py-3 bg-surface/60 border-t border-b border-edge mt-2">
+                    <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Credits</p>
                   </div>
                   <CheatRow code={SARS_DEDUCTION_CODES.employees_tax.code} label={SARS_DEDUCTION_CODES.employees_tax.label} value={`− ${formatRand(taxResult.employeesTaxPaid)}`} />
                 </>
               )}
 
-              <div className="px-4 py-3 bg-zinc-800/60 border-t border-zinc-700">
+              <div className="px-4 py-3 bg-raised/60 border-t border-edge">
                 <div className="flex justify-between text-sm font-bold text-white">
                   <span>Net tax payable</span>
                   <span className={taxResult.netTaxPayable > 0 ? 'text-amber-400' : 'text-emerald-400'}>
@@ -262,7 +262,7 @@ export default function FilingPage() {
               </div>
             </div>
 
-            <p className="text-xs text-zinc-600">These values are based on the 2024/2025 SARS tax tables and the information you&apos;ve entered. Always verify against your actual documents before submitting.</p>
+            <p className="text-xs text-ink-3">These values are based on the 2024/2025 SARS tax tables and the information you&apos;ve entered. Always verify against your actual documents before submitting.</p>
 
             <StepNav onPrev={() => setStep(0)} onNext={() => setStep(2)} />
           </div>
@@ -273,7 +273,7 @@ export default function FilingPage() {
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold text-white">eFiling walkthrough</h1>
-              <p className="text-sm text-zinc-500 mt-1">Follow these steps on the SARS eFiling portal to submit your ITR12.</p>
+              <p className="text-sm text-ink-2 mt-1">Follow these steps on the SARS eFiling portal to submit your ITR12.</p>
             </div>
 
             <div className="space-y-4">
@@ -285,12 +285,12 @@ export default function FilingPage() {
                 { n: '05', title: 'Review the calculated tax', body: 'SARS eFiling will automatically calculate your tax. Compare it against your cheat sheet. If the figures differ significantly, review your entries.' },
                 { n: '06', title: 'Submit your return', body: 'Once satisfied, click "File Return" and confirm. Save your SARS reference number — you\'ll need it in the next step.' },
               ].map((s) => (
-                <div key={s.n} className="rounded-xl border border-zinc-800 p-4 space-y-3">
+                <div key={s.n} className="rounded-xl border border-edge p-4 space-y-3">
                   <div className="flex items-start gap-3">
                     <span className="text-2xl font-black text-zinc-800 leading-none flex-shrink-0">{s.n}</span>
                     <div className="space-y-1 flex-1">
-                      <h3 className="text-sm font-semibold text-zinc-100">{s.title}</h3>
-                      <p className="text-sm text-zinc-500 leading-relaxed whitespace-pre-line">{s.body}</p>
+                      <h3 className="text-sm font-semibold text-ink-1">{s.title}</h3>
+                      <p className="text-sm text-ink-2 leading-relaxed whitespace-pre-line">{s.body}</p>
                       {s.link && (
                         <a
                           href={s.link}
@@ -316,10 +316,10 @@ export default function FilingPage() {
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold text-white">Document checklist</h1>
-              <p className="text-sm text-zinc-500 mt-1">Keep these documents for 5 years in case SARS audits your return. Do not submit them unless SARS specifically asks.</p>
+              <p className="text-sm text-ink-2 mt-1">Keep these documents for 5 years in case SARS audits your return. Do not submit them unless SARS specifically asks.</p>
             </div>
 
-            <div className="rounded-2xl border border-zinc-800 divide-y divide-zinc-800 overflow-hidden">
+            <div className="rounded-2xl border border-edge divide-y divide-edge overflow-hidden">
               {[
                 { label: 'Proof of all freelance income',          required: true },
                 { label: 'Bank statements for the full tax year',   required: true },
@@ -331,7 +331,7 @@ export default function FilingPage() {
               ].filter((i) => i.required).map((item, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-4 h-4 rounded-full border-2 border-emerald-500/50 flex-shrink-0" />
-                  <p className="text-sm text-zinc-300">{item.label}</p>
+                  <p className="text-sm text-ink-1">{item.label}</p>
                 </div>
               ))}
             </div>
@@ -355,16 +355,16 @@ export default function FilingPage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-white">Return submitted</h1>
-                  <p className="text-sm text-zinc-500 mt-1">Tax year {taxReturn.tax_year}</p>
+                  <p className="text-sm text-ink-2 mt-1">Tax year {taxReturn.tax_year}</p>
                 </div>
                 {sarsRef && (
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 inline-block">
-                    <p className="text-xs text-zinc-500">SARS reference number</p>
-                    <p className="text-lg font-mono font-bold text-zinc-100 mt-0.5">{sarsRef}</p>
+                  <div className="rounded-xl border border-edge bg-surface/40 px-4 py-3 inline-block">
+                    <p className="text-xs text-ink-2">SARS reference number</p>
+                    <p className="text-lg font-mono font-bold text-ink-1 mt-0.5">{sarsRef}</p>
                   </div>
                 )}
-                <p className="text-sm text-zinc-500">SARS will assess your return and notify you of the outcome. Check your eFiling dashboard for status updates.</p>
-                <Link href="/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium transition-all">
+                <p className="text-sm text-ink-2">SARS will assess your return and notify you of the outcome. Check your eFiling dashboard for status updates.</p>
+                <Link href="/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-raised hover:bg-edge text-ink-1 text-sm font-medium transition-all">
                   Back to dashboard
                 </Link>
               </div>
@@ -372,11 +372,11 @@ export default function FilingPage() {
               <div className="space-y-6">
                 <div>
                   <h1 className="text-xl font-bold text-white">Record your submission</h1>
-                  <p className="text-sm text-zinc-500 mt-1">After filing on eFiling, enter your SARS reference number here to mark your return as submitted.</p>
+                  <p className="text-sm text-ink-2 mt-1">After filing on eFiling, enter your SARS reference number here to mark your return as submitted.</p>
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-xs font-medium text-zinc-400">SARS reference number</label>
+                  <label className="text-xs font-medium text-ink-2">SARS reference number</label>
                   <input
                     type="text"
                     value={sarsRef}
@@ -384,11 +384,11 @@ export default function FilingPage() {
                     placeholder="e.g. 12345678901234"
                     className="input w-full font-mono"
                   />
-                  <p className="text-xs text-zinc-600">Found on your SARS eFiling confirmation page after submission.</p>
+                  <p className="text-xs text-ink-3">Found on your SARS eFiling confirmation page after submission.</p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setStep(3)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">
+                  <button onClick={() => setStep(3)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
                     <ChevronLeft className="w-3.5 h-3.5" /> Back
                   </button>
                   <button
@@ -420,7 +420,7 @@ function FilingNav({ step, totalSteps, onPrev, onNext, canNext }: {
 }) {
   return (
     <div className="flex items-center justify-between pt-4">
-      <button onClick={onPrev} disabled={step === 0} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 disabled:opacity-0 transition-colors">
+      <button onClick={onPrev} disabled={step === 0} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-raised text-ink-2 hover:bg-edge disabled:opacity-0 transition-colors">
         <ChevronLeft className="w-3.5 h-3.5" /> Back
       </button>
       {step < totalSteps - 1 && (
@@ -435,7 +435,7 @@ function FilingNav({ step, totalSteps, onPrev, onNext, canNext }: {
 function StepNav({ onPrev, onNext }: { onPrev: () => void; onNext: () => void }) {
   return (
     <div className="flex items-center justify-between pt-2">
-      <button onClick={onPrev} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">
+      <button onClick={onPrev} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
         <ChevronLeft className="w-3.5 h-3.5" /> Back
       </button>
       <button onClick={onNext} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all">
@@ -447,10 +447,10 @@ function StepNav({ onPrev, onNext }: { onPrev: () => void; onNext: () => void })
 
 function CheatRow({ code, label, value }: { code: string; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/60 last:border-0">
-      <span className="font-mono text-xs text-zinc-500 w-12 flex-shrink-0">{code}</span>
-      <span className="flex-1 text-sm text-zinc-300">{label}</span>
-      <span className="font-bold text-zinc-100 tabular-nums">{value}</span>
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-edge/60 last:border-0">
+      <span className="font-mono text-xs text-ink-2 w-12 flex-shrink-0">{code}</span>
+      <span className="flex-1 text-sm text-ink-1">{label}</span>
+      <span className="font-bold text-ink-1 tabular-nums">{value}</span>
     </div>
   )
 }
@@ -465,16 +465,16 @@ function SectionRow({ label, value, sub, href, highlight }: {
   const content = (
     <div className={`flex items-center justify-between px-4 py-3 ${highlight ? 'bg-emerald-500/5' : ''}`}>
       <div>
-        <p className={`text-sm ${highlight ? 'font-semibold text-zinc-100' : 'text-zinc-300'}`}>{label}</p>
-        {sub && <p className="text-xs text-zinc-500 mt-0.5">{sub}</p>}
+        <p className={`text-sm ${highlight ? 'font-semibold text-ink-1' : 'text-ink-1'}`}>{label}</p>
+        {sub && <p className="text-xs text-ink-2 mt-0.5">{sub}</p>}
       </div>
       <div className="flex items-center gap-2">
-        <span className={`tabular-nums ${highlight ? 'font-bold text-emerald-400' : 'text-zinc-300'}`}>{value}</span>
-        {href && <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />}
+        <span className={`tabular-nums ${highlight ? 'font-bold text-emerald-400' : 'text-ink-1'}`}>{value}</span>
+        {href && <ChevronRight className="w-3.5 h-3.5 text-ink-3" />}
       </div>
     </div>
   )
-  if (href) return <Link href={href} className="block hover:bg-zinc-900/30 transition-colors">{content}</Link>
+  if (href) return <Link href={href} className="block hover:bg-surface/30 transition-colors">{content}</Link>
   return content
 }
 

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +20,7 @@ function SuccessContent() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-base flex items-center justify-center p-4">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-emerald-600/10 blur-[100px] rounded-full" />
       </div>
@@ -37,13 +37,13 @@ function SuccessContent() {
           <h1 className="text-2xl font-bold text-white">
             {ready ? 'Payment confirmed!' : 'Confirming payment…'}
           </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed">
+          <p className="text-sm text-ink-2 leading-relaxed">
             {ready
               ? 'Your subscription is now active. Welcome to Klippa.'
               : 'We\'re confirming your payment with Ozow. This takes a few seconds.'}
           </p>
           {ref && (
-            <p className="text-xs text-zinc-600 font-mono">Ref: {ref.slice(0, 8)}…</p>
+            <p className="text-xs text-ink-3 font-mono">Ref: {ref.slice(0, 8)}…</p>
           )}
         </div>
 
@@ -55,13 +55,13 @@ function SuccessContent() {
             >
               Go to dashboard <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link href="/subscription" className="block text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+            <Link href="/subscription" className="block text-xs text-ink-2 hover:text-ink-1 transition-colors">
               View subscription details
             </Link>
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-2 text-xs text-zinc-600">
+        <div className="flex items-center justify-center gap-2 text-xs text-ink-3">
           <ShieldCheck className="w-3.5 h-3.5" />
           Secured by Ozow
         </div>

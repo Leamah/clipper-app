@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,14 +113,14 @@ function ToggleRow({ label, sub, value, onChange, impact }: {
     <button type="button" onClick={() => onChange(!value)}
       className="w-full flex items-center justify-between gap-4 py-3 text-left group">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-zinc-200 group-hover:text-white transition-colors">{label}</p>
-        <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{sub}</p>
+        <p className="text-sm text-ink-1 group-hover:text-white transition-colors">{label}</p>
+        <p className="text-xs text-ink-2 mt-0.5 leading-snug">{sub}</p>
         {impact && !value && (
           <p className="text-xs text-emerald-500/70 mt-1">{impact}</p>
         )}
       </div>
       {/* Bigger toggle: w-12 h-6 */}
-      <div className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-emerald-600' : 'bg-zinc-700'}`}>
+      <div className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-emerald-600' : 'bg-edge'}`}>
         <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-6' : 'translate-x-0'}`} />
       </div>
     </button>
@@ -130,10 +130,10 @@ function ToggleRow({ label, sub, value, onChange, impact }: {
 // ── Section wrapper ────────────────────────────────────────
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-5">
+    <div className="rounded-2xl border border-edge bg-surface/40 p-6 space-y-5">
       <div>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">{title}</h2>
-        {hint && <p className="text-xs text-zinc-600 mt-1">{hint}</p>}
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-2">{title}</h2>
+        {hint && <p className="text-xs text-ink-3 mt-1">{hint}</p>}
       </div>
       {children}
     </div>
@@ -144,9 +144,9 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-zinc-400">{label}</label>
+      <label className="text-xs font-medium text-ink-2">{label}</label>
       {children}
-      {hint && <p className="text-xs text-zinc-600 leading-relaxed">{hint}</p>}
+      {hint && <p className="text-xs text-ink-3 leading-relaxed">{hint}</p>}
     </div>
   )
 }
@@ -187,21 +187,21 @@ function ProfileNudges({ profile }: { profile: KlippaProfile }) {
   if (nudges.length === 0) return null
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5 space-y-3">
+    <div className="rounded-2xl border border-edge bg-surface/30 p-5 space-y-3">
       <div className="flex items-center gap-2">
-        <Info className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-        <p className="text-xs font-semibold text-zinc-300">Things to check on your profile</p>
+        <Info className="w-4 h-4 text-ink-2 flex-shrink-0" />
+        <p className="text-xs font-semibold text-ink-1">Things to check on your profile</p>
       </div>
       <div className="space-y-2">
         {nudges.map((n, i) => (
           <div key={i} className={`flex items-start gap-2 text-xs rounded-lg px-3 py-2.5 ${
             n.type === 'warn'
               ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300'
-              : 'bg-zinc-800/60 text-zinc-400'
+              : 'bg-raised/60 text-ink-2'
           }`}>
             {n.type === 'warn'
               ? <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-400" />
-              : <ChevronRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-zinc-500" />
+              : <ChevronRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-ink-2" />
             }
             {n.text}
           </div>
@@ -298,7 +298,7 @@ export default function SettingsPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
-      <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
+      <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
     </div>
   )
 
@@ -308,7 +308,7 @@ export default function SettingsPage() {
     <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-xl font-bold text-white">Tax profile</h1>
-          <p className="text-sm text-zinc-500 mt-1">The more complete this is, the more accurate your tax calculation.</p>
+          <p className="text-sm text-ink-2 mt-1">The more complete this is, the more accurate your tax calculation.</p>
         </div>
 
         {/* Smart nudges */}
@@ -332,7 +332,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {(Object.entries(EMPLOYMENT_LABELS) as [EmploymentType, string][]).map(([k, v]) => (
                 <button key={k} type="button" onClick={() => update('employment_type', k)}
-                  className={`py-3 rounded-xl text-xs font-semibold transition-all ${profile.employment_type === k ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                  className={`py-3 rounded-xl text-xs font-semibold transition-all ${profile.employment_type === k ? 'bg-emerald-600 text-white' : 'bg-raised text-ink-2 hover:bg-edge'}`}>
                   {v}
                 </button>
               ))}
@@ -343,7 +343,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               {(Object.entries(WORK_LOCATION_LABELS) as [WorkLocation, string][]).map(([k, v]) => (
                 <button key={k} type="button" onClick={() => update('work_location', k)}
-                  className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl border text-sm transition-all ${profile.work_location === k ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300' : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300'}`}>
+                  className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl border text-sm transition-all ${profile.work_location === k ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300' : 'border-edge text-ink-2 hover:border-edge hover:text-ink-1'}`}>
                   <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${profile.work_location === k ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'}`} />
                   {v}
                 </button>
@@ -354,11 +354,11 @@ export default function SettingsPage() {
           {profile.work_location !== 'office_only' && (
             <div className="pl-2 space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-zinc-400">Home office % <span className="text-zinc-600">(floor area used for work)</span></label>
+                <label className="text-xs font-medium text-ink-2">Home office % <span className="text-ink-3">(floor area used for work)</span></label>
                 <div className="flex items-center gap-3">
                   <input type="range" min={5} max={50} step={5} value={profile.home_office_pct}
                     onChange={(e) => update('home_office_pct', parseFloat(e.target.value))} className="flex-1 accent-emerald-500" />
-                  <span className="text-sm font-bold text-zinc-100 w-10 text-right tabular-nums">{profile.home_office_pct}%</span>
+                  <span className="text-sm font-bold text-ink-1 w-10 text-right tabular-nums">{profile.home_office_pct}%</span>
                 </div>
                 {profile.work_location === 'hybrid' && (
                   <p className="text-xs text-amber-400/80">Hybrid workers: SARS requires the room to be used exclusively for work.</p>
@@ -503,12 +503,12 @@ export default function SettingsPage() {
               ] as { key: keyof KlippaProfile; label: string }[]).map(({ key, label }) => (
                 <button key={key} type="button"
                   onClick={() => update(key, !profile[key])}
-                  className={`py-3 rounded-xl text-xs font-semibold transition-all ${profile[key] ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                  className={`py-3 rounded-xl text-xs font-semibold transition-all ${profile[key] ? 'bg-emerald-600 text-white' : 'bg-raised text-ink-2 hover:bg-edge'}`}>
                   {label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-zinc-600 mt-1.5">Unticked days are treated as home / remote in your logbook.</p>
+            <p className="text-xs text-ink-3 mt-1.5">Unticked days are treated as home / remote in your logbook.</p>
           </Field>
 
           <Field label="Opening odometer (km at the start of this tax year)" hint="SARS needs this for your logbook. Check your vehicle's odometer on 1 March.">
@@ -524,7 +524,7 @@ export default function SettingsPage() {
               {(['weekly', 'monthly', 'none'] as const).map((opt) => (
                 <button key={opt} type="button"
                   onClick={() => update('logbook_reminder', opt)}
-                  className={`py-3 rounded-xl text-xs font-semibold capitalize transition-all ${profile.logbook_reminder === opt ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                  className={`py-3 rounded-xl text-xs font-semibold capitalize transition-all ${profile.logbook_reminder === opt ? 'bg-emerald-600 text-white' : 'bg-raised text-ink-2 hover:bg-edge'}`}>
                   {opt === 'none' ? 'Off' : opt}
                 </button>
               ))}

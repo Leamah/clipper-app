@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -6,7 +6,8 @@ import {
   ShieldCheck, LayoutDashboard, TrendingUp, Receipt, FileText,
   Clock, Car, CalendarDays, ClipboardCheck, Settings,
 } from 'lucide-react'
-import UserNav from '@/components/UserNav'
+import UserNav       from '@/components/UserNav'
+import ThemeToggle   from '@/components/ThemeToggle'
 import { supabase } from '@/lib/supabase'
 
 export type ActivePage =
@@ -36,7 +37,7 @@ interface AppNavProps {
 
 const NAV_BASE   = 'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors'
 const NAV_ACTIVE = `${NAV_BASE} text-emerald-300 bg-emerald-500/10 font-medium`
-const NAV_IDLE   = `${NAV_BASE} text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50`
+const NAV_IDLE   = `${NAV_BASE} text-ink-2 hover:text-ink-1 hover:bg-raised/50`
 
 function navCls(page: ActivePage, active: ActivePage) {
   return page === active ? NAV_ACTIVE : NAV_IDLE
@@ -73,14 +74,14 @@ export default function AppNav({
   }, [propFlags])
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-52 bg-zinc-950 border-r border-zinc-800/60 flex flex-col z-30">
+    <aside className="fixed left-0 top-0 h-screen w-52 bg-base border-r border-edge/60 flex flex-col z-30">
       {/* Logo */}
-      <div className="h-14 px-4 flex items-center border-b border-zinc-800/60 flex-shrink-0">
+      <div className="h-14 px-4 flex items-center border-b border-edge/60 flex-shrink-0">
         <Link href="/dashboard" className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
             <ShieldCheck className="w-3.5 h-3.5 text-white" />
           </div>
-          <span className="font-semibold text-sm tracking-tight text-zinc-100">Klippa</span>
+          <span className="font-semibold text-sm tracking-tight text-ink-1">Klippa</span>
         </Link>
       </div>
 
@@ -123,19 +124,22 @@ export default function AppNav({
           </Link>
         )}
 
-        <div className="pt-2 mt-1 border-t border-zinc-800/40">
+        <div className="pt-2 mt-1 border-t border-edge/40">
           <Link href="/filing" className={navCls('filing', activePage)}>
             <ClipboardCheck className="w-4 h-4 shrink-0" /> File Return
           </Link>
         </div>
       </nav>
 
-      {/* Bottom: Settings + user */}
-      <div className="px-2 py-3 border-t border-zinc-800/60 space-y-0.5">
+      {/* Bottom: Settings, theme toggle + user */}
+      <div className="px-2 py-3 border-t border-edge/60 space-y-0.5">
         <Link href="/settings" className={navCls('settings', activePage)}>
           <Settings className="w-4 h-4 shrink-0" /> Settings
         </Link>
-        <div className="px-1 pt-2">
+        <div className="flex items-center justify-between px-1 pt-1">
+          <ThemeToggle />
+        </div>
+        <div className="px-1">
           <UserNav sidebar />
         </div>
       </div>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,16 +29,16 @@ const DOC_TYPE_COLORS: Record<DocumentType, string> = {
   medical:         'bg-pink-500/15 text-pink-300',
   ra_certificate:  'bg-orange-500/15 text-orange-300',
   timesheet:       'bg-teal-500/15 text-teal-300',
-  other:           'bg-zinc-700 text-zinc-400',
+  other:           'bg-edge text-ink-2',
 }
 
 function OcrStatusPill({ status }: { status: string }) {
   const config = {
-    pending:    { icon: <Clock className="w-3 h-3" />,        color: 'bg-zinc-700 text-zinc-400',          label: 'Pending' },
+    pending:    { icon: <Clock className="w-3 h-3" />,        color: 'bg-edge text-ink-2',          label: 'Pending' },
     processing: { icon: <Loader2 className="w-3 h-3 animate-spin" />, color: 'bg-blue-500/15 text-blue-300', label: 'Processing' },
     complete:   { icon: <CheckCircle2 className="w-3 h-3" />, color: 'bg-emerald-500/15 text-emerald-300', label: 'Complete' },
     failed:     { icon: <AlertCircle className="w-3 h-3" />,  color: 'bg-red-500/15 text-red-300',         label: 'Failed' },
-  }[status] ?? { icon: <Clock className="w-3 h-3" />, color: 'bg-zinc-700 text-zinc-400', label: status }
+  }[status] ?? { icon: <Clock className="w-3 h-3" />, color: 'bg-edge text-ink-2', label: status }
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
@@ -122,15 +122,15 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5">
+      <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-white">Upload document</h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Document type</label>
+            <label className="text-xs font-medium text-ink-2">Document type</label>
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value as DocumentType)}
@@ -143,7 +143,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Tax year</label>
+            <label className="text-xs font-medium text-ink-2">Tax year</label>
             <select
               value={taxYear}
               onChange={(e) => setTaxYear(parseInt(e.target.value))}
@@ -156,26 +156,26 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">File</label>
+            <label className="text-xs font-medium text-ink-2">File</label>
             {file ? (
               <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10">
                 <FileText className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-200 truncate">{file.name}</p>
-                  <p className="text-xs text-zinc-500">{(file.size / 1024).toFixed(0)} KB</p>
+                  <p className="text-sm text-ink-1 truncate">{file.name}</p>
+                  <p className="text-xs text-ink-2">{(file.size / 1024).toFixed(0)} KB</p>
                 </div>
-                <button onClick={() => setFile(null)} className="text-zinc-500 hover:text-zinc-300 flex-shrink-0">
+                <button onClick={() => setFile(null)} className="text-ink-2 hover:text-ink-1 flex-shrink-0">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => fileRef.current?.click()}
-                className="w-full flex flex-col items-center gap-2 py-8 rounded-xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/50 text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="w-full flex flex-col items-center gap-2 py-8 rounded-xl border-2 border-dashed border-edge hover:border-emerald-500/50 text-ink-2 hover:text-ink-1 transition-colors"
               >
                 <Upload className="w-6 h-6" />
                 <span className="text-sm">Click to select PDF or image</span>
-                <span className="text-xs text-zinc-600">PDF, PNG, JPG, JPEG supported</span>
+                <span className="text-xs text-ink-3">PDF, PNG, JPG, JPEG supported</span>
               </button>
             )}
             <input
@@ -191,7 +191,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
         {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">Cancel</button>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">Cancel</button>
           <button
             onClick={handleUpload}
             disabled={!file || uploading}
@@ -238,14 +238,14 @@ function DocumentsPage() {
   const years = [...new Set(docs.map((d) => d.tax_year).filter(Boolean))] as number[]
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
+    <div className="min-h-screen bg-base text-ink-1 pl-52">
       <AppNav activePage="documents" />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-white">Documents</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">{docs.length} documents uploaded</p>
+            <p className="text-sm text-ink-2 mt-0.5">{docs.length} documents uploaded</p>
           </div>
           <button onClick={() => setShowUpload(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
             <Plus className="w-3.5 h-3.5" /> Upload
@@ -257,7 +257,7 @@ function DocumentsPage() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as DocumentType | 'all')}
-            className="px-3 py-1.5 rounded-lg text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 outline-none"
+            className="px-3 py-1.5 rounded-lg text-xs bg-raised border border-edge text-ink-1 outline-none"
           >
             <option value="all">All types</option>
             {(Object.entries(DOC_TYPE_LABELS) as [DocumentType, string][]).map(([k, v]) => (
@@ -268,7 +268,7 @@ function DocumentsPage() {
             <select
               value={filterYear ?? ''}
               onChange={(e) => setFilterYear(e.target.value ? parseInt(e.target.value) : null)}
-              className="px-3 py-1.5 rounded-lg text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 outline-none"
+              className="px-3 py-1.5 rounded-lg text-xs bg-raised border border-edge text-ink-1 outline-none"
             >
               <option value="">All years</option>
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -278,14 +278,14 @@ function DocumentsPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
+            <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-zinc-800 p-16 text-center space-y-4">
-            <Upload className="w-8 h-8 text-zinc-700 mx-auto" />
+          <div className="rounded-2xl border border-dashed border-edge p-16 text-center space-y-4">
+            <Upload className="w-8 h-8 text-ink-3 mx-auto" />
             <div>
-              <p className="text-sm font-medium text-zinc-400">No documents yet</p>
-              <p className="text-xs text-zinc-600 mt-1">Upload IRP5 certificates, receipts, and bank statements.</p>
+              <p className="text-sm font-medium text-ink-2">No documents yet</p>
+              <p className="text-xs text-ink-3 mt-1">Upload IRP5 certificates, receipts, and bank statements.</p>
             </div>
             <button onClick={() => setShowUpload(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
               <Plus className="w-3.5 h-3.5" /> Upload document
@@ -294,27 +294,27 @@ function DocumentsPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((doc) => (
-              <div key={doc.id} className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3 hover:border-zinc-700 transition-colors">
+              <div key={doc.id} className="rounded-xl border border-edge bg-surface/40 p-4 space-y-3 hover:border-edge transition-colors">
                 <div className="flex items-start justify-between gap-2">
-                  <FileText className="w-8 h-8 text-zinc-600 flex-shrink-0 mt-0.5" />
+                  <FileText className="w-8 h-8 text-ink-3 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-zinc-200 truncate font-medium">{doc.original_filename ?? 'Untitled'}</p>
-                    <p className="text-xs text-zinc-600 mt-0.5">{doc.file_size_bytes ? `${(doc.file_size_bytes / 1024).toFixed(0)} KB` : ''}</p>
+                    <p className="text-sm text-ink-1 truncate font-medium">{doc.original_filename ?? 'Untitled'}</p>
+                    <p className="text-xs text-ink-3 mt-0.5">{doc.file_size_bytes ? `${(doc.file_size_bytes / 1024).toFixed(0)} KB` : ''}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${DOC_TYPE_COLORS[doc.document_type as DocumentType] ?? 'bg-zinc-700 text-zinc-400'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${DOC_TYPE_COLORS[doc.document_type as DocumentType] ?? 'bg-edge text-ink-2'}`}>
                     {DOC_TYPE_LABELS[doc.document_type as DocumentType] ?? doc.document_type}
                   </span>
                   {doc.tax_year && (
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-500">{doc.tax_year}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-raised text-ink-2">{doc.tax_year}</span>
                   )}
                 </div>
 
                 <OcrStatusPill status={doc.ocr_status} />
 
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-ink-3">
                   {new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(doc.created_at))}
                 </p>
               </div>

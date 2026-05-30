@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -172,7 +172,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen bg-base">
         <AppNav activePage="dashboard" featureFlags={featureFlags} />
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -182,7 +182,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
+    <div className="min-h-screen bg-base text-ink-1 pl-52">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-600/[0.06] blur-[120px] rounded-full" />
       </div>
@@ -195,11 +195,11 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Tax year {taxYear}</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">ITR12 — Freelancer / Consultant</p>
+            <p className="text-sm text-ink-2 mt-0.5">ITR12 — Freelancer / Consultant</p>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
             daysLeft > 30
-              ? 'bg-zinc-800 text-zinc-400'
+              ? 'bg-raised text-ink-2'
               : daysLeft > 7
                 ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                 : 'bg-red-500/15 text-red-300 border border-red-500/30'
@@ -252,7 +252,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-emerald-300">You&apos;re on the free plan</p>
-                <p className="text-xs text-zinc-500 mt-0.5">Unlock unlimited expenses, the full filing wizard and audit-readiness tools from R149/mo.</p>
+                <p className="text-xs text-ink-2 mt-0.5">Unlock unlimited expenses, the full filing wizard and audit-readiness tools from R149/mo.</p>
               </div>
             </div>
             <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap group-hover:translate-x-0.5 transition-transform">
@@ -264,19 +264,19 @@ export default function Dashboard() {
         {/* Progress + next action */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Completion */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
-            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Return completion</p>
+          <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-4">
+            <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Return completion</p>
             <div className="space-y-3">
               <CompletionRow label="Income"        done={hasIncome}   pct={50} href="/income"   />
               <CompletionRow label="Expenses"      done={hasExpenses} pct={30} href="/expenses" />
               <CompletionRow label="Filed with SARS" done={taxReturn?.status === 'submitted'} pct={20} href="/filing" />
             </div>
             <div className="pt-1">
-              <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
+              <div className="flex justify-between text-xs text-ink-2 mb-1.5">
                 <span>Overall</span>
                 <span>{completionPct}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-raised overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${completionPct}%` }} />
               </div>
             </div>
@@ -286,7 +286,7 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 flex flex-col justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Next step</p>
-              <p className="text-sm font-semibold text-zinc-100 leading-snug">{nextAction.label}</p>
+              <p className="text-sm font-semibold text-ink-1 leading-snug">{nextAction.label}</p>
             </div>
             <motion.div whileTap={{ scale: 0.97 }}>
               <Link
@@ -311,7 +311,7 @@ export default function Dashboard() {
             <motion.div key={item.href} whileHover={{ y: -1 }} whileTap={{ scale: 0.96 }}>
               <Link
                 href={item.href}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:border-emerald-500/30 hover:bg-zinc-900 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-edge bg-surface/40 hover:border-emerald-500/30 hover:bg-surface text-xs font-medium text-ink-2 hover:text-ink-1 transition-all"
               >
                 <span className="text-emerald-500">{item.icon}</span>
                 {item.label}
@@ -346,13 +346,13 @@ export default function Dashboard() {
 
         {/* Tax breakdown — collapsed by default */}
         {taxResult && totalIncome > 0 && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+          <div className="rounded-2xl border border-edge bg-surface/40 overflow-hidden">
             <button
               onClick={() => setShowBreakdown(v => !v)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-800/30 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-raised/30 transition-colors"
             >
-              <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Tax breakdown estimate</p>
-              <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${showBreakdown ? 'rotate-180' : ''}`} />
+              <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Tax breakdown estimate</p>
+              <ChevronDown className={`w-4 h-4 text-ink-2 transition-transform duration-200 ${showBreakdown ? 'rotate-180' : ''}`} />
             </button>
 
             {showBreakdown && (
@@ -370,7 +370,7 @@ export default function Dashboard() {
                   {taxResult.travel > 0            && <BreakdownRow label="Travel deduction (fixed cost)"  value={`− ${formatRand(taxResult.travel)}`}           muted />}
                   {taxResult.interestExemption > 0 && <BreakdownRow label="Interest exemption"             value={`− ${formatRand(taxResult.interestExemption)}`} muted />}
                   {taxResult.otherDeductions > 0   && <BreakdownRow label="Business expense deductions"    value={`− ${formatRand(taxResult.otherDeductions)}`}  muted />}
-                  <div className="border-t border-zinc-800 pt-2">
+                  <div className="border-t border-edge pt-2">
                     <BreakdownRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} bold />
                   </div>
                   <BreakdownRow label="Tax on taxable income" value={formatRand(taxResult.grossTax)} />
@@ -378,17 +378,17 @@ export default function Dashboard() {
                   {taxResult.secondaryRebate > 0   && <BreakdownRow label="Secondary rebate (age 65+)"    value={`− ${formatRand(taxResult.secondaryRebate)}`}  muted />}
                   {taxResult.tertiaryRebate > 0    && <BreakdownRow label="Tertiary rebate (age 75+)"     value={`− ${formatRand(taxResult.tertiaryRebate)}`}   muted />}
                   {taxResult.medicalAidCredits > 0 && <BreakdownRow label="Medical aid credits (Section 6A)" value={`− ${formatRand(taxResult.medicalAidCredits)}`} muted />}
-                  <div className="border-t border-zinc-800 pt-2">
+                  <div className="border-t border-edge pt-2">
                     <BreakdownRow label="Tax payable" value={formatRand(taxResult.taxPayable)} bold />
                   </div>
                   {taxResult.employeesTaxPaid > 0  && <BreakdownRow label="PAYE already deducted (IRP5)"  value={`− ${formatRand(taxResult.employeesTaxPaid)}`} muted />}
                   {taxResult.employeesTaxPaid > 0  && (
-                    <div className="border-t border-zinc-800 pt-2">
+                    <div className="border-t border-edge pt-2">
                       <BreakdownRow label="Net tax payable / refund" value={taxResult.netTaxPayable >= 0 ? formatRand(taxResult.netTaxPayable) : `Refund ${formatRand(Math.abs(taxResult.netTaxPayable))}`} bold />
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-ink-3">
                   Estimate only · {taxReturn?.tax_year ? `${taxReturn.tax_year - 1}/${taxReturn.tax_year} SARS tables` : 'SARS tables'}. Final figure on your eFiling return may differ.
                 </p>
               </motion.div>
@@ -448,7 +448,7 @@ function ProfileCompletionCard({ completion }: { completion: ProfileCompletionRe
       className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all ${
         complete
           ? 'border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10'
-          : 'border-zinc-800 bg-zinc-900/40 hover:border-emerald-500/30 hover:bg-zinc-900/60'
+          : 'border-edge bg-surface/40 hover:border-emerald-500/30 hover:bg-surface/60'
       }`}
     >
       {/* Donut progress ring */}
@@ -476,27 +476,27 @@ function ProfileCompletionCard({ completion }: { completion: ProfileCompletionRe
       {/* Text */}
       <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-zinc-100">
+          <p className="text-sm font-semibold text-ink-1">
             {complete ? 'Tax profile complete' : 'Tax profile setup'}
           </p>
-          <span className="text-xs text-zinc-500 flex-shrink-0">{done}/{total} items</span>
+          <span className="text-xs text-ink-2 flex-shrink-0">{done}/{total} items</span>
         </div>
 
         {complete ? (
           <p className="text-xs text-emerald-400">All details filled in — your tax calculations are accurate</p>
         ) : (
           <>
-            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-raised rounded-full overflow-hidden">
               <div
                 className="h-full bg-emerald-500 rounded-full transition-all duration-700"
                 style={{ width: `${pct}%` }}
               />
             </div>
             {missing.length > 0 && (
-              <p className="text-xs text-zinc-500 leading-snug">
-                <span className="text-zinc-400">Still needed: </span>
+              <p className="text-xs text-ink-2 leading-snug">
+                <span className="text-ink-2">Still needed: </span>
                 {missing.slice(0, 2).join(', ')}
-                {missing.length > 2 && <span className="text-zinc-600"> +{missing.length - 2} more</span>}
+                {missing.length > 2 && <span className="text-ink-3"> +{missing.length - 2} more</span>}
               </p>
             )}
           </>
@@ -504,7 +504,7 @@ function ProfileCompletionCard({ completion }: { completion: ProfileCompletionRe
       </div>
 
       {/* Arrow */}
-      <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${complete ? 'text-emerald-500/50 group-hover:text-emerald-400' : 'text-zinc-600 group-hover:text-emerald-400'}`} />
+      <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${complete ? 'text-emerald-500/50 group-hover:text-emerald-400' : 'text-ink-3 group-hover:text-emerald-400'}`} />
     </Link>
   )
 }
@@ -516,7 +516,7 @@ function MetricCard({ label, value, sub, color, icon, highlight }: {
   icon: React.ReactNode; highlight?: boolean
 }) {
   const colors = {
-    zinc:    { border: 'border-zinc-800',       bg: 'bg-zinc-900/40',    icon: 'text-zinc-400'    },
+    zinc:    { border: 'border-edge',       bg: 'bg-surface/40',    icon: 'text-ink-2'    },
     amber:   { border: 'border-amber-500/25',   bg: 'bg-amber-500/5',    icon: 'text-amber-400'   },
     emerald: { border: 'border-emerald-500/25', bg: 'bg-emerald-500/5',  icon: 'text-emerald-400' },
   }[color]
@@ -532,7 +532,7 @@ function MetricCard({ label, value, sub, color, icon, highlight }: {
         {label}
       </div>
       <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
-      <p className="text-xs text-zinc-500" dangerouslySetInnerHTML={{ __html: sub }} />
+      <p className="text-xs text-ink-2" dangerouslySetInnerHTML={{ __html: sub }} />
     </motion.div>
   )
 }
@@ -540,11 +540,11 @@ function MetricCard({ label, value, sub, color, icon, highlight }: {
 function CompletionRow({ label, done, pct, href }: { label: string; done?: boolean; pct: number; href: string }) {
   return (
     <Link href={href} className="flex items-center gap-3 text-sm hover:opacity-80 transition-opacity">
-      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${done ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-700'}`}>
+      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${done ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
         {done && <Check className="w-2.5 h-2.5 text-white" />}
       </div>
-      <span className={done ? 'text-zinc-300' : 'text-zinc-500'}>{label}</span>
-      <span className="ml-auto text-xs text-zinc-600">{pct}%</span>
+      <span className={done ? 'text-ink-1' : 'text-ink-2'}>{label}</span>
+      <span className="ml-auto text-xs text-ink-3">{pct}%</span>
     </Link>
   )
 }
@@ -555,7 +555,7 @@ function Check({ className }: { className?: string }) {
 
 function BreakdownRow({ label, value, muted, bold }: { label: string; value: string; muted?: boolean; bold?: boolean }) {
   return (
-    <div className={`flex justify-between ${muted ? 'text-zinc-500' : bold ? 'text-zinc-100 font-semibold' : 'text-zinc-300'}`}>
+    <div className={`flex justify-between ${muted ? 'text-ink-2' : bold ? 'text-ink-1 font-semibold' : 'text-ink-1'}`}>
       <span>{label}</span>
       <span className="tabular-nums">{value}</span>
     </div>

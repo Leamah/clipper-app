@@ -2,25 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Semantic colour tokens ───────────────────────────────────────── */
+/*    Space-separated RGB channels so Tailwind can apply opacity       */
+/*    modifiers: rgb(var(--color-base) / 0.6)                          */
+
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
+  /* Light mode */
+  --color-base:    250 250 250;   /* zinc-50  — page background          */
+  --color-surface: 255 255 255;   /* white    — card / panel background  */
+  --color-raised:  244 244 245;   /* zinc-100 — elevated element / input */
+  --color-edge:    228 228 231;   /* zinc-200 — border / divider         */
+  --color-ink-1:   24  24  27;    /* zinc-900 — primary text             */
+  --color-ink-2:   113 113 122;   /* zinc-500 — muted / secondary text   */
+  --color-ink-3:   161 161 170;   /* zinc-400 — hint / placeholder text  */
 }
+
+.dark {
+  /* Dark mode */
+  --color-base:    9   9   11;    /* zinc-950 */
+  --color-surface: 24  24  27;    /* zinc-900 */
+  --color-raised:  39  39  42;    /* zinc-800 */
+  --color-edge:    63  63  70;    /* zinc-700 */
+  --color-ink-1:   250 250 250;   /* zinc-50  */
+  --color-ink-2:   113 113 122;   /* zinc-500 */
+  --color-ink-3:   82  82  91;    /* zinc-600 */
+}
+
+/* ── Base styles ─────────────────────────────────────────────────── */
 
 * {
   box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: rgb(var(--color-base));
+  color: rgb(var(--color-ink-1));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Shared input style — used across all Klippa forms */
+/* ── Shared input style — used across all Klippa forms ─────────────
+   Uses semantic tokens so it adapts to both light and dark modes     */
 .input {
-  @apply w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60 transition-colors;
+  @apply w-full bg-raised/60 border border-edge rounded-xl px-4 py-3 text-sm text-ink-1 placeholder:text-ink-3 outline-none focus:border-emerald-500/60 transition-colors;
   min-height: 48px;
 }
 
@@ -46,8 +70,8 @@ input[type="number"]::-webkit-outer-spin-button {
   animation: shimmer 2s linear infinite;
 }
 
-/* Scrollbar */
+/* ── Scrollbar ──────────────────────────────────────────────────── */
 ::-webkit-scrollbar        { width: 6px; }
-::-webkit-scrollbar-track  { background: #18181b; }
-::-webkit-scrollbar-thumb  { background: #3f3f46; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #52525b; }
+::-webkit-scrollbar-track  { background: rgb(var(--color-surface)); }
+::-webkit-scrollbar-thumb  { background: rgb(var(--color-edge)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-raised)); }

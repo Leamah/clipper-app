@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,17 +47,17 @@ function DeadlineCard({
           ? 'border-red-500/30 bg-red-500/5'
           : soon
             ? 'border-amber-500/30 bg-amber-500/5'
-            : 'border-zinc-800 bg-zinc-900/40'
+            : 'border-edge bg-surface/40'
     }`}>
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{label}</p>
-          <p className="text-sm font-medium text-zinc-200">
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-2">{label}</p>
+          <p className="text-sm font-medium text-ink-1">
             {date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
           {!paid && (
             <div className={`flex items-center gap-1.5 text-xs font-medium ${
-              overdue ? 'text-red-400' : soon ? 'text-amber-400' : 'text-zinc-500'
+              overdue ? 'text-red-400' : soon ? 'text-amber-400' : 'text-ink-2'
             }`}>
               <Clock className="w-3 h-3" />
               {overdue
@@ -73,7 +73,7 @@ function DeadlineCard({
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex-shrink-0 ${
             paid
               ? 'bg-emerald-600 text-white'
-              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+              : 'bg-raised text-ink-2 hover:bg-edge hover:text-ink-1'
           }`}
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -82,7 +82,7 @@ function DeadlineCard({
       </div>
       <div>
         <p className="text-2xl font-bold text-white tabular-nums">{formatRand(amount)}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">{sub}</p>
+        <p className="text-xs text-ink-2 mt-0.5">{sub}</p>
       </div>
     </div>
   )
@@ -200,7 +200,7 @@ export default function ProvisionalPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 pl-52">
+      <div className="min-h-screen bg-base pl-52">
         <AppNav activePage="provisional" featureFlags={featureFlags} />
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -210,7 +210,7 @@ export default function ProvisionalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
+    <div className="min-h-screen bg-base text-ink-1 pl-52">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/[0.04] blur-[100px] rounded-full" />
       </div>
@@ -222,18 +222,18 @@ export default function ProvisionalPage() {
         {/* Header */}
         <div>
           <h1 className="text-xl font-bold text-white">Provisional Tax (IRP6)</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="text-sm text-ink-2 mt-1">
             Tax year {runningYear} · 1 March {runningYear - 1} – 28 February {runningYear}
           </p>
         </div>
 
         {/* What is provisional tax */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-3">
+        <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-            <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">What is provisional tax?</p>
+            <Info className="w-4 h-4 text-ink-2 flex-shrink-0" />
+            <p className="text-xs font-semibold text-ink-1 uppercase tracking-wider">What is provisional tax?</p>
           </div>
-          <p className="text-sm text-zinc-400 leading-relaxed">
+          <p className="text-sm text-ink-2 leading-relaxed">
             If you earn income outside a regular salary (freelance, consulting, rental, commission),
             SARS requires you to pay your estimated annual tax in two instalments — one mid-year and one at year end.
             This prevents a large lump-sum payment at assessment time.
@@ -244,9 +244,9 @@ export default function ProvisionalPage() {
               { label: 'First payment', value: 'By 31 August — 50% of estimated annual tax' },
               { label: 'Second payment', value: 'By 28 February — balance of estimated annual tax' },
             ].map((item) => (
-              <div key={item.label} className="rounded-xl bg-zinc-800/60 px-4 py-3 space-y-1">
-                <p className="text-xs font-semibold text-zinc-400">{item.label}</p>
-                <p className="text-xs text-zinc-300 leading-relaxed">{item.value}</p>
+              <div key={item.label} className="rounded-xl bg-raised/60 px-4 py-3 space-y-1">
+                <p className="text-xs font-semibold text-ink-2">{item.label}</p>
+                <p className="text-xs text-ink-1 leading-relaxed">{item.value}</p>
               </div>
             ))}
           </div>
@@ -254,7 +254,7 @@ export default function ProvisionalPage() {
 
         {/* Registration status */}
         {profile && !needsProvisional && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-900/40 text-sm text-zinc-400">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-edge bg-surface/40 text-sm text-ink-2">
             <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-500" />
             Based on your profile (employee income only), you may not be required to register as a provisional taxpayer.
             If you have any freelance or other non-employment income, provisional tax applies.
@@ -262,18 +262,18 @@ export default function ProvisionalPage() {
         )}
 
         {/* Income estimate input */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
+        <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <Calculator className="w-4 h-4 text-emerald-400" />
-            <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+            <p className="text-xs font-semibold text-ink-1 uppercase tracking-wider">
               Estimate your annual income for tax year {runningYear}
             </p>
           </div>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-ink-2">
             Pre-filled from your most recent year&apos;s records. Adjust if your expected income this year is different.
           </p>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Estimated gross income (R)</label>
+            <label className="text-xs font-medium text-ink-2">Estimated gross income (R)</label>
             <input
               type="number"
               className="input w-full font-mono text-lg"
@@ -289,18 +289,18 @@ export default function ProvisionalPage() {
           </div>
 
           {taxResult && (
-            <div className="rounded-xl bg-zinc-800/60 divide-y divide-zinc-700/50">
-              <div className="flex justify-between px-4 py-2.5 text-sm text-zinc-400">
+            <div className="rounded-xl bg-raised/60 divide-y divide-edge/50">
+              <div className="flex justify-between px-4 py-2.5 text-sm text-ink-2">
                 <span>Estimated taxable income</span>
-                <span className="tabular-nums text-zinc-200">{formatRand(taxResult.taxableIncome)}</span>
+                <span className="tabular-nums text-ink-1">{formatRand(taxResult.taxableIncome)}</span>
               </div>
               {taxResult.section11fRa > 0 && (
-                <div className="flex justify-between px-4 py-2.5 text-sm text-zinc-500">
+                <div className="flex justify-between px-4 py-2.5 text-sm text-ink-2">
                   <span>RA deduction</span>
                   <span className="tabular-nums">− {formatRand(taxResult.section11fRa)}</span>
                 </div>
               )}
-              <div className="flex justify-between px-4 py-2.5 text-sm text-zinc-400">
+              <div className="flex justify-between px-4 py-2.5 text-sm text-ink-2">
                 <span>Estimated annual tax payable</span>
                 <span className="tabular-nums font-semibold text-amber-400">{formatRand(taxResult.netTaxPayable)}</span>
               </div>
@@ -311,7 +311,7 @@ export default function ProvisionalPage() {
         {/* Payment cards */}
         {taxResult && annualTax > 0 && (
           <div className="space-y-4">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Your payment schedule</p>
+            <p className="text-xs font-semibold text-ink-2 uppercase tracking-wider">Your payment schedule</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <DeadlineCard
                 label="First provisional payment"
@@ -330,7 +330,7 @@ export default function ProvisionalPage() {
                 onTogglePaid={() => togglePayment(2)}
               />
             </div>
-            <div className="flex items-start gap-2 text-xs text-zinc-600 px-1">
+            <div className="flex items-start gap-2 text-xs text-ink-3 px-1">
               <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               <span>
                 These are estimates only. Your actual payment may differ based on your final income.
@@ -354,8 +354,8 @@ export default function ProvisionalPage() {
         )}
 
         {/* How to pay */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
-          <p className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">How to pay on SARS eFiling</p>
+        <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-4">
+          <p className="text-xs font-semibold text-ink-1 uppercase tracking-wider">How to pay on SARS eFiling</p>
           <div className="space-y-3">
             {[
               'Log in to secure.sarsefiling.co.za',
@@ -366,8 +366,8 @@ export default function ProvisionalPage() {
               'Save your payment receipt for your records',
             ].map((step, i) => (
               <div key={i} className="flex items-start gap-3">
-                <span className="text-xs font-bold text-zinc-700 w-5 flex-shrink-0 mt-0.5">{String(i + 1).padStart(2, '0')}</span>
-                <p className="text-sm text-zinc-400 leading-relaxed">{step}</p>
+                <span className="text-xs font-bold text-ink-3 w-5 flex-shrink-0 mt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                <p className="text-sm text-ink-2 leading-relaxed">{step}</p>
               </div>
             ))}
           </div>
@@ -382,14 +382,14 @@ export default function ProvisionalPage() {
         </div>
 
         {/* Link to ITR12 */}
-        <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-900/40">
+        <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-edge bg-surface/40">
           <div>
-            <p className="text-sm font-medium text-zinc-300">Ready to file your annual return?</p>
-            <p className="text-xs text-zinc-500 mt-0.5">After year end, file your ITR12 to settle the final tax assessment.</p>
+            <p className="text-sm font-medium text-ink-1">Ready to file your annual return?</p>
+            <p className="text-xs text-ink-2 mt-0.5">After year end, file your ITR12 to settle the final tax assessment.</p>
           </div>
           <Link
             href="/filing"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-all flex-shrink-0"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-raised hover:bg-edge text-ink-1 text-xs font-semibold transition-all flex-shrink-0"
           >
             File Return <ChevronRight className="w-3.5 h-3.5" />
           </Link>

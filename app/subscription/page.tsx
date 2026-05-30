@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -142,8 +142,8 @@ function SubscriptionContent() {
   const hasActiveSub = activeSub?.status === 'active'
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="relative z-30 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm">
+    <div className="min-h-screen bg-base text-ink-1">
+      <header className="relative z-30 border-b border-edge/60 bg-base/80 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
@@ -151,7 +151,7 @@ function SubscriptionContent() {
             </div>
             <span className="font-semibold text-sm tracking-tight">Klippa</span>
           </Link>
-          <Link href="/pricing" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+          <Link href="/pricing" className="text-xs text-ink-2 hover:text-ink-1 transition-colors">
             View pricing
           </Link>
         </div>
@@ -159,7 +159,7 @@ function SubscriptionContent() {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-1.5 text-xs text-ink-2 hover:text-ink-1 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
           </button>
           <h1 className="text-lg font-semibold">Your Plan</h1>
@@ -167,7 +167,7 @@ function SubscriptionContent() {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
+            <Loader2 className="w-6 h-6 animate-spin text-ink-3" />
           </div>
         ) : (
           <div className="grid sm:grid-cols-5 gap-6">
@@ -181,7 +181,7 @@ function SubscriptionContent() {
                   <Zap className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
                   <div className="text-xs">
                     <p className="font-semibold text-emerald-300">Free trial active</p>
-                    <p className="text-zinc-400 mt-0.5">
+                    <p className="text-ink-2 mt-0.5">
                       Expires {format(parseISO(profile!.trial_ends_at!), 'd MMM yyyy')}. Subscribe before then to keep access.
                     </p>
                   </div>
@@ -190,13 +190,13 @@ function SubscriptionContent() {
 
               {/* Active subscription banner */}
               {hasActiveSub && (
-                <div className="rounded-xl border border-zinc-700 bg-zinc-900/50 px-4 py-3 flex items-start gap-2.5">
-                  <Calendar className="w-4 h-4 text-zinc-400 mt-0.5 flex-shrink-0" />
+                <div className="rounded-xl border border-edge bg-surface/50 px-4 py-3 flex items-start gap-2.5">
+                  <Calendar className="w-4 h-4 text-ink-2 mt-0.5 flex-shrink-0" />
                   <div className="text-xs">
-                    <p className="font-semibold text-zinc-200">
+                    <p className="font-semibold text-ink-1">
                       {activeSub.plan.charAt(0).toUpperCase() + activeSub.plan.slice(1)} plan active
                     </p>
-                    <p className="text-zinc-400 mt-0.5">
+                    <p className="text-ink-2 mt-0.5">
                       Renews {activeSub.current_period_end ? format(parseISO(activeSub.current_period_end), 'd MMM yyyy') : '—'}
                     </p>
                   </div>
@@ -205,7 +205,7 @@ function SubscriptionContent() {
 
               {/* Plan picker */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-400">Choose a plan</p>
+                <p className="text-xs font-medium text-ink-2">Choose a plan</p>
                 <div className="grid grid-cols-2 gap-3">
                   {(Object.entries(PLANS) as [PlanKey, typeof PLANS[PlanKey]][]).map(([key, p]) => (
                     <button
@@ -214,13 +214,13 @@ function SubscriptionContent() {
                       className={`rounded-xl border p-4 text-left transition-all space-y-1 ${
                         plan === key
                           ? 'border-emerald-500 bg-emerald-950/30'
-                          : 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/40'
+                          : 'border-edge hover:border-zinc-500 bg-surface/40'
                       }`}
                     >
-                      <p className="text-xs font-semibold text-zinc-200">{p.name}</p>
+                      <p className="text-xs font-semibold text-ink-1">{p.name}</p>
                       <p className="text-lg font-bold">
                         R {cycle === 'monthly' ? p.monthlyPrice : Math.round(p.annualPrice / 12)}
-                        <span className="text-xs font-normal text-zinc-500">/mo</span>
+                        <span className="text-xs font-normal text-ink-2">/mo</span>
                       </p>
                     </button>
                   ))}
@@ -234,8 +234,8 @@ function SubscriptionContent() {
                       onClick={() => setCycle(c)}
                       className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
                         cycle === c
-                          ? 'bg-zinc-800 text-zinc-100 border border-zinc-600'
-                          : 'text-zinc-500 border border-zinc-800 hover:text-zinc-300'
+                          ? 'bg-raised text-ink-1 border border-zinc-600'
+                          : 'text-ink-2 border border-edge hover:text-ink-1'
                       }`}
                     >
                       {c === 'monthly' ? 'Monthly' : 'Annual (save ~17%)'}
@@ -246,22 +246,22 @@ function SubscriptionContent() {
 
               {/* Promo code */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-zinc-400">Promo code</p>
+                <p className="text-xs font-medium text-ink-2">Promo code</p>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-2" />
                     <input
                       type="text"
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                       placeholder="e.g. TRIAL30"
-                      className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60 transition-colors"
+                      className="w-full bg-raised/60 border border-edge rounded-xl pl-9 pr-4 py-2.5 text-sm text-ink-1 placeholder:text-ink-3 outline-none focus:border-emerald-500/60 transition-colors"
                     />
                   </div>
                   <button
                     onClick={applyPromo}
                     disabled={!promoCode.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-300 disabled:opacity-40 transition-all"
+                    className="px-4 py-2.5 rounded-xl bg-raised hover:bg-edge text-xs font-semibold text-ink-1 disabled:opacity-40 transition-all"
                   >
                     Apply
                   </button>
@@ -287,24 +287,24 @@ function SubscriptionContent() {
                 {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                 {paying ? 'Redirecting to payment…' : `Pay R ${finalAmount.toFixed(2)} via Ozow`}
               </button>
-              <p className="text-xs text-zinc-600 text-center">
+              <p className="text-xs text-ink-3 text-center">
                 Instant EFT via Ozow · Secure · No card needed
               </p>
             </div>
 
             {/* Right — plan summary */}
             <div className="sm:col-span-2 space-y-4">
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-4">
-                <p className="text-xs font-medium text-zinc-400">What you get</p>
+              <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-4">
+                <p className="text-xs font-medium text-ink-2">What you get</p>
                 <ul className="space-y-2.5">
                   {selectedPlan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-xs text-zinc-300">
+                    <li key={f} className="flex items-start gap-2 text-xs text-ink-1">
                       <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />{f}
                     </li>
                   ))}
                 </ul>
-                <div className="border-t border-zinc-800 pt-4 space-y-1.5">
-                  <div className="flex justify-between text-xs text-zinc-400">
+                <div className="border-t border-edge pt-4 space-y-1.5">
+                  <div className="flex justify-between text-xs text-ink-2">
                     <span>{selectedPlan.name} ({cycle})</span>
                     <span>R {cycle === 'monthly' ? selectedPlan.monthlyPrice : selectedPlan.annualPrice}</span>
                   </div>
@@ -314,7 +314,7 @@ function SubscriptionContent() {
                       <span>− R {((cycle === 'monthly' ? selectedPlan.monthlyPrice : selectedPlan.annualPrice) * discount / 100).toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm font-semibold text-zinc-100 pt-1">
+                  <div className="flex justify-between text-sm font-semibold text-ink-1 pt-1">
                     <span>Total</span>
                     <span>R {finalAmount.toFixed(2)}</span>
                   </div>
@@ -323,20 +323,20 @@ function SubscriptionContent() {
 
               {/* Active promos */}
               {promos.length > 0 && (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 space-y-2">
-                  <p className="text-xs font-medium text-zinc-400">Your promos</p>
+                <div className="rounded-xl border border-edge bg-surface/30 p-4 space-y-2">
+                  <p className="text-xs font-medium text-ink-2">Your promos</p>
                   {promos.map((up) => (
-                    <div key={up.klippa_promotions?.code} className="text-xs text-zinc-400 flex items-center gap-1.5">
+                    <div key={up.klippa_promotions?.code} className="text-xs text-ink-2 flex items-center gap-1.5">
                       <Tag className="w-3 h-3 text-emerald-500" />
                       <span className="font-mono text-emerald-400">{up.klippa_promotions?.code}</span>
                       {up.type === 'trial' && up.trial_ends_at && (
-                        <span className="text-zinc-500">trial until {format(parseISO(up.trial_ends_at), 'd MMM')}</span>
+                        <span className="text-ink-2">trial until {format(parseISO(up.trial_ends_at), 'd MMM')}</span>
                       )}
                       {up.type === 'discount' && (
-                        <span className="text-zinc-500">{up.klippa_promotions?.discount_pct}% off</span>
+                        <span className="text-ink-2">{up.klippa_promotions?.discount_pct}% off</span>
                       )}
                       {up.type === 'free_submission' && (
-                        <span className="text-zinc-500">{up.free_submissions_remaining} free filing(s)</span>
+                        <span className="text-ink-2">{up.free_submissions_remaining} free filing(s)</span>
                       )}
                     </div>
                   ))}

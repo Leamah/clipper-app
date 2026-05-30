@@ -8,10 +8,20 @@ export const metadata: Metadata = {
   description: 'Know your tax. Keep more money. Built for South African freelancers and consultants.',
 }
 
+// Prevent flash of wrong theme: reads localStorage before first paint
+const themeScript = `(function(){
+  var t = localStorage.getItem('klippa-theme') || 'dark';
+  document.documentElement.classList.toggle('dark', t === 'dark');
+})()`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+    <html lang="en">
+      <head>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-screen bg-base text-ink-1 antialiased">
         <IdleGuard />
         <PageTransition>{children}</PageTransition>
       </body>

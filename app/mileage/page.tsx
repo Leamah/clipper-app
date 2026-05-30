@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -226,8 +226,8 @@ export default function MileagePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
+      <div className="min-h-screen bg-base flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
       </div>
     )
   }
@@ -245,20 +245,20 @@ export default function MileagePage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pl-52">
+    <div className="min-h-screen bg-base text-ink-1 pl-52">
       <AppNav activePage="mileage" featureFlags={featureFlags} logbookPending={pendingWeeks.length} />
 
       {/* Action bar below nav */}
       {isConfigured && (
-        <div className="border-b border-zinc-800/40 bg-zinc-950/60">
+        <div className="border-b border-edge/40 bg-base/60">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 h-11 flex items-center gap-2">
-            <span className="text-xs text-zinc-500 mr-auto">Mileage Logbook — Tax Year {taxYear}</span>
+            <span className="text-xs text-ink-2 mr-auto">Mileage Logbook — Tax Year {taxYear}</span>
             <button onClick={exportLogbook} disabled={trips.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40 transition-all">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:border-zinc-600 hover:text-ink-1 disabled:opacity-40 transition-all">
               <Download className="w-3 h-3" /> CSV
             </button>
             <button onClick={handleExportSARSPDF} disabled={trips.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40 transition-all">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:border-zinc-600 hover:text-ink-1 disabled:opacity-40 transition-all">
               <FileText className="w-3 h-3" /> SARS Logbook PDF
             </button>
             <button onClick={() => setShowAddTrip(true)}
@@ -279,7 +279,7 @@ export default function MileagePage() {
             </div>
             <div>
               <p className="text-base font-semibold text-amber-200">Set up your commute once</p>
-              <p className="text-sm text-zinc-400 mt-1 max-w-md mx-auto">
+              <p className="text-sm text-ink-2 mt-1 max-w-md mx-auto">
                 Tell Klippa where you live, where you work, and which days you commute.
                 We&apos;ll auto-build your SARS logbook and send you weekly or monthly
                 reminders to confirm it.
@@ -303,17 +303,17 @@ export default function MileagePage() {
             </div>
 
             {/* Commute summary */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 flex flex-wrap gap-4 text-xs text-zinc-400">
+            <div className="rounded-xl border border-edge bg-surface/30 p-4 flex flex-wrap gap-4 text-xs text-ink-2">
               <span className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+                <MapPin className="w-3.5 h-3.5 text-ink-2" />
                 {profile?.home_suburb ?? 'Home'} → {profile?.work_suburb ?? 'Office'}
               </span>
               <span className="flex items-center gap-1.5">
-                <Car className="w-3.5 h-3.5 text-zinc-500" />
+                <Car className="w-3.5 h-3.5 text-ink-2" />
                 {(profile?.commute_km ?? 0) * 2} km return
               </span>
               <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+                <Calendar className="w-3.5 h-3.5 text-ink-2" />
                 {[
                   profile?.office_mon && 'Mon',
                   profile?.office_tue && 'Tue',
@@ -333,7 +333,7 @@ export default function MileagePage() {
                   <p className="text-sm font-semibold text-amber-200">
                     {pendingWeeks.length} {pendingWeeks.length === 1 ? 'week needs' : 'weeks need'} your review
                   </p>
-                  <span className="text-xs text-zinc-500">Confirm which days you drove for business</span>
+                  <span className="text-xs text-ink-2">Confirm which days you drove for business</span>
                 </div>
 
                 {pendingWeeks.map((week) => (
@@ -353,7 +353,7 @@ export default function MileagePage() {
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <p className="text-sm text-emerald-200 font-medium">Logbook is up to date</p>
-                <span className="text-xs text-zinc-500">All weeks confirmed through last week</span>
+                <span className="text-xs text-ink-2">All weeks confirmed through last week</span>
               </div>
             )}
 
@@ -361,14 +361,14 @@ export default function MileagePage() {
             {trips.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Confirmed logbook</p>
-                  <p className="text-xs text-zinc-600">{trips.length} trips · {totalAllKm.toFixed(0)} km total</p>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-ink-2">Confirmed logbook</p>
+                  <p className="text-xs text-ink-3">{trips.length} trips · {totalAllKm.toFixed(0)} km total</p>
                 </div>
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+                <div className="rounded-2xl border border-edge bg-surface/40 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="border-b border-zinc-800 text-zinc-500">
+                        <tr className="border-b border-edge text-ink-2">
                           <th className="text-left px-4 py-3 font-medium">Date</th>
                           <th className="text-left px-4 py-3 font-medium">Route</th>
                           <th className="text-left px-4 py-3 font-medium">Purpose</th>
@@ -379,26 +379,26 @@ export default function MileagePage() {
                       </thead>
                       <tbody>
                         {trips.map((t) => (
-                          <tr key={t.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors">
-                            <td className="px-4 py-3 text-zinc-300 whitespace-nowrap">
+                          <tr key={t.id} className="border-b border-edge/50 hover:bg-raised/20 transition-colors">
+                            <td className="px-4 py-3 text-ink-1 whitespace-nowrap">
                               {format(parseISO(t.trip_date), 'd MMM yyyy')}
                             </td>
                             <td className="px-4 py-3">
                               {t.start_location || t.end_location ? (
-                                <span className="text-zinc-400">{t.start_location ?? '?'} → {t.end_location ?? '?'}</span>
-                              ) : <span className="text-zinc-600">—</span>}
+                                <span className="text-ink-2">{t.start_location ?? '?'} → {t.end_location ?? '?'}</span>
+                              ) : <span className="text-ink-3">—</span>}
                             </td>
-                            <td className="px-4 py-3 text-zinc-400 max-w-[200px] truncate">{t.purpose}</td>
-                            <td className="px-4 py-3 text-right font-medium text-zinc-200 tabular-nums">{t.distance_km}</td>
+                            <td className="px-4 py-3 text-ink-2 max-w-[200px] truncate">{t.purpose}</td>
+                            <td className="px-4 py-3 text-right font-medium text-ink-1 tabular-nums">{t.distance_km}</td>
                             <td className="px-4 py-3 text-center">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                                t.trip_type === 'business' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-700 text-zinc-400'
+                                t.trip_type === 'business' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-edge text-ink-2'
                               }`}>
                                 {t.trip_type}
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <button onClick={() => deleteTrip(t.id)} className="p-1 text-zinc-600 hover:text-red-400 transition-colors">
+                              <button onClick={() => deleteTrip(t.id)} className="p-1 text-ink-3 hover:text-red-400 transition-colors">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </td>
@@ -406,9 +406,9 @@ export default function MileagePage() {
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr className="bg-zinc-800/30">
-                          <td colSpan={3} className="px-4 py-3 text-xs text-zinc-500 font-medium">Total business km</td>
-                          <td className="px-4 py-3 text-right text-xs font-bold text-zinc-200 tabular-nums">{totalBusinessKm.toFixed(0)}</td>
+                        <tr className="bg-raised/30">
+                          <td colSpan={3} className="px-4 py-3 text-xs text-ink-2 font-medium">Total business km</td>
+                          <td className="px-4 py-3 text-right text-xs font-bold text-ink-1 tabular-nums">{totalBusinessKm.toFixed(0)}</td>
                           <td colSpan={2} className="px-4 py-3 text-xs text-emerald-400 font-semibold text-right pr-8">
                             Est. {formatRand(travelDeduction)}
                           </td>
@@ -421,12 +421,12 @@ export default function MileagePage() {
             )}
 
             {/* SARS logbook note */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 flex items-start gap-3">
-              <FileText className="w-4 h-4 text-zinc-500 flex-shrink-0 mt-0.5" />
-              <div className="text-xs text-zinc-500 space-y-1">
-                <p className="font-medium text-zinc-400">SARS logbook requirements</p>
+            <div className="rounded-xl border border-edge bg-surface/30 p-4 flex items-start gap-3">
+              <FileText className="w-4 h-4 text-ink-2 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-ink-2 space-y-1">
+                <p className="font-medium text-ink-2">SARS logbook requirements</p>
                 <p>Your logbook must record: date, start and end point, distance, and business purpose for every trip.
-                  Keep the logbook for 5 years after submission. Click <strong className="text-zinc-300">Export CSV</strong> to
+                  Keep the logbook for 5 years after submission. Click <strong className="text-ink-1">Export CSV</strong> to
                   download a SARS-compatible version. You will also need your opening and closing odometer readings for the tax year.</p>
               </div>
             </div>
@@ -471,28 +471,28 @@ function WeekReviewCard({
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+    <div className="rounded-2xl border border-edge bg-surface/40 overflow-hidden">
       {/* Header — click to expand */}
-      <button onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-800/30 transition-colors text-left">
+      <button onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-raised/30 transition-colors text-left">
         <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${open ? 'border-emerald-500' : 'border-zinc-600'}`}>
           {open && <div className="w-full h-full rounded-full bg-emerald-500/50" />}
         </div>
         <div className="flex-1">
-          <p className="text-sm font-medium text-zinc-200">
+          <p className="text-sm font-medium text-ink-1">
             {fmtDate(week.start)} — {fmtDate(week.end)}
           </p>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-xs text-ink-2 mt-0.5">
             {selectedCount > 0
               ? `${selectedCount} trips auto-detected · ${totalKm} km (return)`
               : 'No office days scheduled this week'}
           </p>
         </div>
-        <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-ink-2 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="border-t border-zinc-800 px-4 py-4 space-y-4">
-          <p className="text-xs text-zinc-500">
+        <div className="border-t border-edge px-4 py-4 space-y-4">
+          <p className="text-xs text-ink-2">
             Klippa auto-detected these trips based on your schedule. Uncheck days you didn&apos;t drive.
             Change the purpose if a day was a client visit rather than a regular commute.
           </p>
@@ -500,7 +500,7 @@ function WeekReviewCard({
           <div className="space-y-2">
             {days.map((d, i) => (
               <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                d.selected ? 'border-emerald-600/40 bg-emerald-950/20' : 'border-zinc-800 bg-zinc-900/30 opacity-60'
+                d.selected ? 'border-emerald-600/40 bg-emerald-950/20' : 'border-edge bg-surface/30 opacity-60'
               }`}>
                 {/* Day toggle */}
                 <button onClick={() => toggleDay(i)}
@@ -511,35 +511,35 @@ function WeekReviewCard({
                 </button>
 
                 {/* Day label */}
-                <p className="text-xs font-medium text-zinc-300 w-20 flex-shrink-0">{fmtShort(d.date)}</p>
+                <p className="text-xs font-medium text-ink-1 w-20 flex-shrink-0">{fmtShort(d.date)}</p>
 
                 {/* Route */}
                 {d.selected ? (
                   <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-xs text-zinc-400">{d.from} → {d.to} · <span className="text-zinc-300">{d.km * 2} km return</span></p>
+                    <p className="text-xs text-ink-2">{d.from} → {d.to} · <span className="text-ink-1">{d.km * 2} km return</span></p>
                     <input
                       type="text"
                       value={d.purpose}
                       onChange={(e) => updatePurpose(i, e.target.value)}
-                      className="w-full bg-zinc-800/60 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-emerald-500/60"
+                      className="w-full bg-raised/60 border border-edge rounded-lg px-2.5 py-1.5 text-xs text-ink-1 placeholder:text-ink-3 outline-none focus:border-emerald-500/60"
                       placeholder="Purpose (e.g. Business commute)"
                     />
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-600 flex-1">Stayed home / not a scheduled day</p>
+                  <p className="text-xs text-ink-3 flex-1">Stayed home / not a scheduled day</p>
                 )}
               </div>
             ))}
           </div>
 
           {/* Summary */}
-          <div className="flex items-center justify-between text-xs text-zinc-400 pt-1 border-t border-zinc-800">
+          <div className="flex items-center justify-between text-xs text-ink-2 pt-1 border-t border-edge">
             <span>{selectedCount} trips · {totalKm} km (return)</span>
             <div className="flex gap-2">
               <button
                 onClick={() => onConfirm(days.map((d) => ({ ...d, selected: false })))}
                 disabled={confirming}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors disabled:opacity-50">
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors disabled:opacity-50">
                 No trips this week
               </button>
               <button
@@ -561,9 +561,9 @@ function WeekReviewCard({
 
 function StatCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-      <p className="text-xs text-zinc-500 mb-1">{label}</p>
-      <p className={`text-lg font-bold tabular-nums ${accent ? 'text-emerald-400' : 'text-zinc-100'}`}>{value}</p>
+    <div className="rounded-xl border border-edge bg-surface/40 p-4">
+      <p className="text-xs text-ink-2 mb-1">{label}</p>
+      <p className={`text-lg font-bold tabular-nums ${accent ? 'text-emerald-400' : 'text-ink-1'}`}>{value}</p>
     </div>
   )
 }
@@ -650,12 +650,12 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5">
+      <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-white flex items-center gap-2">
             <Car className="w-4 h-4 text-emerald-400" /> Add trip
           </h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -663,7 +663,7 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
             {(['business', 'private'] as const).map((t) => (
               <button key={t} type="button"
                 onClick={() => setForm((f) => ({ ...f, trip_type: t }))}
-                className={`py-2 rounded-lg text-xs font-semibold transition-all ${form.trip_type === t ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                className={`py-2 rounded-lg text-xs font-semibold transition-all ${form.trip_type === t ? 'bg-emerald-600 text-white' : 'bg-raised text-ink-2 hover:bg-edge'}`}>
                 {t === 'business' ? '💼 Business' : '🏠 Private'}
               </button>
             ))}
@@ -671,13 +671,13 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Date</label>
+              <label className="text-xs font-medium text-ink-2">Date</label>
               <input type="date" value={form.trip_date} onChange={(e) => setForm((f) => ({ ...f, trip_date: e.target.value }))} className="input" required />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">
+              <label className="text-xs font-medium text-ink-2">
                 Distance (km)
-                {odoKm && <span className="text-zinc-600 font-normal"> — auto from odometer</span>}
+                {odoKm && <span className="text-ink-3 font-normal"> — auto from odometer</span>}
               </label>
               <input
                 type="number" min="0.1" step="0.1"
@@ -689,11 +689,11 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
           </div>
 
           {/* Odometer fields — SARS compliance */}
-          <div className="rounded-lg bg-zinc-800/50 border border-zinc-700/50 px-3 py-3 space-y-2">
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Odometer readings (SARS-compliant)</p>
+          <div className="rounded-lg bg-raised/50 border border-edge/50 px-3 py-3 space-y-2">
+            <p className="text-[10px] text-ink-2 uppercase tracking-wide">Odometer readings (SARS-compliant)</p>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <label className="text-xs text-zinc-400">Opening KM</label>
+                <label className="text-xs text-ink-2">Opening KM</label>
                 <input
                   type="number" min="0" step="1"
                   value={form.odometer_start}
@@ -703,7 +703,7 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-zinc-400">Closing KM</label>
+                <label className="text-xs text-ink-2">Closing KM</label>
                 <input
                   type="number" min="0" step="1"
                   value={form.odometer_end}
@@ -720,24 +720,24 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">From (suburb)</label>
+              <label className="text-xs font-medium text-ink-2">From (suburb)</label>
               <input type="text" value={form.start_location} onChange={(e) => setForm((f) => ({ ...f, start_location: e.target.value }))} placeholder="e.g. Midrand" className="input" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">To (suburb)</label>
+              <label className="text-xs font-medium text-ink-2">To (suburb)</label>
               <input type="text" value={form.end_location} onChange={(e) => setForm((f) => ({ ...f, end_location: e.target.value }))} placeholder="e.g. Rosebank" className="input" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Reason for travel <span className="text-zinc-600">(required by SARS)</span></label>
+            <label className="text-xs font-medium text-ink-2">Reason for travel <span className="text-ink-3">(required by SARS)</span></label>
             <input type="text" value={form.purpose} onChange={(e) => setForm((f) => ({ ...f, purpose: e.target.value }))} placeholder="e.g. Client meeting, site visit, courier run" className="input" required />
           </div>
 
           {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
 
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge">Cancel</button>
             <button type="submit" disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               {saving ? 'Saving…' : 'Save trip'}

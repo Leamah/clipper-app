@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,7 +107,7 @@ export default function OnboardingPage() {
   const progressPct = ((step + 1) / totalSteps) * 100
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-base text-ink-1 flex items-center justify-center p-4">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-emerald-600/10 blur-[100px] rounded-full" />
       </div>
@@ -123,31 +123,31 @@ export default function OnboardingPage() {
               <span className="font-semibold text-sm tracking-tight">Klippa</span>
             </div>
             {step > 0 && (
-              <button onClick={back} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+              <button onClick={back} className="text-xs text-ink-2 hover:text-ink-1 transition-colors">
                 ← Back
               </button>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-zinc-500">
+            <div className="flex justify-between text-xs text-ink-2">
               <span>Setting up your tax profile</span>
               <span>{step + 1} of {totalSteps}</span>
             </div>
-            <div className="h-1 rounded-full bg-zinc-800 overflow-hidden">
+            <div className="h-1 rounded-full bg-raised overflow-hidden">
               <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-8 shadow-xl space-y-8">
+        <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-8">
 
           {/* Step 0: Employment type */}
           {step === 0 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-white">What do you do for work?</h2>
-                <p className="text-sm text-zinc-500 mt-1">This determines which deductions apply to you.</p>
+                <p className="text-sm text-ink-2 mt-1">This determines which deductions apply to you.</p>
               </div>
               <div className="space-y-3">
                 {([
@@ -156,15 +156,15 @@ export default function OnboardingPage() {
                   { value: 'mixed'     as EmploymentType, label: 'Both (salary + freelance)', sub: 'I have a salary and also freelance income' },
                 ]).map((opt) => (
                   <button key={opt.value} onClick={() => { setState((s) => ({ ...s, employment_type: opt.value })); next() }}
-                    className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-zinc-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${state.employment_type === opt.value ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-700'}`}>
+                    className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-edge hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${state.employment_type === opt.value ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
                       {state.employment_type === opt.value && <Check className="w-3 h-3 text-white" />}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-zinc-100">{opt.label}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{opt.sub}</p>
+                      <p className="text-sm font-semibold text-ink-1">{opt.label}</p>
+                      <p className="text-xs text-ink-2 mt-0.5">{opt.sub}</p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-zinc-700 group-hover:text-emerald-500 ml-auto" />
+                    <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500 ml-auto" />
                   </button>
                 ))}
               </div>
@@ -176,7 +176,7 @@ export default function OnboardingPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Where do you work from?</h2>
-                <p className="text-sm text-zinc-500 mt-1">This affects your home office deduction eligibility.</p>
+                <p className="text-sm text-ink-2 mt-1">This affects your home office deduction eligibility.</p>
               </div>
               <div className="space-y-3">
                 {([
@@ -194,20 +194,20 @@ export default function OnboardingPage() {
                   },
                   {
                     value: 'office_only' as WorkLocation,
-                    icon: <Building2 className="w-5 h-5 text-zinc-400" />,
+                    icon: <Building2 className="w-5 h-5 text-ink-2" />,
                     label: 'Office / On-site',
                     sub: 'I work at a fixed employer or client premises — no home office deduction',
                   },
                 ]).map((opt) => (
                   <button key={opt.value}
                     onClick={() => { setState((s) => ({ ...s, work_location: opt.value, works_from_home: opt.value !== 'office_only' })); next() }}
-                    className={`w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-all group ${state.work_location === opt.value ? 'border-emerald-500/60 bg-emerald-500/5' : 'border-zinc-800 hover:border-emerald-500/40 hover:bg-emerald-500/5'}`}>
+                    className={`w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-all group ${state.work_location === opt.value ? 'border-emerald-500/60 bg-emerald-500/5' : 'border-edge hover:border-emerald-500/40 hover:bg-emerald-500/5'}`}>
                     <div className="flex-shrink-0">{opt.icon}</div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-zinc-100">{opt.label}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{opt.sub}</p>
+                      <p className="text-sm font-semibold text-ink-1">{opt.label}</p>
+                      <p className="text-xs text-ink-2 mt-0.5">{opt.sub}</p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-zinc-700 group-hover:text-emerald-500" />
+                    <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500" />
                   </button>
                 ))}
               </div>
@@ -219,7 +219,7 @@ export default function OnboardingPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Do you drive for work?</h2>
-                <p className="text-sm text-zinc-500 mt-1 leading-relaxed">Client visits, site trips, and business travel qualify. You&apos;ll keep a logbook of business kilometres to claim this deduction.</p>
+                <p className="text-sm text-ink-2 mt-1 leading-relaxed">Client visits, site trips, and business travel qualify. You&apos;ll keep a logbook of business kilometres to claim this deduction.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {([
@@ -228,9 +228,9 @@ export default function OnboardingPage() {
                 ]).map(({ v, icon, label }) => (
                   <button key={String(v)}
                     onClick={() => { setState((s) => ({ ...s, has_vehicle: v })); next() }}
-                    className={`flex flex-col items-center gap-3 p-5 rounded-xl border transition-all ${state.has_vehicle === v ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-zinc-800 hover:border-emerald-500/40'}`}>
+                    className={`flex flex-col items-center gap-3 p-5 rounded-xl border transition-all ${state.has_vehicle === v ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-edge hover:border-emerald-500/40'}`}>
                     {icon}
-                    <span className="text-xs font-semibold text-zinc-100 text-center leading-tight">{label}</span>
+                    <span className="text-xs font-semibold text-ink-1 text-center leading-tight">{label}</span>
                   </button>
                 ))}
               </div>
@@ -242,7 +242,7 @@ export default function OnboardingPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Which financial products do you have?</h2>
-                <p className="text-sm text-zinc-500 mt-1">Select all that apply — each one unlocks relevant deductions or exemptions.</p>
+                <p className="text-sm text-ink-2 mt-1">Select all that apply — each one unlocks relevant deductions or exemptions.</p>
               </div>
               <div className="space-y-2.5">
                 {([
@@ -280,16 +280,16 @@ export default function OnboardingPage() {
                   const selected = state.financial_products.has(key)
                   return (
                     <button key={key} type="button" onClick={() => toggleProduct(key)}
-                      className={`w-full text-left flex items-start gap-3 p-4 rounded-xl border transition-all ${selected ? 'border-emerald-500/50 bg-emerald-500/8' : 'border-zinc-800 hover:border-zinc-700'}`}>
+                      className={`w-full text-left flex items-start gap-3 p-4 rounded-xl border transition-all ${selected ? 'border-emerald-500/50 bg-emerald-500/8' : 'border-edge hover:border-edge'}`}>
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'}`}>
                         {selected && <Check className="w-3 h-3 text-white" />}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-zinc-100">{label}</p>
+                          <p className="text-sm font-medium text-ink-1">{label}</p>
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400">{badge}</span>
                         </div>
-                        <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{sub}</p>
+                        <p className="text-xs text-ink-2 mt-0.5 leading-relaxed">{sub}</p>
                       </div>
                     </button>
                   )
@@ -307,23 +307,23 @@ export default function OnboardingPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-white">How many people are on your medical aid?</h2>
-                <p className="text-sm text-zinc-500 mt-1">Include yourself and all registered dependants.</p>
+                <p className="text-sm text-ink-2 mt-1">Include yourself and all registered dependants.</p>
               </div>
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5, 6].map((n) => (
                   <button key={n}
                     onClick={() => { setState((s) => ({ ...s, medical_aid_members: n })); next() }}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${state.medical_aid_members === n ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-zinc-800 hover:border-zinc-700'}`}>
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${state.medical_aid_members === n ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-edge hover:border-edge'}`}>
                     <div>
-                      <p className="text-sm font-medium text-zinc-100">
+                      <p className="text-sm font-medium text-ink-1">
                         {n === 1 ? 'Just me (main member)' : `${n} members`}
                         {n === 2 ? ' (you + 1 dependant)' : n > 2 ? ` (you + ${n - 1} dependants)` : ''}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
+                      <p className="text-xs text-ink-2 mt-0.5">
                         Credit: R{(n <= 2 ? n * 364 : 2 * 364 + (n - 2) * 246) * 12} /year
                       </p>
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${state.medical_aid_members === n ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-700'}`}>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${state.medical_aid_members === n ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
                       {state.medical_aid_members === n && <Check className="w-3 h-3 text-white" />}
                     </div>
                   </button>
@@ -337,18 +337,18 @@ export default function OnboardingPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Which tax year are we filing?</h2>
-                <p className="text-sm text-zinc-500 mt-1">South African tax years run 1 March to the last day of February.</p>
+                <p className="text-sm text-ink-2 mt-1">South African tax years run 1 March to the last day of February.</p>
               </div>
               <div className="space-y-3">
                 {TAX_YEAR_OPTIONS.map((opt) => (
                   <button key={opt.value} onClick={() => setState((s) => ({ ...s, tax_year: opt.value }))}
-                    className={`w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-all ${state.tax_year === opt.value ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-zinc-800 hover:border-zinc-700'}`}>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${state.tax_year === opt.value ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-700'}`}>
+                    className={`w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-all ${state.tax_year === opt.value ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-edge hover:border-edge'}`}>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${state.tax_year === opt.value ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
                       {state.tax_year === opt.value && <Check className="w-3 h-3 text-white" />}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-zinc-100">Tax year {opt.label}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">{opt.sub}</p>
+                      <p className="text-sm font-semibold text-ink-1">Tax year {opt.label}</p>
+                      <p className="text-xs text-ink-2 mt-0.5">{opt.sub}</p>
                     </div>
                   </button>
                 ))}
