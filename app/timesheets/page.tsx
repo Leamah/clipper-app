@@ -8,6 +8,7 @@ import AppNav from '@/components/AppNav'
 import {
   Plus, ChevronLeft, ChevronRight, Download, CheckCircle2,
   Clock, Briefcase, Pencil, X, Check, AlertCircle, Users,
+  PenLine, Lock, Save,
 } from 'lucide-react'
 import {
   format, startOfMonth, getDaysInMonth, getDay, getYear, getMonth,
@@ -134,16 +135,34 @@ function NewClientPanel({
   )
 }
 
+// ── Status badge ──────────────────────────────────────────
+
+function StatusBadge({ status }: { status: KlippaTimesheet['status'] }) {
+  const map = {
+    draft:     { label: 'Draft',                    cls: 'text-zinc-400 bg-zinc-800' },
+    submitted: { label: 'Awaiting client sign-off', cls: 'text-amber-300 bg-amber-500/15' },
+    approved:  { label: 'Approved',                 cls: 'text-emerald-300 bg-emerald-500/15' },
+  }
+  const { label, cls } = map[status] ?? map.draft
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${cls}`}>
+      {label}
+    </span>
+  )
+}
+
 // ── Day Card ──────────────────────────────────────────────
 
 function DayCard({
   dateStr,
   entry,
+  locked,
   onSave,
   onDelete,
 }: {
   dateStr:  string
   entry:    KlippaTimesheetEntry | null
+  locked:   boolean
   onSave:   (dateStr: string, hours: number, comment: string) => Promise<void>
   onDelete: (dateStr: string) => Promise<void>
 }) {
@@ -166,6 +185,7 @@ function DayCard({
   }, [entry])
 
   function openEdit() {
+    if (locked) return
     setEditing(true)
     setTimeout(() => inputRef.current?.focus(), 50)
   }
@@ -253,11 +273,15 @@ function DayCard({
     return (
       <button
         onClick={openEdit}
-        className="w-full text-left rounded-xl border border-emerald-500/30 bg-emerald-950/20 hover:border-emerald-500/50 p-2.5 min-h-[72px] transition-colors group"
+        disabled={locked}
+        className="w-full text-left rounded-xl border border-emerald-500/30 bg-emerald-950/20 hover:border-emerald-500/50 p-2.5 min-h-[72px] transition-colors group disabled:cursor-default disabled:hover:border-emerald-500/30"
       >
         <div className="flex items-center justify-between mb-0.5">
           <span className="text-[10px] text-zinc-500 font-medium">{dayLabel}</span>
-          <Pencil className="w-2.5 h-2.5 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity" />
+          {locked
+            ? <Lock className="w-2.5 h-2.5 text-zinc-700" />
+            : <Pencil className="w-2.5 h-2.5 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity" />
+          }
         </div>
         <div className="text-xl font-bold text-emerald-300">{entry!.hours}</div>
         <div className="text-[10px] text-zinc-500">hrs</div>
@@ -308,9 +332,13 @@ export default function TimesheetsPage() {
   const [timesheet,   setTimesheet]   = useState<KlippaTimesheet | null>(null)
   const [entries,     setEntries]     = useState<KlippaTimesheetEntry[]>([])
   const [currentMonth,setCurrentMonth]= useState(() => startOfMonth(new Date()))
-  const [showNewClient,setShowNewClient] = useState(false)
-  const [smartFillHrs, setSmartFillHrs]  = useState('8')
-  const [loading,     setLoading]     = useState(true)
+  const [showNewClient,   setShowNewClient]    = useState(false)
+  const [smartFillHrs,    setSmartFillHrs]     = useState('8')
+  const [loading,         setLoading]          = useState(true)
+  const [signingConsultant, setSigningConsultant] = useState(false)
+  const [signingClient,   setSigningClient]    = useState(false)
+  const [savingPdf,       setSavingPdf]        = useState(false)
+  const [saveMsg,         setSaveMsg]          = useState<string | null>(null)
 
   // ── Load profile & clients ────────────────────────────
   useEffect(() => {
@@ -458,16 +486,93 @@ export default function TimesheetsPage() {
     setEntries((ents ?? []) as KlippaTimesheetEntry[])
   }
 
-  // ── Mark submitted ────────────────────────────────────
-  async function markSubmitted() {
+  // ── Signoff functions ─────────────────────────────────
+  async function signConsultant() {
     if (!timesheet) return
+    setSigningConsultant(true)
+    const now = new Date().toISOString()
     const { data } = await supabase
       .from('klippa_timesheets')
-      .update({ status: 'submitted', updated_at: new Date().toISOString() })
+      .update({ consultant_signed_at: now, status: 'submitted', updated_at: now })
       .eq('id', timesheet.id)
       .select()
       .single()
     if (data) setTimesheet(data as KlippaTimesheet)
+    setSigningConsultant(false)
+  }
+
+  async function unsignConsultant() {
+    if (!timesheet) return
+    const now = new Date().toISOString()
+    const { data } = await supabase
+      .from('klippa_timesheets')
+      .update({ consultant_signed_at: null, client_signed_at: null, status: 'draft', updated_at: now })
+      .eq('id', timesheet.id)
+      .select()
+      .single()
+    if (data) setTimesheet(data as KlippaTimesheet)
+  }
+
+  async function signClient() {
+    if (!timesheet) return
+    setSigningClient(true)
+    const now = new Date().toISOString()
+    const { data } = await supabase
+      .from('klippa_timesheets')
+      .update({ client_signed_at: now, status: 'approved', updated_at: now })
+      .eq('id', timesheet.id)
+      .select()
+      .single()
+    if (data) setTimesheet(data as KlippaTimesheet)
+    setSigningClient(false)
+  }
+
+  // ── Save PDF to Documents ─────────────────────────────
+  async function handleSavePDF() {
+    if (!timesheet || !profile) return
+    setSavingPdf(true)
+    setSaveMsg(null)
+    try {
+      const { exportTimesheetPDF } = await import('@/lib/pdf-export')
+      const monthStr   = format(currentMonth, 'yyyy-MM')
+      const clientName = activeClient?.name ?? 'Client'
+      const filename   = `Timesheet_${clientName}_${monthStr}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_')
+
+      // Generate PDF as a Blob (no auto-download)
+      const blob = exportTimesheetPDF(
+        { ...timesheet, client_name: activeClient?.name, client_contact: activeClient?.contact ?? undefined },
+        entries,
+        { blob: true },
+      ) as Blob
+
+      // Upload to storage
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const storagePath = `${user.id}/timesheets/${timesheet.id}-${monthStr}.pdf`
+      const { error: upErr } = await supabase.storage
+        .from('klippa_documents')
+        .upload(storagePath, blob, { contentType: 'application/pdf', upsert: true })
+
+      if (upErr) throw upErr
+
+      await supabase.from('klippa_documents').insert({
+        user_id:           user.id,
+        document_type:     'timesheet',
+        original_filename: filename,
+        storage_path:      storagePath,
+        file_size_bytes:   blob.size,
+        ocr_status:        'complete',
+        upload_method:     'timesheet_export',
+      })
+
+      setSaveMsg('Saved to Documents ✓')
+    } catch {
+      setSaveMsg('Save failed — try again')
+    } finally {
+      setSavingPdf(false)
+      setTimeout(() => setSaveMsg(null), 4000)
+    }
   }
 
   // ── Export PDF ────────────────────────────────────────
@@ -631,11 +736,7 @@ export default function TimesheetsPage() {
             {timesheet.hourly_rate && (
               <span>{fmtRand(timesheet.hourly_rate)}/hr</span>
             )}
-            {timesheet.status === 'submitted' && (
-              <span className="flex items-center gap-1 text-emerald-400">
-                <CheckCircle2 className="w-3 h-3" /> Submitted
-              </span>
-            )}
+            <StatusBadge status={timesheet.status} />
           </div>
         )}
 
@@ -694,12 +795,103 @@ export default function TimesheetsPage() {
                 key={ds}
                 dateStr={ds}
                 entry={entryMap.get(ds) ?? null}
+                locked={!!timesheet?.consultant_signed_at}
                 onSave={saveEntry}
                 onDelete={deleteEntry}
               />
             )
           })}
         </div>
+
+        {/* Sign-off card */}
+        {timesheet && (
+          <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+                <PenLine className="w-4 h-4 text-zinc-400" />
+                Sign-off
+              </h3>
+              <StatusBadge status={timesheet.status} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Consultant */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-3">Consultant</div>
+                <div className="text-sm text-zinc-200 font-medium truncate">
+                  {timesheet.consultant_name || profile?.full_name || '—'}
+                </div>
+                <div className="text-xs text-zinc-500 mb-4">
+                  {timesheet.position || activeClient?.position || '—'}
+                </div>
+                {timesheet.consultant_signed_at ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-emerald-400 text-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      Digitally signed {format(new Date(timesheet.consultant_signed_at), 'd MMM yyyy')}
+                    </div>
+                    <button
+                      onClick={unsignConsultant}
+                      className="text-xs text-zinc-600 hover:text-zinc-400 underline underline-offset-2 transition-colors"
+                    >
+                      Undo signature
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={signConsultant}
+                    disabled={signingConsultant}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    <PenLine className="w-3.5 h-3.5" />
+                    {signingConsultant ? 'Signing…' : 'Sign digitally'}
+                  </button>
+                )}
+              </div>
+
+              {/* Client */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-3">Client</div>
+                <div className="text-sm text-zinc-200 font-medium truncate">
+                  {activeClient?.contact || '—'}
+                </div>
+                <div className="text-xs text-zinc-500 mb-4">{activeClient?.name || '—'}</div>
+                {timesheet.client_signed_at ? (
+                  <div className="flex items-center gap-1.5 text-emerald-400 text-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    Confirmed {format(new Date(timesheet.client_signed_at), 'd MMM yyyy')}
+                  </div>
+                ) : timesheet.consultant_signed_at ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-zinc-500 leading-relaxed">
+                      Export the PDF for physical or DocuSign signature, then mark confirmed here.
+                    </p>
+                    <button
+                      onClick={signClient}
+                      disabled={signingClient}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-zinc-700 hover:border-emerald-600 text-zinc-300 hover:text-emerald-300 text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {signingClient ? 'Marking…' : 'Mark client signed'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-600">Sign the consultant section first.</p>
+                )}
+              </div>
+            </div>
+
+            {timesheet.consultant_signed_at && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                <Lock className="w-3 h-3 shrink-0" />
+                Entries locked after signing.
+                <button onClick={unsignConsultant} className="underline underline-offset-2 hover:text-amber-200 transition-colors">
+                  Undo to edit.
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sticky footer */}
@@ -720,6 +912,9 @@ export default function TimesheetsPage() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {saveMsg && (
+              <span className="text-xs text-emerald-400 mr-1">{saveMsg}</span>
+            )}
             <button
               onClick={handleExportPDF}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200 text-sm transition-colors"
@@ -727,21 +922,14 @@ export default function TimesheetsPage() {
               <Download className="w-3.5 h-3.5" />
               Export PDF
             </button>
-
-            {timesheet?.status !== 'submitted' ? (
-              <button
-                onClick={markSubmitted}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Mark submitted
-              </button>
-            ) : (
-              <span className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-950/40 text-emerald-400 text-sm">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Submitted
-              </span>
-            )}
+            <button
+              onClick={handleSavePDF}
+              disabled={savingPdf}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-700 hover:border-emerald-600 text-zinc-400 hover:text-emerald-300 text-sm transition-colors disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {savingPdf ? 'Saving…' : 'Save to Docs'}
+            </button>
           </div>
         </div>
       </div>

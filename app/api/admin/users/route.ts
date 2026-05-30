@@ -94,14 +94,42 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Service role key not configured' }, { status: 500 })
   }
 
-  const { id, subscription_tier } = await request.json()
+  const { id, subscription_tier, feature_overrides } = await request.json()
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
   const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
 
+  // Build the update payload
+  const updatePayload: Record<string, unknown> = {}
+  if (subscription_tier !== undefined) updatePayload.subscription_tier = subscription_tier
+  if (feature_overrides  !== undefined) updatePayload.feature_overrides  = feature_overrides
+
+  // If tier is changing and user doesn't have manual overrides, sync feature flags to tier defaults
+  if (subscription_tier) {
+    const { data: current } = await adminClient
+      .from('klippa_profiles')
+      .select('feature_overrides')
+      .eq('id', id)
+      .single()
+
+    if (!current?.feature_overrides) {
+      // Load tier's feature config
+      const { data: tierFeatures } = await adminClient
+        .from('klippa_tier_features')
+        .select('feature_key, enabled')
+        .eq('tier', subscription_tier)
+
+      if (tierFeatures) {
+        for (const tf of tierFeatures) {
+          updatePayload[`feature_${tf.feature_key}`] = tf.enabled
+        }
+      }
+    }
+  }
+
   const { data, error } = await adminClient
     .from('klippa_profiles')
-    .update({ subscription_tier })
+    .update(updatePayload)
     .eq('id', id)
     .select()
     .single()

@@ -41,6 +41,7 @@ export type DocumentType =
   | 'invoice'
   | 'medical'
   | 'ra_certificate'
+  | 'timesheet'
   | 'other'
 
 export type OcrStatus = 'pending' | 'processing' | 'complete' | 'failed'
@@ -81,6 +82,7 @@ export interface KlippaProfile {
   feature_timesheets:   boolean
   feature_logbook:      boolean
   feature_provisional:  boolean
+  feature_overrides:    boolean  // true = admin has manually set flags; tier changes won't overwrite
   // Retirement savings
   has_ra:               boolean
   ra_contributions:     number
@@ -214,16 +216,28 @@ export interface KlippaClient {
 }
 
 export interface KlippaTimesheet {
-  id:              string
-  user_id:         string
-  client_id:       string | null
-  month:           string       // ISO date: first day of month 'YYYY-MM-01'
-  consultant_name: string | null
-  position:        string | null
-  hourly_rate:     number | null
-  status:          'draft' | 'submitted'
-  created_at:      string
-  updated_at:      string
+  id:                    string
+  user_id:               string
+  client_id:             string | null
+  month:                 string       // ISO date: first day of month 'YYYY-MM-01'
+  consultant_name:       string | null
+  position:              string | null
+  hourly_rate:           number | null
+  status:                'draft' | 'submitted' | 'approved'
+  consultant_signed_at:  string | null  // ISO timestamp — digital signature
+  client_signed_at:      string | null  // ISO timestamp — manually confirmed by consultant
+  created_at:            string
+  updated_at:            string
+}
+
+// ── Tier Feature Config ────────────────────────────────────
+
+export interface KlippaTierFeature {
+  id:          string
+  tier:        SubscriptionTier
+  feature_key: 'timesheets' | 'logbook' | 'provisional'
+  enabled:     boolean
+  updated_at:  string
 }
 
 export interface KlippaTimesheetEntry {

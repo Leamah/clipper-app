@@ -28,7 +28,8 @@ function fmtRand(n: number): string {
 export function exportTimesheetPDF(
   timesheet: KlippaTimesheet & { client_name?: string; client_contact?: string },
   entries:   KlippaTimesheetEntry[],
-): void {
+  options?:  { blob?: boolean },
+): void | Blob {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   const monthDate  = new Date(timesheet.month + 'T00:00:00')
@@ -143,14 +144,64 @@ export function exportTimesheetPDF(
     doc.text(`Billable Amount: ${fmtRand(billable)}`, 80, finalY)
   }
 
+  // ── Sign-off section ──────────────────────────────────────
+  const sigY = finalY + 10
+
+  // Box outlines
+  doc.setDrawColor(...ZINC700)
+  doc.setLineWidth(0.3)
+  doc.rect(14,  sigY, 87, 32)   // Consultant box
+  doc.rect(109, sigY, 87, 32)   // Client box
+
+  // Box headers
+  doc.setFillColor(...ZINC900)
+  doc.rect(14,  sigY, 87, 7, 'F')
+  doc.rect(109, sigY, 87, 7, 'F')
+  doc.setTextColor(...WHITE)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.text('CONSULTANT',  17.5, sigY + 5)
+  doc.text('CLIENT / AUTHORISED SIGNATORY', 112, sigY + 5)
+
+  // Consultant box content
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.text(
-    'I confirm that the above is a true record of the hours worked.',
-    14, finalY + 12,
-  )
-  doc.text('Signed: ....................................', 14, finalY + 20)
-  doc.text('Date: .....................................',  100, finalY + 20)
+  doc.setTextColor(30, 30, 30)
+  doc.text(`Name: ${timesheet.consultant_name ?? ''}`, 17, sigY + 13)
+  doc.text(`Position: ${timesheet.position ?? ''}`,   17, sigY + 19)
+
+  if (timesheet.consultant_signed_at) {
+    const signDate = new Date(timesheet.consultant_signed_at)
+      .toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+    doc.setTextColor(...EMERALD)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`✓ Digitally confirmed: ${signDate}`, 17, sigY + 27)
+  } else {
+    doc.setTextColor(30, 30, 30)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Signature: ____________________________', 17, sigY + 27)
+    doc.text('Date: _______________',                   17, sigY + 33)
+  }
+
+  // Client box content
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(30, 30, 30)
+  doc.text(`Name: ${timesheet.client_contact ?? ''}`,  112, sigY + 13)
+  doc.text(`Company: ${timesheet.client_name ?? ''}`,  112, sigY + 19)
+
+  if (timesheet.client_signed_at) {
+    const clientDate = new Date(timesheet.client_signed_at)
+      .toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+    doc.setTextColor(...EMERALD)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`✓ Confirmed: ${clientDate}`, 112, sigY + 27)
+  } else {
+    doc.setTextColor(30, 30, 30)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Signature: ____________________________', 112, sigY + 27)
+    doc.text('Date: _______________',                   112, sigY + 33)
+  }
 
   // ── Footer branding ───────────────────────────────────────
   doc.setTextColor(150, 150, 150)
@@ -160,6 +211,9 @@ export function exportTimesheetPDF(
   const fileName = `Klippa_Timesheet_${timesheet.client_name ?? 'Client'}_${format(monthDate, 'yyyy-MM')}.pdf`
     .replace(/[^a-zA-Z0-9_.-]/g, '_')
 
+  if (options?.blob) {
+    return doc.output('blob')
+  }
   doc.save(fileName)
 }
 

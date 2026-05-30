@@ -8,8 +8,9 @@ import Link from 'next/link'
 import {
   ShieldCheck, ArrowLeft, Loader2, Shield, FileText,
   RefreshCw, AlertCircle, ChevronDown, Tag, Plus,
-  ToggleLeft, ToggleRight, Trash2,
+  ToggleLeft, ToggleRight, Trash2, SlidersHorizontal,
 } from 'lucide-react'
+import type { KlippaTierFeature } from '@/lib/types'
 
 interface UserRow {
   id:                  string
@@ -62,7 +63,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function AdminPage() {
   const router = useRouter()
-  const [tab,       setTab]      = useState<'users' | 'ocr' | 'promotions'>('users')
+  const [tab,       setTab]      = useState<'users' | 'ocr' | 'promotions' | 'plan_features'>('users')
   const [users,     setUsers]    = useState<UserRow[]>([])
   const [docs,      setDocs]     = useState<DocRow[]>([])
   const [promos,    setPromos]   = useState<PromoRow[]>([])
@@ -82,6 +83,11 @@ export default function AdminPage() {
   const [newNote,    setNewNote]    = useState('')
   const [newActive,  setNewActive]  = useState(true)
   const [creating,   setCreating]   = useState(false)
+
+  // Plan Features state
+  const [tierFeatures,    setTierFeatures]    = useState<KlippaTierFeature[]>([])
+  const [togglingFeature, setTogglingFeature] = useState<string | null>(null)
+  const [syncMsg,         setSyncMsg]         = useState<string | null>(null)
 
   const loadUsers = useCallback(() => {
     setLoading(true); setError(null)
@@ -106,9 +112,17 @@ export default function AdminPage() {
       .catch((e) => setError(e.message))
   }, [])
 
+  const loadTierFeatures = useCallback(() => {
+    fetch('/api/admin/tier-features')
+      .then((r) => r.json())
+      .then((d) => { if (d.error) throw new Error(d.error); setTierFeatures(d.features ?? []) })
+      .catch((e) => setError(e.message))
+  }, [])
+
   useEffect(() => { loadUsers() }, [loadUsers])
   useEffect(() => { if (tab === 'ocr') loadDocs() }, [tab, loadDocs])
   useEffect(() => { if (tab === 'promotions') loadPromos() }, [tab, loadPromos])
+  useEffect(() => { if (tab === 'plan_features') loadTierFeatures() }, [tab, loadTierFeatures])
 
   const changeTier = async (userId: string, tier: string) => {
     setUpdating(userId)
@@ -145,6 +159,37 @@ export default function AdminPage() {
     if (!d.error) setPromos((prev) => prev.map((p) => p.id === id ? { ...p, is_active: false } : p))
   }
 
+  const toggleTierFeature = async (tier: string, feature_key: string, enabled: boolean) => {
+    const key = `${tier}:${feature_key}`
+    setTogglingFeature(key)
+    setSyncMsg(null)
+    // Optimistic update
+    setTierFeatures((prev) =>
+      prev.map((f) => f.tier === tier && f.feature_key === feature_key ? { ...f, enabled } : f)
+    )
+    try {
+      const r = await fetch('/api/admin/tier-features', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier, feature_key, enabled, sync_users: true }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      if (d.synced_users > 0) {
+        setSyncMsg(`Synced ${d.synced_users} user${d.synced_users === 1 ? '' : 's'} on ${tier}`)
+        setTimeout(() => setSyncMsg(null), 4000)
+      }
+    } catch (e: unknown) {
+      // Revert on error
+      setTierFeatures((prev) =>
+        prev.map((f) => f.tier === tier && f.feature_key === feature_key ? { ...f, enabled: !enabled } : f)
+      )
+      setError(e instanceof Error ? e.message : 'Toggle failed')
+    } finally {
+      setTogglingFeature(null)
+    }
+  }
+
   const createPromo = async () => {
     if (!newCode.trim()) return
     setCreating(true); setError(null)
@@ -175,9 +220,10 @@ export default function AdminPage() {
   }
 
   const tabs = [
-    { key: 'users',      label: 'Users',      icon: <Shield   className="w-3.5 h-3.5" /> },
-    { key: 'ocr',        label: 'OCR Queue',  icon: <FileText className="w-3.5 h-3.5" /> },
-    { key: 'promotions', label: 'Promotions', icon: <Tag      className="w-3.5 h-3.5" /> },
+    { key: 'users',         label: 'Users',         icon: <Shield              className="w-3.5 h-3.5" /> },
+    { key: 'ocr',           label: 'OCR Queue',     icon: <FileText            className="w-3.5 h-3.5" /> },
+    { key: 'promotions',    label: 'Promotions',    icon: <Tag                 className="w-3.5 h-3.5" /> },
+    { key: 'plan_features', label: 'Plan Features', icon: <SlidersHorizontal  className="w-3.5 h-3.5" /> },
   ] as const
 
   return (
@@ -205,7 +251,7 @@ export default function AdminPage() {
             </div>
           </div>
           <button
-            onClick={() => { if (tab === 'users') loadUsers(); else if (tab === 'ocr') loadDocs(); else loadPromos() }}
+            onClick={() => { if (tab === 'users') loadUsers(); else if (tab === 'ocr') loadDocs(); else if (tab === 'promotions') loadPromos(); else loadTierFeatures() }}
             className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -317,6 +363,94 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ── Plan Features tab ── */}
+        {tab === 'plan_features' && (
+          <div className="space-y-6">
+            {/* Info + sync message */}
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-xs text-zinc-500 max-w-lg">
+                Control which features are available per subscription tier. Toggling a cell immediately updates all users on that tier (unless they have individual overrides set).
+              </p>
+              {syncMsg && (
+                <span className="flex-shrink-0 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
+                  ✓ {syncMsg}
+                </span>
+              )}
+            </div>
+
+            {/* Feature matrix */}
+            <div className="rounded-2xl border border-zinc-800 overflow-hidden">
+              <div className="px-5 py-4 border-b border-zinc-800 bg-zinc-900/60">
+                <p className="text-sm font-semibold text-zinc-200">Feature matrix</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-zinc-800">
+                      <th className="text-left px-5 py-3 text-xs font-medium text-zinc-400 w-44">Feature</th>
+                      {(['free', 'starter', 'professional', 'admin'] as const).map((tier) => (
+                        <th key={tier} className="px-5 py-3 text-center text-xs font-medium">
+                          <span className={`px-2.5 py-0.5 rounded-full capitalize ${TIER_STYLES[tier]}`}>{tier}</span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {([
+                      { key: 'logbook',     label: 'Logbook',     desc: 'SARS vehicle logbook & mileage tracking' },
+                      { key: 'timesheets',  label: 'Timesheets',  desc: 'Consultant timesheet management & signoff' },
+                      { key: 'provisional', label: 'Provisional', desc: 'Provisional tax returns (IRP6)' },
+                    ] as const).map(({ key: featureKey, label, desc }) => (
+                      <tr key={featureKey} className="border-b border-zinc-800/60 last:border-0">
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-medium text-zinc-200">{label}</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
+                        </td>
+                        {(['free', 'starter', 'professional', 'admin'] as const).map((tier) => {
+                          const row     = tierFeatures.find((f) => f.tier === tier && f.feature_key === featureKey)
+                          const enabled = row?.enabled ?? false
+                          const togKey  = `${tier}:${featureKey}`
+                          const busy    = togglingFeature === togKey
+                          return (
+                            <td key={tier} className="px-5 py-4 text-center">
+                              {tierFeatures.length === 0 ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-zinc-600 mx-auto" />
+                              ) : (
+                                <button
+                                  onClick={() => toggleTierFeature(tier, featureKey, !enabled)}
+                                  disabled={busy}
+                                  title={`${enabled ? 'Disable' : 'Enable'} ${label} for ${tier}`}
+                                  className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 ${
+                                    enabled ? 'bg-emerald-500' : 'bg-zinc-700'
+                                  }`}
+                                >
+                                  {busy ? (
+                                    <Loader2 className="w-3 h-3 animate-spin text-white mx-auto" />
+                                  ) : (
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                  )}
+                                </button>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Per-user overrides note */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 px-5 py-4">
+              <p className="text-xs font-medium text-zinc-300 mb-1">Per-user overrides</p>
+              <p className="text-xs text-zinc-500">
+                To override features for a specific user (bypassing their tier defaults), go to the <button onClick={() => setTab('users')} className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Users tab</button>, change their plan — the feature flags will sync automatically. Once a user has a manual override (<code className="text-zinc-400">feature_overrides = true</code>), tier-level changes won't affect them until the override is cleared.
+              </p>
+            </div>
           </div>
         )}
 

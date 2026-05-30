@@ -17,6 +17,7 @@ const DOC_TYPE_LABELS: Record<DocumentType, string> = {
   invoice:         'Invoice',
   medical:         'Medical Aid Certificate',
   ra_certificate:  'RA Certificate',
+  timesheet:       'Timesheet',
   other:           'Other',
 }
 
@@ -27,6 +28,7 @@ const DOC_TYPE_COLORS: Record<DocumentType, string> = {
   invoice:         'bg-emerald-500/15 text-emerald-300',
   medical:         'bg-pink-500/15 text-pink-300',
   ra_certificate:  'bg-orange-500/15 text-orange-300',
+  timesheet:       'bg-teal-500/15 text-teal-300',
   other:           'bg-zinc-700 text-zinc-400',
 }
 
