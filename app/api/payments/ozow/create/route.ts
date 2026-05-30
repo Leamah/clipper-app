@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient }       from '@supabase/supabase-js'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 import { randomUUID }         from 'crypto'
@@ -10,6 +11,7 @@ import {
 export async function POST(request: Request) {
   const cookieStore = cookies()
 
+  // Auth check — uses anon key + session cookie to verify the caller
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -34,10 +36,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'plan and billingCycle are required' }, { status: 400 })
   }
 
-  // Look up any applied discount for this user
+  // Service-role client for DB writes — bypasses RLS so inserts always succeed
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  // Look up any applied discount
   let discountPct = 0
   if (promoCode) {
-    const { data: promo } = await supabase
+    const { data: promo } = await adminClient
       .from('klippa_promotions')
       .select('id, type, discount_pct, trial_days, free_submissions')
       .eq('code', promoCode.toUpperCase())
@@ -54,16 +62,16 @@ export async function POST(request: Request) {
   const origin         = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
 
   // Persist the pending subscription so we can match it in the webhook
-  const { error: insertError } = await supabase
+  const { error: insertError } = await adminClient
     .from('klippa_subscriptions')
     .insert({
-      user_id:        user.id,
+      user_id:         user.id,
       plan,
-      status:         'pending',
-      billing_cycle:  billingCycle,
-      amount_paid:    amount,
-      discount_pct:   discountPct,
-      ozow_reference: transactionRef,
+      status:          'pending',
+      billing_cycle:   billingCycle,
+      amount_paid:     amount,
+      discount_pct:    discountPct,
+      ozow_reference:  transactionRef,
       promo_code_used: promoCode?.toUpperCase() ?? null,
     })
 
