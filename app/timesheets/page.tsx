@@ -31,13 +31,6 @@ function isoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-// Day-of-week: 0=Sun…6=Sat
-function isWeekend(dateStr: string): boolean {
-  const d = new Date(dateStr + 'T00:00:00')
-  const dow = getDay(d)
-  return dow === 0 || dow === 6
-}
-
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 // ── New Client Panel ──────────────────────────────────────
@@ -173,7 +166,6 @@ function DayCard({
   const d        = new Date(dateStr + 'T00:00:00')
   const dayNum   = d.getDate()
   const dayLabel = DAY_LABELS[getDay(d)]
-  const weekend  = getDay(d) === 0 || getDay(d) === 6
   const holiday  = getSAHolidayName(dateStr)
   const hasEntry = !!entry
 
@@ -184,7 +176,6 @@ function DayCard({
   }, [entry])
 
   function openEdit() {
-    if (weekend) return
     setEditing(true)
     setTimeout(() => inputRef.current?.focus(), 50)
   }
@@ -211,19 +202,6 @@ function DayCard({
     if (e.key === 'Enter') handleSave()
     if (e.key === 'Escape') setEditing(false)
   }
-
-  // ── Weekend card ──────────────────────────────────────
-  if (weekend) {
-    return (
-      <div className="rounded-xl border border-zinc-800/40 bg-zinc-900/30 p-2.5 min-h-[72px] opacity-40">
-        <div className="text-[10px] text-zinc-600 font-medium">{dayLabel}</div>
-        <div className="text-lg font-semibold text-zinc-700">{dayNum}</div>
-      </div>
-    )
-  }
-
-  // ── Public holiday card ───────────────────────────────
-  const isHoliday = !!holiday && !hasEntry
 
   // ── Editing state ─────────────────────────────────────
   if (editing) {
@@ -702,10 +680,6 @@ export default function TimesheetsPage() {
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-amber-950/30 border border-amber-500/20 inline-block" />
             Public holiday
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-zinc-900/30 border border-zinc-700/40 inline-block opacity-40" />
-            Weekend
           </span>
         </div>
 
