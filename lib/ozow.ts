@@ -135,9 +135,9 @@ export function buildOzowRequest(
 }
 
 // ── Webhook verification ──────────────────────────────────
-// Ozow sends these fields in the notification POST:
-// SiteCode, TransactionId, TransactionReference, Amount, Status,
-// Optional1-5, CurrencyCode, IsTest, StatusMessage, HashCheck
+// Ozow notification response variables 1-13 (docs p9-10), then Hash (field 14).
+// IMPORTANT: response hash field is "Hash" — NOT "HashCheck" (that's request-only).
+// Using the wrong name makes HashCheck undefined → verification always fails → 400.
 
 export function verifyOzowWebhook(
   body:       Record<string, string>,
@@ -146,10 +146,11 @@ export function verifyOzowWebhook(
   const {
     SiteCode, TransactionId, TransactionReference, Amount, Status,
     Optional1 = '', Optional2 = '', Optional3 = '', Optional4 = '', Optional5 = '',
-    CurrencyCode, IsTest, StatusMessage, HashCheck,
+    CurrencyCode, IsTest, StatusMessage,
+    Hash,   // field 14 in response table — named "Hash", not "HashCheck"
   } = body
 
-  if (!HashCheck) return false
+  if (!Hash) return false
 
   const values = [
     SiteCode, TransactionId, TransactionReference, Amount, Status,
@@ -158,7 +159,8 @@ export function verifyOzowWebhook(
   ]
 
   const computed = buildOzowHash(values, privateKey)
-  return computed === HashCheck.toLowerCase()
+  // Docs p11: trim leading zeros before comparing (some SHA512 implementations drop them)
+  return computed.replace(/^0+/, '') === Hash.toLowerCase().replace(/^0+/, '')
 }
 
 // ── Subscription tier mapping ─────────────────────────────
