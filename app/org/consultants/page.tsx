@@ -37,6 +37,7 @@ export default function ConsultantsPage() {
   const [inviteEmail,  setInviteEmail]  = useState('')
   const [sending,      setSending]      = useState(false)
   const [inviteMsg,    setInviteMsg]    = useState<string | null>(null)
+  const [acceptUrl,    setAcceptUrl]    = useState<string | null>(null)
   const [deletingId,   setDeletingId]   = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -84,8 +85,9 @@ export default function ConsultantsPage() {
       if (json.error) throw new Error(json.error)
       setInvites((prev) => [json.invite, ...prev])
       setInviteEmail('')
-      setInviteMsg(`Invite sent to ${inviteEmail.trim()}`)
-      setTimeout(() => setInviteMsg(null), 4000)
+      setInviteMsg(`Invite created for ${inviteEmail.trim()}`)
+      setAcceptUrl(json.acceptUrl ?? null)
+      setTimeout(() => { setInviteMsg(null); setAcceptUrl(null) }, 30_000)
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
     finally { setSending(false) }
   }
@@ -177,8 +179,25 @@ export default function ConsultantsPage() {
           </div>
 
           {inviteMsg && (
-            <div className="flex items-center gap-2 text-xs text-emerald-400">
-              <Check className="w-3.5 h-3.5" /> {inviteMsg}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-emerald-400">
+                <Check className="w-3.5 h-3.5" /> {inviteMsg}
+              </div>
+              {acceptUrl && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 space-y-1.5">
+                  <p className="text-xs text-ink-2">Share this acceptance link with the consultant:</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-[11px] text-emerald-300 font-mono truncate">{acceptUrl}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(acceptUrl) }}
+                      className="text-xs text-ink-2 hover:text-ink-1 px-2 py-1 rounded border border-edge hover:border-raised transition-colors flex-shrink-0"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-ink-3">Link expires in 7 days.</p>
+                </div>
+              )}
             </div>
           )}
         </div>

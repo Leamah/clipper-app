@@ -49,7 +49,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'An invite is already pending for this email' }, { status: 409 })
   }
 
-  // Create the invite
+  // Create the invite with a unique token + 7-day expiry
+  const token      = crypto.randomUUID()
+  const expiresAt  = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
   const { data: invite, error: inviteErr } = await admin
     .from('klippa_org_invites')
     .insert({
@@ -57,16 +60,29 @@ export async function POST(request: Request) {
       invited_email:   email.trim().toLowerCase(),
       invited_by:      user.id,
       role,
+      token,
+      expires_at:      expiresAt,
     })
     .select()
     .single()
 
   if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 500 })
 
-  // TODO: Send email invite via Resend/SendGrid
-  // For now the invite is created in DB — the invited user can accept via magic link
+  // Fetch org name for the acceptance URL
+  const { data: orgRow } = await admin
+    .from('klippa_organisations')
+    .select('name')
+    .eq('id', orgId)
+    .single()
 
-  return NextResponse.json({ invite })
+  const siteUrl   = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
+  const acceptUrl = `${siteUrl}/invite/${token}`
+
+  // TODO: Send email via Resend/SendGrid with acceptUrl
+  // For now: invite is in DB — owner can share acceptUrl manually
+  console.info(`[org/invite] Created invite for ${email} → ${acceptUrl}`)
+
+  return NextResponse.json({ invite, acceptUrl, orgName: orgRow?.name })
 }
 
 export async function GET() {
