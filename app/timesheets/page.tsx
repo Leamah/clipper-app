@@ -367,6 +367,7 @@ export default function TimesheetsPage() {
       const { data: created, error } = await supabase
         .from('klippa_timesheets')
         .insert({
+          user_id:         profile.id,
           client_id:       activeClient.id,
           month:           monthStr,
           consultant_name: profile.full_name,
@@ -411,6 +412,7 @@ export default function TimesheetsPage() {
       const { data } = await supabase
         .from('klippa_timesheet_entries')
         .insert({
+          user_id:      profile!.id,
           timesheet_id: timesheet.id,
           entry_date:   dateStr,
           hours,
@@ -490,9 +492,8 @@ export default function TimesheetsPage() {
   }
 
   // ── Totals ────────────────────────────────────────────
-  const totalHours   = entries.reduce((s, e) => s + Number(e.hours), 0)
-  const billable     = timesheet?.hourly_rate ? totalHours * timesheet.hourly_rate : null
-  const hasNoEntries = entries.length === 0
+  const totalHours = entries.reduce((s, e) => s + Number(e.hours), 0)
+  const billable   = timesheet?.hourly_rate ? totalHours * timesheet.hourly_rate : null
 
   // ── Calendar grid days ────────────────────────────────
   const year   = getYear(currentMonth)
@@ -638,9 +639,8 @@ export default function TimesheetsPage() {
           </div>
         )}
 
-        {/* Smart fill bar — only when no entries yet */}
-        {hasNoEntries && (
-          <div className="mb-5 flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+        {/* Smart fill bar */}
+        <div className="mb-5 flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
             <span className="text-sm text-zinc-400 flex-1">Fill all working days with</span>
             <input
               type="number"
@@ -659,7 +659,6 @@ export default function TimesheetsPage() {
               Apply
             </button>
           </div>
-        )}
 
         {/* Legend */}
         <div className="flex items-center gap-4 mb-4 text-[11px] text-zinc-600">
