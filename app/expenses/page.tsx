@@ -2,17 +2,16 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   Plus, FileSpreadsheet, Trash2, Loader2,
-  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, Camera
+  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, Camera,
 } from 'lucide-react'
-import type { KlippaExpenseRecord, KlippaTaxReturn, ExpenseCategory, IncomeType } from '@/lib/types'
-import { EXPENSE_CATEGORY_LABELS, CATEGORY_DEFAULT_DEDUCTIBLE_PCT } from '@/lib/types'
+import type { KlippaExpenseRecord, KlippaTaxReturn, ExpenseCategory } from '@/lib/types'
+import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
 
 function formatRand(n: number) {
@@ -23,7 +22,16 @@ function formatDate(s: string | null) {
   return new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s))
 }
 
-// ── AI Classification card (with mixed-use intelligence) ──
+// ── Pre-fill from capture ─────────────────────────────────
+
+interface CapturePreFill {
+  merchant_name: string
+  amount:        string
+  expense_date:  string
+  receipt_id:    string | null
+}
+
+// ── AI Classification card ────────────────────────────────
 
 function AiResultCard({ record, onAccept, onReject, loading }: {
   record:   KlippaExpenseRecord
@@ -52,7 +60,6 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
 
   return (
     <div className="rounded-xl border border-zinc-700 bg-zinc-800/50 p-4 space-y-3">
-      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
@@ -69,7 +76,6 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
         </div>
       </div>
 
-      {/* SARS Rule — plain English */}
       {record.ai_sars_rule && (
         <div className="rounded-lg bg-zinc-900/80 border border-zinc-800 px-3 py-2.5">
           <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">SARS says</p>
@@ -77,12 +83,10 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
         </div>
       )}
 
-      {/* Reasoning */}
       {record.ai_reasoning && (
         <p className="text-xs text-zinc-400 leading-relaxed italic px-1">&ldquo;{record.ai_reasoning}&rdquo;</p>
       )}
 
-      {/* Deductibility range (mixed-use) */}
       {isMixed && conservative != null && aggressive != null ? (
         <div className="rounded-lg bg-zinc-900/60 p-3 space-y-2.5">
           <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide">Deductibility range</p>
@@ -121,7 +125,6 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
         </div>
       )}
 
-      {/* Behavioral tip */}
       {record.ai_behavioral_tip && (
         <div className="flex items-start gap-2 rounded-lg bg-blue-500/8 border border-blue-500/15 px-3 py-2">
           <span className="text-blue-400 mt-0.5 flex-shrink-0">💡</span>
@@ -129,7 +132,6 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
         </div>
       )}
 
-      {/* Evidence & triggers toggle */}
       {((record.ai_required_evidence?.length ?? 0) > 0 || (record.ai_audit_triggers?.length ?? 0) > 0) && (
         <button onClick={() => setShowEvidence((v) => !v)}
           className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1">
@@ -162,7 +164,6 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
         </div>
       )}
 
-      {/* Accept / Reject */}
       <div className="flex gap-2 pt-1">
         <button onClick={onReject} disabled={loading}
           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors disabled:opacity-50">
@@ -180,58 +181,24 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
 
 // ── Add Expense Modal ─────────────────────────────────────
 
-function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
-  taxReturnId: string | null
-  onClose:     () => void
-  onSaved:     (r: KlippaExpenseRecord, classify: boolean) => void
+function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, onClose, onSaved }: {
+  taxReturnId:     string | null
+  prefilled?:      CapturePreFill
+  merchantHistory: string[]
+  onClose:         () => void
+  onSaved:         (r: KlippaExpenseRecord, classify: boolean) => void
 }) {
   const [form, setForm] = useState({
-    merchant_name: '',
-    amount:        '',
-    expense_date:  '',
+    merchant_name: prefilled?.merchant_name ?? '',
+    amount:        prefilled?.amount        ?? '',
+    expense_date:  prefilled?.expense_date  ?? '',
     description:   '',
     category:      'other' as ExpenseCategory,
+    receipt_id:    prefilled?.receipt_id    ?? null as string | null,
   })
-  const [doClassify,  setDoClassify]  = useState(true)
-  const [scanning,    setScanning]    = useState(false)
-  const [scanStatus,  setScanStatus]  = useState<'idle' | 'scanning' | 'done' | 'failed'>('idle')
-  const [saving,      setSaving]      = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  // ── Receipt scan via OCR ──────────────────────────────────
-  const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setScanning(true)
-    setScanStatus('scanning')
-    setError(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      if (taxReturnId) fd.append('tax_return_id', taxReturnId)
-      const res  = await fetch('/api/documents/ocr', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'OCR failed')
-
-      const ext = data.extracted
-      // Pre-fill whatever was extracted — user can correct
-      setForm((f) => ({
-        ...f,
-        merchant_name: ext.merchant_name ?? f.merchant_name,
-        amount:        ext.amount != null ? String(ext.amount) : f.amount,
-        expense_date:  ext.expense_date ?? f.expense_date,
-      }))
-      setScanStatus('done')
-      setDoClassify(true)   // auto-enable AI classify after scan
-    } catch (e: unknown) {
-      setScanStatus('failed')
-      setError(e instanceof Error ? e.message : 'Receipt scan failed')
-    } finally {
-      setScanning(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }
+  const [doClassify, setDoClassify] = useState(true)
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -241,7 +208,16 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
       const res = await fetch('/api/expenses', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ...form, tax_return_id: taxReturnId, classify: doClassify }),
+        body:    JSON.stringify({
+          merchant_name: form.merchant_name,
+          amount:        form.amount,
+          expense_date:  form.expense_date,
+          description:   form.description,
+          category:      form.category,
+          receipt_id:    form.receipt_id,
+          tax_return_id: taxReturnId,
+          classify:      doClassify,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to save')
@@ -254,52 +230,35 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
     }
   }
 
+  const hasPrefill = !!prefilled?.merchant_name || !!prefilled?.amount
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-white">Add expense</h3>
-          <div className="flex items-center gap-2">
-            {/* Scan receipt button */}
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleScan} />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={scanning}
-              title="Scan receipt"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                scanStatus === 'done'
-                  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300'
-                  : scanStatus === 'failed'
-                  ? 'border-red-500/50 text-red-400'
-                  : 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
-              }`}
-            >
-              {scanning
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Camera className="w-3.5 h-3.5" />
-              }
-              {scanning ? 'Scanning…' : scanStatus === 'done' ? 'Receipt scanned ✓' : 'Scan receipt'}
-            </button>
-            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
+          <div>
+            <h3 className="font-semibold text-white">Add expense</h3>
+            {hasPrefill && (
+              <p className="text-xs text-emerald-400 mt-0.5">Receipt scanned — check and confirm</p>
+            )}
           </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
         </div>
 
-        {scanStatus === 'done' && (
-          <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
-            Receipt scanned — fields pre-filled. Check and confirm below.
-          </p>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label="Merchant / Description">
+          {/* Merchant — datalist from history */}
+          <Field label="Merchant">
             <input
               type="text"
+              list="merchant-history"
               value={form.merchant_name}
               onChange={(e) => setForm((f) => ({ ...f, merchant_name: e.target.value }))}
-              placeholder="e.g. Takealot, MTN, Computicket"
+              placeholder="Select or type merchant name"
               className="input"
             />
+            <datalist id="merchant-history">
+              {merchantHistory.map((m) => <option key={m} value={m} />)}
+            </datalist>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -325,7 +284,7 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
             </Field>
           </div>
 
-          <Field label="Description (optional)">
+          <Field label="Description">
             <input
               type="text"
               value={form.description}
@@ -363,8 +322,12 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
           {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
 
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               {saving ? (doClassify ? 'Classifying…' : 'Saving…') : 'Add expense'}
             </button>
@@ -375,7 +338,7 @@ function AddExpenseModal({ taxReturnId, onClose, onSaved }: {
   )
 }
 
-// ── CSV Import for expenses ───────────────────────────────
+// ── CSV Import Modal ──────────────────────────────────────
 
 function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
   taxReturnId: string | null
@@ -385,6 +348,7 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([])
   const [selected,     setSelected]     = useState<Set<number>>(new Set())
   const [bankName,     setBankName]     = useState<string | null>(null)
+  const [csvFile,      setCsvFile]      = useState<File | null>(null)
   const [saving,       setSaving]       = useState(false)
   const [saveError,    setSaveError]    = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -392,11 +356,11 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setCsvFile(file)
     const reader = new FileReader()
     reader.onload = (ev) => {
       const text = ev.target?.result as string
       const result = parseBankCSV(text)
-      // Debits = negative amounts = expenses
       const debits = result.transactions.filter((t) => t.amount < 0)
       setTransactions(debits)
       setBankName(result.bank)
@@ -405,7 +369,9 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
     reader.readAsText(file)
   }
 
-  const toggle = (i: number) => setSelected((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n })
+  const toggle = (i: number) => setSelected((s) => {
+    const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n
+  })
 
   const handleImport = async () => {
     if (selected.size === 0) return
@@ -414,6 +380,33 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
+
+      // Save CSV file to storage
+      let csvDocumentId: string | null = null
+      if (csvFile) {
+        const storagePath = `${user.id}/csv-${Date.now()}-${csvFile.name}`
+        const { error: upErr } = await supabase.storage
+          .from('klippa_documents')
+          .upload(storagePath, csvFile, { contentType: 'text/csv' })
+
+        if (!upErr) {
+          const { data: docRow } = await supabase
+            .from('klippa_documents')
+            .insert({
+              user_id:           user.id,
+              tax_return_id:     taxReturnId ?? null,
+              document_type:     'bank_statement',
+              original_filename: csvFile.name,
+              storage_path:      storagePath,
+              file_size_bytes:   csvFile.size,
+              ocr_status:        'complete',
+              upload_method:     'csv_import',
+            })
+            .select('id')
+            .single()
+          csvDocumentId = docRow?.id ?? null
+        }
+      }
 
       const toImport = [...selected].map((i) => transactions[i])
       const rows = toImport.map((t) => ({
@@ -444,14 +437,19 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl p-6 space-y-5 max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between flex-shrink-0">
-          <h3 className="font-semibold text-white">Import expenses from CSV</h3>
+          <h3 className="font-semibold text-white">Import from CSV</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X className="w-4 h-4" /></button>
         </div>
 
         {transactions.length === 0 ? (
           <div className="space-y-4">
-            <p className="text-sm text-zinc-400">Upload your bank CSV. We&apos;ll detect debit transactions as expenses. You&apos;ll be able to review them before importing.</p>
-            <button onClick={() => fileRef.current?.click()} className="w-full flex flex-col items-center gap-3 py-10 rounded-xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/50 text-zinc-500 hover:text-zinc-300 transition-colors">
+            <p className="text-sm text-zinc-400">
+              Upload your bank CSV. Debit transactions are detected as expenses. The file is saved for audit purposes.
+            </p>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="w-full flex flex-col items-center gap-3 py-10 rounded-xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/50 text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
               <FileSpreadsheet className="w-8 h-8" />
               <span className="text-sm">Select CSV file</span>
             </button>
@@ -459,11 +457,23 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
           </div>
         ) : (
           <>
-            <p className="text-xs text-zinc-500 flex-shrink-0">{bankName && `${bankName} · `}{transactions.length} debit transactions. AI classification happens after import.</p>
+            <p className="text-xs text-zinc-500 flex-shrink-0">
+              {bankName && `${bankName} · `}{transactions.length} debit transactions · AI classifies after import
+            </p>
             <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
               {transactions.map((t, i) => (
-                <button key={i} onClick={() => toggle(i)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${selected.has(i) ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-zinc-800/50 border border-transparent'}`}>
-                  <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${selected.has(i) ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'}`}>
+                <button
+                  key={i}
+                  onClick={() => toggle(i)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${
+                    selected.has(i)
+                      ? 'bg-emerald-500/10 border border-emerald-500/30'
+                      : 'bg-zinc-800/50 border border-transparent'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+                    selected.has(i) ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-600'
+                  }`}>
                     {selected.has(i) && <Check className="w-2.5 h-2.5 text-white" />}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -476,8 +486,12 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
             </div>
             {saveError && <p className="text-xs text-red-400 flex-shrink-0">{saveError}</p>}
             <div className="flex gap-2 flex-shrink-0 pt-2">
-              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">Cancel</button>
-              <button onClick={handleImport} disabled={saving || selected.size === 0} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors">
+              <button onClick={onClose}
+                className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleImport} disabled={saving || selected.size === 0}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 {saving ? 'Importing…' : `Import ${selected.size} expenses`}
               </button>
@@ -493,21 +507,23 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
 
 function ExpensesPage() {
   const searchParams = useSearchParams()
-  const [records,      setRecords]   = useState<KlippaExpenseRecord[]>([])
-  const [taxReturn,    setTaxReturn] = useState<KlippaTaxReturn | null>(null)
-  const [loading,      setLoading]   = useState(true)
-  const [showAdd,      setShowAdd]   = useState(searchParams.get('add') === '1')
-  const [showCSV,      setShowCSV]   = useState(false)
-  const [classifying,  setClassifying] = useState<string | null>(null)
-  const [activeTab,    setActiveTab] = useState<'pending' | 'confirmed' | 'all'>('pending')
+  const [records,      setRecords]      = useState<KlippaExpenseRecord[]>([])
+  const [taxReturn,    setTaxReturn]    = useState<KlippaTaxReturn | null>(null)
+  const [loading,      setLoading]      = useState(true)
+  const [showAdd,      setShowAdd]      = useState(searchParams.get('add') === '1')
+  const [showCSV,      setShowCSV]      = useState(false)
+  const [classifying,  setClassifying]  = useState<string | null>(null)
+  const [activeTab,    setActiveTab]    = useState<'pending' | 'confirmed' | 'all'>('pending')
+  const [capturing,    setCapturing]    = useState(false)
+  const [capturePreFill, setCapturePreFill] = useState<CapturePreFill | undefined>(undefined)
+  const [captureError,   setCaptureError]   = useState<string | null>(null)
+  const captureRef = useRef<HTMLInputElement>(null)
 
   const loadRecords = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const { data: ret } = await supabase.from('klippa_tax_returns').select('*').eq('user_id', user.id).order('tax_year', { ascending: false }).limit(1).single()
     setTaxReturn(ret as KlippaTaxReturn | null)
-
     const { data } = await supabase.from('klippa_expense_records').select('*').eq('user_id', user.id).order('expense_date', { ascending: false })
     setRecords((data ?? []) as KlippaExpenseRecord[])
     setLoading(false)
@@ -515,13 +531,45 @@ function ExpensesPage() {
 
   useEffect(() => { loadRecords() }, [loadRecords])
 
+  // Unique merchants from history for the datalist
+  const merchantHistory = useMemo(() =>
+    [...new Set(records.map((r) => r.merchant_name).filter(Boolean) as string[])].sort(),
+    [records]
+  )
+
+  // ── Capture: file → OCR → pre-fill Add modal ─────────────
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCapturing(true)
+    setCaptureError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      if (taxReturn?.id) fd.append('tax_return_id', taxReturn.id)
+      const res  = await fetch('/api/documents/ocr', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'OCR failed')
+
+      const ext = data.extracted
+      setCapturePreFill({
+        merchant_name: ext.merchant_name ?? '',
+        amount:        ext.amount != null ? String(ext.amount) : '',
+        expense_date:  ext.expense_date ?? '',
+        receipt_id:    data.document_id ?? null,
+      })
+      setShowAdd(true)
+    } catch (err) {
+      setCaptureError(err instanceof Error ? err.message : 'Capture failed')
+    } finally {
+      setCapturing(false)
+      if (captureRef.current) captureRef.current.value = ''
+    }
+  }
+
   const handleConfirm = async (id: string) => {
     setClassifying(id)
-    const res = await fetch('/api/expenses', {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ id, classification_status: 'confirmed' }),
-    })
+    const res = await fetch('/api/expenses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, classification_status: 'confirmed' }) })
     const data = await res.json()
     if (data.record) setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
     setClassifying(null)
@@ -529,11 +577,7 @@ function ExpensesPage() {
 
   const handleReject = async (id: string) => {
     setClassifying(id)
-    const res = await fetch('/api/expenses', {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ id, classification_status: 'rejected' }),
-    })
+    const res = await fetch('/api/expenses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, classification_status: 'rejected' }) })
     const data = await res.json()
     if (data.record) setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
     setClassifying(null)
@@ -542,6 +586,11 @@ function ExpensesPage() {
   const handleDelete = async (id: string) => {
     await fetch('/api/expenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setRecords((r) => r.filter((x) => x.id !== id))
+  }
+
+  const closeAdd = () => {
+    setShowAdd(false)
+    setCapturePreFill(undefined)
   }
 
   const pending   = records.filter((r) => r.classification_status === 'pending')
@@ -554,6 +603,16 @@ function ExpensesPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <AppNav activePage="expenses" />
 
+      {/* Hidden capture file input */}
+      <input
+        ref={captureRef}
+        type="file"
+        accept="image/*,application/pdf"
+        capture="environment"
+        className="hidden"
+        onChange={handleCapture}
+      />
+
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -565,15 +624,37 @@ function ExpensesPage() {
                 : 'No confirmed expenses yet'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowCSV(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors">
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
+
+          {/* Action bar: Capture | CSV | Add */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => captureRef.current?.click()}
+              disabled={capturing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+            >
+              {capturing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              {capturing ? 'Scanning…' : 'Capture'}
             </button>
-            <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-              <Plus className="w-3.5 h-3.5" /> Add expense
+            <button
+              onClick={() => setShowCSV(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add
             </button>
           </div>
         </div>
+
+        {captureError && (
+          <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">
+            Capture failed: {captureError}
+          </p>
+        )}
 
         {/* Pending review banner */}
         {pending.length > 0 && (
@@ -620,7 +701,6 @@ function ExpensesPage() {
             )}
           </div>
         ) : activeTab === 'pending' ? (
-          /* AI review cards */
           <div className="grid sm:grid-cols-2 gap-4">
             {pending.map((r) => (
               <AiResultCard
@@ -633,7 +713,6 @@ function ExpensesPage() {
             ))}
           </div>
         ) : (
-          /* Table view for confirmed/all */
           <div className="rounded-2xl border border-zinc-800 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -686,7 +765,9 @@ function ExpensesPage() {
       {showAdd && (
         <AddExpenseModal
           taxReturnId={taxReturn?.id ?? null}
-          onClose={() => setShowAdd(false)}
+          prefilled={capturePreFill}
+          merchantHistory={merchantHistory}
+          onClose={closeAdd}
           onSaved={(r) => { setRecords((prev) => [r, ...prev]); setActiveTab('pending') }}
         />
       )}
