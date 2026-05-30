@@ -53,28 +53,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Already logged in → skip login page
-  if (user && pathname === '/login' && request.nextUrl.searchParams.get('signedout') !== '1') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
   if (user) {
     // Fetch klippa profile to check onboarding + admin status
     const { data: profile } = await supabase
       .from('klippa_profiles')
-      .select('onboarding_complete, subscription_tier')
+      .select('onboarding_complete, subscription_tier, user_type')
       .eq('id', user.id)
       .single()
 
-    const isAdmin = profile?.subscription_tier === 'admin'
+    const isAdmin  = profile?.subscription_tier === 'admin'
+    const isOrgUser = profile?.user_type === 'company_owner' || profile?.user_type === 'practitioner'
 
     // Admin routes: require subscription_tier === 'admin'
     if (isAdminRoute || isApiAdminRoute) {
       if (!isAdmin) {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
-      // Admin users can always access /admin regardless of onboarding state
       return response
+    }
+
+    // Already logged in + hitting /login → send to correct home
+    if (pathname === '/login' && request.nextUrl.searchParams.get('signedout') !== '1') {
+      const home = !profile?.onboarding_complete
+        ? '/onboarding'
+        : isOrgUser ? '/org/dashboard' : '/dashboard'
+      return NextResponse.redirect(new URL(home, request.url))
     }
 
     // Redirect to onboarding if profile not complete (except when already there)

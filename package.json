@@ -27,7 +27,6 @@
     "react-dom": "^18",
     "react-dropzone": "^15.0.0",
     "react-hook-form": "^7.76.1",
-    "resend": "^6.12.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -51,11 +51,17 @@ export default function AuthCallback() {
 
       const { data: profile } = await supabase
         .from('klippa_profiles')
-        .select('onboarding_complete')
+        .select('onboarding_complete, user_type')
         .eq('id', userId)
         .single()
 
-      router.replace(!profile || !profile.onboarding_complete ? '/onboarding' : '/dashboard')
+      if (!profile || !profile.onboarding_complete) {
+        router.replace('/onboarding')
+      } else if (profile.user_type === 'company_owner' || profile.user_type === 'practitioner') {
+        router.replace('/org/dashboard')
+      } else {
+        router.replace('/dashboard')
+      }
     }
 
     // Case 1: SDK already processed the hash by the time this effect runs

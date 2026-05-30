@@ -38,7 +38,7 @@ interface AppNavProps {
 }
 
 const NAV_BASE   = 'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors'
-const NAV_ACTIVE = `${NAV_BASE} text-emerald-300 bg-emerald-500/10 font-medium`
+const NAV_ACTIVE = `${NAV_BASE} text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 font-medium`
 const NAV_IDLE   = `${NAV_BASE} text-ink-2 hover:text-ink-1 hover:bg-raised/50`
 
 function navCls(page: ActivePage, active: ActivePage) {
@@ -114,7 +114,7 @@ export default function AppNav({
             <Car className="w-4 h-4 shrink-0" />
             <span className="flex-1">Mileage</span>
             {logbookPending > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-semibold tabular-nums">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-300 font-semibold tabular-nums">
                 {logbookPending}
               </span>
             )}

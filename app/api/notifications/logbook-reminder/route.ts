@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { Resend } from 'resend'
 import {
-  startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear, format,
+  startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear,
 } from 'date-fns'
 
 // This route can be called:
@@ -11,8 +10,6 @@ import {
 //  2. By a Vercel/Supabase cron job weekly/monthly
 //  3. POST /api/notifications/logbook-reminder — sends for the current user
 //  4. POST /api/notifications/logbook-reminder?all=1 — admin only, sends for all users
-
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 function getWeekKey(date: Date): string {
   const year = getISOWeekYear(date)
@@ -24,10 +21,7 @@ function getTaxYearStart(taxYear: number): Date {
   return new Date(taxYear - 1, 2, 1)
 }
 
-function countPendingWeeks(
-  taxYear: number,
-  reviewedWeeks: Set<string>,
-): number {
+function countPendingWeeks(taxYear: number, reviewedWeeks: Set<string>): number {
   const taxStart = getTaxYearStart(taxYear)
   const today    = new Date()
   const cutoff   = startOfWeek(today, { weekStartsOn: 1 })
@@ -41,9 +35,33 @@ function countPendingWeeks(
   return count
 }
 
+async function sendBrevoEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
+  const apiKey = process.env.BREVO_API_KEY
+  if (!apiKey) throw new Error('BREVO_API_KEY not configured')
+
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method:  'POST',
+    headers: {
+      'accept':       'application/json',
+      'api-key':      apiKey,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender:      { name: 'Klippa', email: 'noreply@mail.klippa.co.za' },
+      to:          [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Brevo ${res.status}: ${body}`)
+  }
+}
+
 export async function POST(request: Request) {
-  if (!resend) {
-    return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 503 })
+  if (!process.env.BREVO_API_KEY) {
+    return NextResponse.json({ error: 'BREVO_API_KEY not configured' }, { status: 503 })
   }
 
   const cookieStore = cookies()
@@ -56,7 +74,6 @@ export async function POST(request: Request) {
   const url   = new URL(request.url)
   const isAll = url.searchParams.get('all') === '1'
 
-  // Admin-only for bulk sends
   if (isAll) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -67,47 +84,40 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Fetch all profiles with logbook_reminder != 'none' and commute set up
     const { data: profiles } = await supabase
       .from('klippa_profiles')
-      .select('id, full_name, tax_year, tax_number, logbook_reminder, commute_km, office_mon, office_tue, office_wed, office_thu, office_fri')
+      .select('id, full_name, tax_year, logbook_reminder, commute_km')
       .neq('logbook_reminder', 'none')
       .gt('commute_km', 0)
 
-    if (!profiles?.length) {
-      return NextResponse.json({ sent: 0 })
-    }
+    if (!profiles?.length) return NextResponse.json({ sent: 0 })
 
     let sent = 0
     const today = new Date()
 
     for (const profile of profiles) {
-      // Only send if the user's reminder frequency aligns with today
-      const isWeeklyDay   = today.getDay() === 1 // Monday
-      const isMonthlyDay  = today.getDate() === 1 // 1st of the month
+      const isWeeklyDay  = today.getDay() === 1
+      const isMonthlyDay = today.getDate() === 1
       if (profile.logbook_reminder === 'weekly'  && !isWeeklyDay)  continue
       if (profile.logbook_reminder === 'monthly' && !isMonthlyDay) continue
 
-      // Check how many weeks are pending
       const { data: reviewsData } = await supabase
         .from('klippa_logbook_reviews')
         .select('review_week')
         .eq('user_id', profile.id)
 
-      const reviewedSet   = new Set((reviewsData ?? []).map((r: { review_week: string }) => r.review_week))
-      const pendingCount  = countPendingWeeks(profile.tax_year, reviewedSet)
-
+      const reviewedSet  = new Set((reviewsData ?? []).map((r: { review_week: string }) => r.review_week))
+      const pendingCount = countPendingWeeks(profile.tax_year, reviewedSet)
       if (pendingCount === 0) continue
 
-      // Get user email
       const { data: userData } = await supabase.auth.admin.getUserById(profile.id)
       const email = userData?.user?.email
       if (!email) continue
 
       const name = profile.full_name ?? 'there'
+      const appUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
 
-      await resend.emails.send({
-        from:    'Klippa <noreply@klippa.co.za>',
+      await sendBrevoEmail({
         to:      email,
         subject: `Your logbook needs review — ${pendingCount} ${pendingCount === 1 ? 'week' : 'weeks'} pending`,
         html: `
@@ -117,22 +127,18 @@ export async function POST(request: Request) {
     <h1 style="font-size:20px;font-weight:700;color:#f4f4f5;margin:0 0 20px">
       ${pendingCount} ${pendingCount === 1 ? 'week needs' : 'weeks need'} your review
     </h1>
-
     <p style="font-size:14px;color:#a1a1aa;line-height:1.6;margin:0 0 20px">
-      Hi ${name}, Klippa has auto-built your logbook entries for the
-      last ${pendingCount} ${pendingCount === 1 ? 'week' : 'weeks'}.
+      Hi ${name}, Klippa has auto-built your logbook entries for the last
+      ${pendingCount} ${pendingCount === 1 ? 'week' : 'weeks'}.
       Take 2 minutes to confirm which days you drove for business.
     </p>
-
-    <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://klippa.co.za'}/mileage"
+    <a href="${appUrl}/mileage"
        style="display:inline-block;background:#059669;color:#fff;font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none">
       Review your logbook →
     </a>
-
     <p style="font-size:11px;color:#52525b;margin:24px 0 0;line-height:1.5">
       SARS requires a logbook for all business travel claims.
-      Keeping it up to date takes seconds now, not hours during tax season.
-      <br><br>
+      Keeping it up to date takes seconds now, not hours during tax season.<br><br>
       To change your reminder frequency, go to Settings in Klippa.
     </p>
   </div>

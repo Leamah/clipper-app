@@ -36,6 +36,7 @@ export async function GET() {
     .from('klippa_profiles')
     .select('id, full_name, org_role, feature_timesheets, subscription_tier, created_at')
     .eq('organisation_id', orgId)
+    .neq('org_role', 'owner')
     .order('created_at', { ascending: true })
 
   if (membersErr) return NextResponse.json({ error: membersErr.message }, { status: 500 })
@@ -70,4 +71,55 @@ export async function GET() {
   }))
 
   return NextResponse.json({ members })
+}
+
+export async function DELETE(request: Request) {
+  const cookieStore = cookies()
+  const anon = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll() { return cookieStore.getAll() }, setAll() {} } },
+  )
+  const { data: { user } } = await anon.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { memberId } = await request.json()
+  if (!memberId) return NextResponse.json({ error: 'memberId required' }, { status: 400 })
+
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+  // Caller must be an org owner
+  const { data: callerProfile } = await admin
+    .from('klippa_profiles')
+    .select('organisation_id, org_role')
+    .eq('id', user.id)
+    .single()
+
+  if (!callerProfile?.organisation_id || callerProfile.org_role !== 'owner') {
+    return NextResponse.json({ error: 'Only org owners can remove members' }, { status: 403 })
+  }
+
+  // Prevent owner removing themselves
+  if (memberId === user.id) {
+    return NextResponse.json({ error: 'Owners cannot remove themselves' }, { status: 400 })
+  }
+
+  // Confirm target belongs to same org
+  const { data: targetProfile } = await admin
+    .from('klippa_profiles')
+    .select('organisation_id')
+    .eq('id', memberId)
+    .single()
+
+  if (targetProfile?.organisation_id !== callerProfile.organisation_id) {
+    return NextResponse.json({ error: 'Member not in your organisation' }, { status: 403 })
+  }
+
+  const { error } = await admin
+    .from('klippa_profiles')
+    .update({ organisation_id: null, org_role: null })
+    .eq('id', memberId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
 }

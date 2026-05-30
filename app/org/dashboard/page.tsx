@@ -106,6 +106,9 @@ export default function OrgDashboardPage() {
             <Link href="/org/consultants" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
               <Users className="w-3.5 h-3.5" /> Manage team
             </Link>
+            <Link href="/org/settings" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink-1 hover:bg-raised border border-edge transition-colors">
+              <Settings className="w-3.5 h-3.5" /> Settings
+            </Link>
             <Link href="/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
               My profile
             </Link>

@@ -86,11 +86,14 @@ export default function Dashboard() {
       // the middleware couldn't check the profile (e.g. session not yet in cookies).
       supabase
         .from('klippa_profiles')
-        .select('onboarding_complete')
+        .select('onboarding_complete, user_type')
         .eq('id', user.id)
         .single()
         .then(({ data: p }) => {
           if (!p || !p.onboarding_complete) { router.replace('/onboarding'); return }
+          if (p.user_type === 'company_owner' || p.user_type === 'practitioner') {
+            router.replace('/org/dashboard'); return
+          }
           loadData(user.id)
         })
     })

@@ -39,10 +39,13 @@ export default function ConsultantsPage() {
   const [inviteMsg,    setInviteMsg]    = useState<string | null>(null)
   const [acceptUrl,    setAcceptUrl]    = useState<string | null>(null)
   const [deletingId,   setDeletingId]   = useState<string | null>(null)
+  const [removingId,   setRemovingId]   = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.replace('/login'); return }
+    setCurrentUserId(user.id)
 
     const { data: profile } = await supabase
       .from('klippa_profiles')
@@ -74,7 +77,7 @@ export default function ConsultantsPage() {
 
   const sendInvite = async () => {
     if (!inviteEmail.trim()) return
-    setSending(true); setError(null); setInviteMsg(null)
+    setSending(true); setError(null); setInviteMsg(null); setAcceptUrl(null)
     try {
       const res  = await fetch('/api/org/invite', {
         method:  'POST',
@@ -87,7 +90,6 @@ export default function ConsultantsPage() {
       setInviteEmail('')
       setInviteMsg(`Invite created for ${inviteEmail.trim()}`)
       setAcceptUrl(json.acceptUrl ?? null)
-      setTimeout(() => { setInviteMsg(null); setAcceptUrl(null) }, 30_000)
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
     finally { setSending(false) }
   }
@@ -102,6 +104,22 @@ export default function ConsultantsPage() {
       })
       setInvites((prev) => prev.filter((i) => i.id !== id))
     } finally { setDeletingId(null) }
+  }
+
+  const removeMember = async (memberId: string) => {
+    if (!confirm('Remove this consultant from your organisation? They will lose access to the team workspace.')) return
+    setRemovingId(memberId)
+    try {
+      const res  = await fetch('/api/org/members', {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ memberId }),
+      })
+      const json = await res.json()
+      if (json.error) { setError(json.error); return }
+      setMembers((prev) => prev.filter((m) => m.id !== memberId))
+    } catch { setError('Failed to remove member') }
+    finally { setRemovingId(null) }
   }
 
   if (loading) {
@@ -178,26 +196,33 @@ export default function ConsultantsPage() {
             </button>
           </div>
 
-          {inviteMsg && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-emerald-400">
-                <Check className="w-3.5 h-3.5" /> {inviteMsg}
-              </div>
-              {acceptUrl && (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 space-y-1.5">
-                  <p className="text-xs text-ink-2">Share this acceptance link with the consultant:</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-[11px] text-emerald-300 font-mono truncate">{acceptUrl}</code>
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(acceptUrl) }}
-                      className="text-xs text-ink-2 hover:text-ink-1 px-2 py-1 rounded border border-edge hover:border-raised transition-colors flex-shrink-0"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-ink-3">Link expires in 7 days.</p>
+          {acceptUrl && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-emerald-400">
+                  <Check className="w-3.5 h-3.5" /> {inviteMsg}
                 </div>
-              )}
+                <button
+                  onClick={() => { setAcceptUrl(null); setInviteMsg(null) }}
+                  className="text-ink-3 hover:text-ink-1 transition-colors"
+                  title="Dismiss"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-xs text-ink-2">Copy this link and share it with the consultant (WhatsApp, email, etc.):</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-[11px] text-emerald-300 font-mono break-all">{acceptUrl}</code>
+              </div>
+              <div className="flex items-center gap-2 pt-0.5">
+                <button
+                  onClick={() => { navigator.clipboard.writeText(acceptUrl) }}
+                  className="flex items-center gap-1.5 text-xs font-medium text-ink-1 hover:text-white px-3 py-1.5 rounded-lg border border-edge hover:border-emerald-500/50 bg-raised hover:bg-emerald-500/10 transition-colors"
+                >
+                  Copy link
+                </button>
+                <p className="text-[10px] text-ink-3">Expires in 7 days.</p>
+              </div>
             </div>
           )}
         </div>
@@ -260,7 +285,7 @@ export default function ConsultantsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-edge/50">
-                  {['Name / Email', 'Role', 'Latest timesheet', 'Status'].map((h) => (
+                  {['Name / Email', 'Role', 'Latest timesheet', 'Status', ''].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-xs font-medium text-ink-2">{h}</th>
                   ))}
                 </tr>
@@ -287,6 +312,18 @@ export default function ConsultantsPage() {
                           </span>
                         ) : (
                           <span className="text-xs text-ink-3">No timesheets</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        {m.id !== currentUserId && (
+                          <button
+                            onClick={() => removeMember(m.id)}
+                            disabled={removingId === m.id}
+                            className="text-ink-3 hover:text-red-400 transition-colors disabled:opacity-40"
+                            title="Remove from org"
+                          >
+                            {removingId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
                         )}
                       </td>
                     </tr>

@@ -286,7 +286,7 @@ export default function OnboardingPage() {
                     value={state.org_name}
                     onChange={(e) => setState((s) => ({ ...s, org_name: e.target.value }))}
                     onKeyDown={(e) => e.key === 'Enter' && handleB2BComplete()}
-                    placeholder={state.user_type === 'practitioner' ? 'e.g. Smith & Associates' : 'e.g. Lesedi Consulting'}
+                    placeholder={state.user_type === 'practitioner' ? 'e.g. Smith & Associates' : 'e.g. Klippa Consulting'}
                     className="input"
                     autoFocus
                   />
