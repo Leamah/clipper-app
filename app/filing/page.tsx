@@ -32,9 +32,11 @@ export default function FilingPage() {
   const [step,   setStep]   = useState(0)
   const [data,   setData]   = useState<FilingData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [sarsRef, setSarsRef] = useState('')
+  const [sarsRef,    setSarsRef]    = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted,  setSubmitted]  = useState(false)
+  const [payeInput,  setPayeInput]  = useState(0)
+  const [savingPaye, setSavingPaye] = useState(false)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -69,6 +71,20 @@ export default function FilingPage() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    if (data) setPayeInput(data.taxReturn.employees_tax_paid ?? 0)
+  }, [data])
+
+  const savePaye = async (value: number) => {
+    if (!data) return
+    setSavingPaye(true)
+    await supabase
+      .from('klippa_tax_returns')
+      .update({ employees_tax_paid: value })
+      .eq('id', data.taxReturn.id)
+    setData(prev => prev ? { ...prev, taxReturn: { ...prev.taxReturn, employees_tax_paid: value } } : null)
+    setSavingPaye(false)
+  }
 
   const handleSubmit = async () => {
     if (!data || !sarsRef.trim()) return
@@ -125,7 +141,7 @@ export default function FilingPage() {
     interestIncome,
     otherDeductions:      totalDeductible,
     age:                  ageFromDob(profile.date_of_birth ?? null),
-    employeesTaxPaid:     taxReturn.employees_tax_paid ?? 0,
+    employeesTaxPaid:     payeInput,
     taxYear:              taxReturn.tax_year,
   })
 
@@ -166,21 +182,66 @@ export default function FilingPage() {
         {step === 0 && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-xl font-bold text-white">Review your return</h1>
+              <h1 className="text-xl font-bold text-ink-1">Review your return</h1>
               <p className="text-sm text-ink-2 mt-1">Tax year {taxReturn.tax_year} · ITR12 · Filing deadline {deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
 
             <div className="rounded-2xl border border-edge bg-surface/40 divide-y divide-edge">
               <SectionRow label="Income records" value={`${incomeRecords.length} records`} sub={formatRand(totalIncome)} href="/income" />
               <SectionRow label="Confirmed expenses" value={`${expenseRecords.length} records`} sub={`${formatRand(totalDeductible)} deductible`} href="/expenses" />
+              {/* PAYE from IRP5 — editable inline */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm text-ink-1">Employees&apos; tax paid (PAYE)</p>
+                  <p className="text-xs text-ink-3 mt-0.5">From your IRP5 — leave R0 if fully self-employed</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-ink-3">R</span>
+                  <input
+                    type="number"
+                    value={payeInput}
+                    onChange={(e) => setPayeInput(Number(e.target.value) || 0)}
+                    onBlur={() => savePaye(payeInput)}
+                    className="w-28 text-right bg-raised/60 border border-edge rounded-lg px-2 py-1 text-sm text-ink-1 tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                    min={0}
+                  />
+                  {savingPaye && <Loader2 className="w-3.5 h-3.5 animate-spin text-ink-3" />}
+                </div>
+              </div>
               <SectionRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} />
               <SectionRow label="Tax payable" value={formatRand(taxResult.taxPayable)} highlight />
             </div>
 
+            {/* ── Warning banners ── */}
             {incomeRecords.length === 0 && (
               <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                No income records yet. <Link href="/income" className="underline">Add income</Link> before filing.
+                No income records yet. <Link href="/income" className="underline ml-1">Add income</Link> before filing.
+              </div>
+            )}
+
+            {!profile.date_of_birth && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Date of birth not set — age-based rebates (65 and 75+) may be incorrect.{' '}
+                  <Link href="/settings" className="underline">Update in Settings →</Link>
+                </span>
+              </div>
+            )}
+
+            {profile.works_from_home && !profile.home_expenses_annual && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Annual home running costs are R0 — your home office deduction is R0.{' '}
+                  <Link href="/settings" className="underline">Update in Settings →</Link>
+                </span>
+              </div>
+            )}
+
+            {profile.employment_type !== 'freelance' && payeInput === 0 && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Your profile indicates salaried employment. If your IRP5 shows PAYE withheld, enter it above so your refund estimate is accurate.</span>
               </div>
             )}
 
@@ -199,7 +260,7 @@ export default function FilingPage() {
         {step === 1 && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-xl font-bold text-white">Your eFiling cheat sheet</h1>
+              <h1 className="text-xl font-bold text-ink-1">Your eFiling cheat sheet</h1>
               <p className="text-sm text-ink-2 mt-1">Enter these exact values on SARS eFiling. Copy each line into the corresponding field on your ITR12.</p>
             </div>
 
@@ -253,7 +314,7 @@ export default function FilingPage() {
               )}
 
               <div className="px-4 py-3 bg-raised/60 border-t border-edge">
-                <div className="flex justify-between text-sm font-bold text-white">
+                <div className="flex justify-between text-sm font-bold text-ink-1">
                   <span>Net tax payable</span>
                   <span className={taxResult.netTaxPayable > 0 ? 'text-amber-400' : 'text-emerald-400'}>
                     {taxResult.netTaxPayable > 0 ? formatRand(taxResult.netTaxPayable) : `Refund ${formatRand(Math.abs(taxResult.netTaxPayable))}`}
@@ -262,7 +323,7 @@ export default function FilingPage() {
               </div>
             </div>
 
-            <p className="text-xs text-ink-3">These values are based on the 2024/2025 SARS tax tables and the information you&apos;ve entered. Always verify against your actual documents before submitting.</p>
+            <p className="text-xs text-ink-3">These values are based on the {taxReturn.tax_year} SARS tax tables and the information you&apos;ve entered. Always verify against your actual documents before submitting.</p>
 
             <StepNav onPrev={() => setStep(0)} onNext={() => setStep(2)} />
           </div>
@@ -272,7 +333,7 @@ export default function FilingPage() {
         {step === 2 && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-xl font-bold text-white">eFiling walkthrough</h1>
+              <h1 className="text-xl font-bold text-ink-1">eFiling walkthrough</h1>
               <p className="text-sm text-ink-2 mt-1">Follow these steps on the SARS eFiling portal to submit your ITR12.</p>
             </div>
 
@@ -287,7 +348,7 @@ export default function FilingPage() {
               ].map((s) => (
                 <div key={s.n} className="rounded-xl border border-edge p-4 space-y-3">
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl font-black text-zinc-800 leading-none flex-shrink-0">{s.n}</span>
+                    <span className="text-2xl font-black text-edge leading-none flex-shrink-0">{s.n}</span>
                     <div className="space-y-1 flex-1">
                       <h3 className="text-sm font-semibold text-ink-1">{s.title}</h3>
                       <p className="text-sm text-ink-2 leading-relaxed whitespace-pre-line">{s.body}</p>
@@ -315,7 +376,7 @@ export default function FilingPage() {
         {step === 3 && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-xl font-bold text-white">Document checklist</h1>
+              <h1 className="text-xl font-bold text-ink-1">Document checklist</h1>
               <p className="text-sm text-ink-2 mt-1">Keep these documents for 5 years in case SARS audits your return. Do not submit them unless SARS specifically asks.</p>
             </div>
 
@@ -354,7 +415,7 @@ export default function FilingPage() {
                   <Check className="w-8 h-8 text-emerald-400" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">Return submitted</h1>
+                  <h1 className="text-xl font-bold text-ink-1">Return submitted</h1>
                   <p className="text-sm text-ink-2 mt-1">Tax year {taxReturn.tax_year}</p>
                 </div>
                 {sarsRef && (
@@ -371,7 +432,7 @@ export default function FilingPage() {
             ) : (
               <div className="space-y-6">
                 <div>
-                  <h1 className="text-xl font-bold text-white">Record your submission</h1>
+                  <h1 className="text-xl font-bold text-ink-1">Record your submission</h1>
                   <p className="text-sm text-ink-2 mt-1">After filing on eFiling, enter your SARS reference number here to mark your return as submitted.</p>
                 </div>
 

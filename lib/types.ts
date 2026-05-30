@@ -46,6 +46,9 @@ export type DocumentType =
 
 export type OcrStatus = 'pending' | 'processing' | 'complete' | 'failed'
 export type SubscriptionTier = 'free' | 'starter' | 'professional' | 'admin'
+export type UserType         = 'freelancer' | 'company_owner' | 'practitioner'
+export type OrgType          = 'company' | 'practice'
+export type OrgRole          = 'owner' | 'admin' | 'member'
 
 // ── Database Row Types ─────────────────────────────────────
 
@@ -96,6 +99,10 @@ export interface KlippaProfile {
   tax_year:             number
   subscription_tier:    SubscriptionTier
   onboarding_complete:  boolean
+  // B2B
+  user_type:            UserType
+  organisation_id:      string | null
+  org_role:             OrgRole | null
   created_at:           string
   updated_at:           string
 }
@@ -228,6 +235,33 @@ export interface KlippaTimesheet {
   client_signed_at:      string | null  // ISO timestamp — manually confirmed by consultant
   created_at:            string
   updated_at:            string
+}
+
+// ── B2B Types ──────────────────────────────────────────────
+
+export interface KlippaOrganisation {
+  id:                string
+  name:              string
+  slug:              string | null
+  org_type:          OrgType
+  owner_id:          string
+  logo_url:          string | null
+  subscription_tier: string
+  seat_count:        number
+  created_at:        string
+  updated_at:        string
+}
+
+export interface KlippaOrgInvite {
+  id:              string
+  organisation_id: string
+  invited_email:   string
+  invited_by:      string
+  status:          'pending' | 'accepted' | 'declined'
+  role:            OrgRole
+  token:           string
+  expires_at:      string
+  created_at:      string
 }
 
 // ── Tier Feature Config ────────────────────────────────────

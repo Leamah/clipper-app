@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ShieldCheck, LayoutDashboard, TrendingUp, Receipt, FileText,
-  Clock, Car, CalendarDays, ClipboardCheck, Settings,
+  Clock, Car, CalendarDays, ClipboardCheck, Settings, Users,
 } from 'lucide-react'
 import UserNav       from '@/components/UserNav'
 import ThemeToggle   from '@/components/ThemeToggle'
@@ -22,11 +22,13 @@ export type ActivePage =
   | 'settings'
   | 'pricing'
   | 'subscription'
+  | 'org'
 
 export interface FeatureFlags {
   timesheets:  boolean
   logbook:     boolean
   provisional: boolean
+  is_org_user?: boolean   // company_owner | practitioner
 }
 
 interface AppNavProps {
@@ -43,7 +45,7 @@ function navCls(page: ActivePage, active: ActivePage) {
   return page === active ? NAV_ACTIVE : NAV_IDLE
 }
 
-const DEFAULT_FLAGS: FeatureFlags = { timesheets: false, logbook: true, provisional: false }
+const DEFAULT_FLAGS: FeatureFlags = { timesheets: false, logbook: true, provisional: false, is_org_user: false }
 
 export default function AppNav({
   activePage,
@@ -58,7 +60,7 @@ export default function AppNav({
       if (!user) return
       supabase
         .from('klippa_profiles')
-        .select('feature_timesheets, feature_logbook, feature_provisional')
+        .select('feature_timesheets, feature_logbook, feature_provisional, user_type')
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
@@ -67,6 +69,7 @@ export default function AppNav({
               timesheets:  data.feature_timesheets  ?? false,
               logbook:     data.feature_logbook     ?? true,
               provisional: data.feature_provisional ?? false,
+              is_org_user: data.user_type === 'company_owner' || data.user_type === 'practitioner',
             })
           }
         })
@@ -129,6 +132,14 @@ export default function AppNav({
             <ClipboardCheck className="w-4 h-4 shrink-0" /> File Return
           </Link>
         </div>
+
+        {flags.is_org_user && (
+          <div className="pt-2 mt-1 border-t border-edge/40">
+            <Link href="/org/dashboard" className={navCls('org' as ActivePage, activePage)}>
+              <Users className="w-4 h-4 shrink-0" /> My Team
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Bottom: Settings, theme toggle + user */}
