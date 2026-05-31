@@ -115,11 +115,11 @@ export default function TaxChatbot() {
       {/* Floating button — bottom-right */}
       <button
         onClick={() => setOpen(o => !o)}
-        aria-label="Open tax assistant"
+        aria-label="Chat to Klip"
         className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 text-white text-xs font-semibold shadow-lg shadow-emerald-900/40 hover:from-emerald-400 hover:to-teal-600 transition-all"
       >
         <Bot className="w-4 h-4" />
-        <span className="hidden sm:inline">Tax Assistant</span>
+        <span className="hidden sm:inline">Chat to Klip</span>
       </button>
 
       {/* Chat panel */}
@@ -134,8 +134,8 @@ export default function TaxChatbot() {
                 <Bot className="w-3.5 h-3.5 text-white" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-ink-1">SA Tax Assistant</p>
-                <p className="text-[10px] text-emerald-400">Powered by GPT-4o mini · SARS-aware</p>
+                <p className="text-xs font-semibold text-ink-1">Chat to Klip</p>
+                <p className="text-[10px] text-emerald-400">Your Klippa &amp; SA tax assistant</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -162,7 +162,7 @@ export default function TaxChatbot() {
               <div>
                 <p className="text-sm font-semibold text-ink-1">Premium feature</p>
                 <p className="text-xs text-ink-2 mt-1 leading-relaxed">
-                  Get instant answers to your SARS and tax questions — included with every paid plan.
+                  Get instant answers about Klippa and SA tax — included with every paid plan.
                 </p>
               </div>
               <Link href="/subscription"
@@ -181,7 +181,7 @@ export default function TaxChatbot() {
                     <div className="text-center py-4">
                       <Sparkles className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
                       <p className="text-xs text-ink-2 leading-relaxed">
-                        Ask me anything about SA tax — provisional tax, deductions, VAT, eFiling and more.
+                        Ask me anything about using Klippa, or SA tax — provisional tax, deductions, VAT, eFiling and more.
                       </p>
                     </div>
                     <div className="space-y-1.5">
@@ -237,7 +237,7 @@ export default function TaxChatbot() {
                     onKeyDown={handleKey}
                     disabled={loading}
                     rows={1}
-                    placeholder="Ask a tax question…"
+                    placeholder="Ask Klip anything…"
                     className="flex-1 bg-raised/60 border border-edge rounded-xl px-3 py-2 text-xs text-ink-1 placeholder:text-ink-3 outline-none focus:border-emerald-500/60 transition-colors resize-none disabled:opacity-50 max-h-24 overflow-y-auto"
                     style={{ lineHeight: '1.5' }}
                   />
