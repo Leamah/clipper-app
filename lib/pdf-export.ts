@@ -180,76 +180,81 @@ export async function exportTimesheetPDF(
     },
   })
 
-  // ── Footer summary ────────────────────────────────────────
-  const finalY = (doc as any).lastAutoTable.finalY + 8
+  // ── Footer summary + sign-off ─────────────────────────────
+  // Keep the totals and BOTH signature boxes together. If they don't
+  // fit under the (possibly multi-page) table, start a fresh page so
+  // the signature section is ALWAYS present and never clipped.
+  const pageH   = doc.internal.pageSize.getHeight()   // 297mm (A4)
+  const boxH    = 36
+  const BLOCK_H = 8 /* totals */ + 10 /* gap */ + boxH + 8 /* breathing room */
   const billable = timesheet.hourly_rate ? totalHours * timesheet.hourly_rate : null
+
+  let cursorY = (doc as any).lastAutoTable.finalY + 8
+  if (cursorY + BLOCK_H > pageH - 14) {
+    doc.addPage()
+    cursorY = 20
+  }
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(30, 30, 30)
-  doc.text(`Total Hours: ${totalHours}`, 14, finalY)
+  doc.text(`Total Hours: ${totalHours}`, 14, cursorY)
   if (billable !== null) {
-    doc.text(`Billable Amount: ${fmtRand(billable)}`, 80, finalY)
+    doc.text(`Billable Amount: ${fmtRand(billable)}`, 80, cursorY)
   }
 
-  // ── Sign-off section ──────────────────────────────────────
-  const sigY = finalY + 10
+  // ── Sign-off section (constant: name, signature + date fields) ──
+  const sigY = cursorY + 10
 
-  // Box outlines
-  doc.setDrawColor(...ZINC700)
-  doc.setLineWidth(0.3)
-  doc.rect(14,  sigY, 87, 32)   // Consultant box
-  doc.rect(109, sigY, 87, 32)   // Client box
+  /** Draw one signature box at x with a constant name / signature / date layout. */
+  const signBox = (x: number, title: string, line1: string, line2: string, signedAt?: string | null) => {
+    doc.setDrawColor(...ZINC700)
+    doc.setLineWidth(0.3)
+    doc.rect(x, sigY, 87, boxH)
 
-  // Box headers
-  doc.setFillColor(...ZINC900)
-  doc.rect(14,  sigY, 87, 7, 'F')
-  doc.rect(109, sigY, 87, 7, 'F')
-  doc.setTextColor(...WHITE)
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'bold')
-  doc.text('CONSULTANT',  17.5, sigY + 5)
-  doc.text('CLIENT / AUTHORISED SIGNATORY', 112, sigY + 5)
-
-  // Consultant box content
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(30, 30, 30)
-  doc.text(`Name: ${timesheet.consultant_name ?? ''}`, 17, sigY + 13)
-  doc.text(`Position: ${timesheet.position ?? ''}`,   17, sigY + 19)
-
-  if (timesheet.consultant_signed_at) {
-    const signDate = new Date(timesheet.consultant_signed_at)
-      .toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
-    doc.setTextColor(...ACCENT)
+    // Header bar
+    doc.setFillColor(...ZINC900)
+    doc.rect(x, sigY, 87, 7, 'F')
+    doc.setTextColor(...WHITE)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
-    doc.text(`✓ Digitally confirmed: ${signDate}`, 17, sigY + 27)
-  } else {
+    doc.text(title, x + 3.5, sigY + 5)
+
+    // Name / company
     doc.setTextColor(30, 30, 30)
     doc.setFont('helvetica', 'normal')
-    doc.text('Signature: ____________________________', 17, sigY + 27)
-    doc.text('Date: _______________',                   17, sigY + 33)
+    doc.setFontSize(8)
+    doc.text(line1, x + 3, sigY + 13)
+    doc.text(line2, x + 3, sigY + 18)
+
+    // Constant signature + date fields
+    doc.setDrawColor(120, 120, 120)
+    doc.text('Signature:', x + 3, sigY + 28)
+    doc.line(x + 22, sigY + 28, x + 84, sigY + 28)
+    doc.text('Date:', x + 3, sigY + 34)
+    doc.line(x + 16, sigY + 34, x + 50, sigY + 34)
+
+    // Overlay digital confirmation on top of the fields when signed
+    if (signedAt) {
+      const d = new Date(signedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+      doc.setTextColor(...ACCENT)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Digitally signed', x + 24, sigY + 27)
+      doc.text(d, x + 18, sigY + 33)
+      doc.setTextColor(30, 30, 30)
+      doc.setFont('helvetica', 'normal')
+    }
   }
 
-  // Client box content
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(30, 30, 30)
-  doc.text(`Name: ${timesheet.client_contact ?? ''}`,  112, sigY + 13)
-  doc.text(`Company: ${timesheet.client_name ?? ''}`,  112, sigY + 19)
+  signBox(14,  'CONSULTANT',
+    `Name: ${timesheet.consultant_name ?? ''}`,
+    `Position: ${timesheet.position ?? ''}`,
+    timesheet.consultant_signed_at)
 
-  if (timesheet.client_signed_at) {
-    const clientDate = new Date(timesheet.client_signed_at)
-      .toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
-    doc.setTextColor(...ACCENT)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`✓ Confirmed: ${clientDate}`, 112, sigY + 27)
-  } else {
-    doc.setTextColor(30, 30, 30)
-    doc.setFont('helvetica', 'normal')
-    doc.text('Signature: ____________________________', 112, sigY + 27)
-    doc.text('Date: _______________',                   112, sigY + 33)
-  }
+  signBox(109, 'CLIENT / AUTHORISED SIGNATORY',
+    `Name: ${timesheet.client_contact ?? ''}`,
+    `Company: ${timesheet.client_name ?? ''}`,
+    timesheet.client_signed_at)
 
   // ── Footer branding ───────────────────────────────────────
   doc.setTextColor(150, 150, 150)

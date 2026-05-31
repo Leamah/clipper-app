@@ -789,18 +789,18 @@ export default function TimesheetsPage() {
           </span>
         </div>
 
-        {/* Calendar header */}
-        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+        {/* Calendar header — only meaningful in the 7-col week view */}
+        <div className="hidden sm:grid grid-cols-7 gap-1.5 mb-1.5">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
             <div key={d} className="text-center text-[10px] text-ink-3 font-medium py-1">{d}</div>
           ))}
         </div>
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-1.5">
-          {/* Offset cells */}
+        {/* Calendar grid — 2-col list on mobile, 7-col week on desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-7 gap-1.5">
+          {/* Week-alignment offset cells (desktop only) */}
           {Array.from({ length: gridOffset }).map((_, i) => (
-            <div key={`offset-${i}`} />
+            <div key={`offset-${i}`} className="hidden sm:block" />
           ))}
 
           {/* Day cards */}
