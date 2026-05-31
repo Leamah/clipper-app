@@ -116,6 +116,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Exclude static assets — _next internals, favicon, images, fonts, and
+    // all media files (mp4/webm/ogg etc.).  Without this exclusion the
+    // middleware auth-gates every asset request: a visitor on the landing page
+    // with no session cookie gets their /influencer.mp4 request redirected to
+    // /login, so the hero video never loads.
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm|ogg|mov|avi|woff2?|ttf|otf|ico)$).*)',
   ],
 }
