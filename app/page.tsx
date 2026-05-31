@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -118,7 +118,11 @@ function HeroIllustration() {
 // ── Page ──────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const router = useRouter()
+  const router  = useRouter()
+  // React has a well-known bug where the `muted` *prop* is not reflected as a
+  // DOM *property* on <video> elements during hydration, so browsers may see an
+  // unmuted video and block autoPlay.  Setting the property via a ref ensures it.
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Redirect logged-in users to the app, but NEVER gate the marketing content on
   // this check — returning null until the client-side auth call resolves would
@@ -128,6 +132,13 @@ export default function LandingPage() {
       if (user) router.replace('/dashboard')
     })
   }, [router])
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = true
+      videoRef.current.play().catch(() => { /* autoplay blocked — controls still visible */ })
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-base text-ink-1 overflow-x-hidden">
@@ -220,17 +231,17 @@ export default function LandingPage() {
             </div>
           </Reveal>
 
-          {/* Right: hero video */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, ease: 'easeOut', delay: 0.25 }}
-            className="relative"
-          >
+          {/* Right: hero video
+              Plain div (not motion.div) so the container is visible immediately —
+              motion.div starts at opacity:0 in SSR and requires JS hydration to
+              become visible; a plain div has no such delay. */}
+          <div className="relative">
             <div className="absolute -inset-4 bg-emerald-600/10 blur-3xl rounded-full pointer-events-none" />
-            <div className="relative rounded-2xl overflow-hidden border border-edge/70 shadow-2xl shadow-emerald-950/40 bg-surface">
+            {/* aspect-video keeps the box 16:9 even before video metadata loads */}
+            <div className="relative aspect-video rounded-2xl overflow-hidden border border-edge/70 shadow-2xl shadow-emerald-950/40 bg-surface">
               <video
-                className="w-full h-auto block"
+                ref={videoRef}
+                className="w-full h-full object-cover"
                 autoPlay
                 muted
                 loop
@@ -241,7 +252,7 @@ export default function LandingPage() {
                 <source src="/influencer.mp4" type="video/mp4" />
               </video>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 

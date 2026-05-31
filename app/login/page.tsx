@@ -70,17 +70,19 @@ function LoginForm() {
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
         : `${window.location.origin}/auth/callback`
 
-      // Call Supabase directly via the SDK.
-      // lib/supabase.ts patches the @supabase/ssr client back to flowType:'implicit'
-      // right after construction (the library hard-codes 'pkce' and silently ignores
-      // our config option).  With flowType:'implicit', signInWithOtp() never generates
-      // a PKCE code-verifier — which was the root cause of "Failed to fetch" (the
-      // crypto/storage step threw before the network request was ever made).
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: { emailRedirectTo: callbackUrl },
+      // Use the server-side proxy to send the magic link.  This avoids:
+      //   • CORS preflight failures (same-origin request, not cross-origin)
+      //   • Browser PKCE code-verifier errors from @supabase/ssr
+      //   • Any device/browser crypto.subtle restrictions
+      const otpRes = await fetch('/api/auth/send-otp', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: email.trim(), emailRedirectTo: callbackUrl }),
       })
-      if (otpError) throw otpError
+      if (!otpRes.ok) {
+        const body = await otpRes.json().catch(() => ({}))
+        throw new Error((body as { error?: string }).error ?? 'Failed to send magic link')
+      }
       setSent(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
