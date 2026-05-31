@@ -106,9 +106,16 @@ function ContractForm({ userId, existing, onSaved, onCancel }: {
   const handleSave = async () => {
     setSaving(true); setError(null)
     try {
+      const payload = {
+        ...form,
+        rate:       form.rate       ? parseFloat(form.rate) : null,
+        start_date: form.start_date || null,
+        end_date:   form.end_date   || null,
+        notes:      form.notes      || null,
+      }
       const body = existing?.id
-        ? { id: existing.id, ...form, rate: form.rate ? parseFloat(form.rate) : null }
-        : { user_id: userId, ...form, rate: form.rate ? parseFloat(form.rate) : null }
+        ? { id: existing.id, ...payload }
+        : { user_id: userId,  ...payload }
 
       const res  = await fetch('/api/org/contracts', {
         method:  existing?.id ? 'PATCH' : 'POST',
