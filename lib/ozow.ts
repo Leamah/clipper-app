@@ -18,8 +18,8 @@ export const OZOW_PAY_URL = 'https://pay.ozow.com/'
 export const PLANS = {
   starter: {
     name:         'Starter',
-    monthlyPrice: 20,
-    annualPrice:  200,    // ~2 months free
+    monthlyPrice: 99,
+    annualPrice:  990,    // 2 months free
     description:  'For anyone who works for themselves and needs to stay SARS-compliant.',
     features: [
       'Unlimited income & expense tracking',
@@ -32,9 +32,9 @@ export const PLANS = {
     ],
   },
   professional: {
-    name:         'Professional',
-    monthlyPrice: 299,
-    annualPrice:  2990,   // ~2 months free
+    name:         'Premium',
+    monthlyPrice: 149,
+    annualPrice:  1490,   // 2 months free
     description:  'For contractors and consultants with higher deduction complexity.',
     features: [
       'Everything in Starter',
@@ -48,6 +48,20 @@ export const PLANS = {
 
 export type PlanKey      = keyof typeof PLANS
 export type BillingCycle = 'monthly' | 'annual'
+
+// ── B2B seat pricing (companies + accounting practices) ───
+// Ozow is a one-time instant-EFT push (not card-on-file recurring), so B2B is
+// billed annually upfront: seats × SEAT_PRICE_ANNUAL in a single payment.
+export const SEAT_PRICE_ANNUAL  = 1490   // R per seat per year
+export const MAX_SEATS          = 500    // sanity cap on a single purchase
+// Fair-use ceiling on active clients a practice can manage before "contact us".
+export const PRACTICE_CLIENT_CAP = 50
+
+/** Total annual rand amount for a B2B seat purchase. */
+export function getSeatTotal(seats: number): number {
+  const n = Math.max(1, Math.min(MAX_SEATS, Math.floor(seats || 1)))
+  return n * SEAT_PRICE_ANNUAL
+}
 
 export function getPlanAmount(
   plan:        PlanKey,

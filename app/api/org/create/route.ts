@@ -15,8 +15,12 @@ export async function POST(request: Request) {
   const { data: { user } } = await anon.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { name, org_type = 'company' } = await request.json()
+  const { name, org_type = 'company', seat_count } = await request.json()
   if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
+
+  // Seats the owner intends to pay for (captured up front; payment deferred to
+  // the first value action via the soft gate). Clamp to a sane range.
+  const seats = Math.max(1, Math.min(500, Math.floor(Number(seat_count) || 1)))
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!serviceKey) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
@@ -34,10 +38,12 @@ export async function POST(request: Request) {
   const { data: org, error: orgErr } = await admin
     .from('klippa_organisations')
     .insert({
-      name:     name.trim(),
-      slug:     slug || null,
+      name:                name.trim(),
+      slug:                slug || null,
       org_type,
-      owner_id: user.id,
+      owner_id:            user.id,
+      seat_count:          seats,
+      subscription_status: 'free',
     })
     .select()
     .single()

@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient }       from '@supabase/supabase-js'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
+import { getOrgEntitlement }  from '@/lib/billing'
+import { PRACTICE_CLIENT_CAP } from '@/lib/ozow'
 
 // Resolve caller → admin client + practice org. Practitioners only.
 async function resolvePracticeContext() {
@@ -76,6 +78,31 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))
   if (!body.full_name?.trim())
     return NextResponse.json({ error: 'Client name is required' }, { status: 400 })
+
+  // ── Soft payment gate ─────────────────────────────────────
+  // Adding the first client is the practice's first value action — require an
+  // active seat subscription. The practitioner can set up & browse unpaid.
+  const ent = await getOrgEntitlement(admin, orgId)
+  if (!ent.entitled) {
+    return NextResponse.json(
+      { error: 'Activate your practice to add clients.', gate: 'payment', checkoutUrl: '/org/billing?gate=1' },
+      { status: 402 },
+    )
+  }
+
+  // ── Fair-use client cap ───────────────────────────────────
+  const { count: activeClients } = await admin
+    .from('klippa_practice_clients')
+    .select('id', { count: 'exact', head: true })
+    .eq('organisation_id', orgId)
+    .eq('status', 'active')
+
+  if ((activeClients ?? 0) >= PRACTICE_CLIENT_CAP) {
+    return NextResponse.json(
+      { error: `You've reached the ${PRACTICE_CLIENT_CAP}-client fair-use limit. Contact us at hello@klippa.co.za for enterprise pricing.`, gate: 'contact' },
+      { status: 402 },
+    )
+  }
 
   const entity_type = VALID_ENTITY.includes(body.entity_type) ? body.entity_type : 'individual'
   const return_type = VALID_RETURN.includes(body.return_type) ? body.return_type : 'ITR12'

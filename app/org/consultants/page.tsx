@@ -234,6 +234,7 @@ export default function ConsultantsPage() {
         body: JSON.stringify({ email: inviteEmail.trim() }),
       })
       const json = await res.json()
+      if (res.status === 402 && json.checkoutUrl) { router.push(json.checkoutUrl); return }
       if (json.error) throw new Error(json.error)
       setInvites(prev => [json.invite, ...prev])
       const invitedTo = inviteEmail.trim()

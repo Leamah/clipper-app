@@ -42,6 +42,14 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // API requests must NEVER be answered with an HTML redirect. When an
+  // unauthenticated /api/* request is redirected to the HTML /login page, the
+  // caller's `fetch(...).then(r => r.json())` receives "<!DOCTYPE html>…" and
+  // throws `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`. Return a
+  // clean JSON 401 instead so clients can handle it. (Admin API routes keep
+  // their own stricter checks below.)
+  const isApiRoute = pathname.startsWith('/api/')
+
   // Pricing and payment pages are accessible without login (so users can see plans)
   const isPublicRoute   = (
     pathname === '/' ||
@@ -55,8 +63,11 @@ export async function middleware(request: NextRequest) {
   // Ozow notify webhook must be reachable without a session (Ozow posts server-to-server)
   const isPaymentWebhook = pathname === '/api/payments/ozow/notify'
 
-  // Unauthenticated → /login
+  // Unauthenticated → JSON 401 for API routes, HTML /login redirect for pages
   if (!user && !isPublicRoute) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    }
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -89,8 +100,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(home, request.url))
     }
 
-    // Redirect to onboarding if profile not complete (except when already there)
-    if (!isOnboarding && !isPublicRoute) {
+    // Redirect to onboarding if profile not complete (except when already there).
+    // Never redirect API routes to the HTML onboarding page — same JSON-parse
+    // hazard as the unauthenticated case above.
+    if (!isOnboarding && !isPublicRoute && !isApiRoute) {
       if (!profile || !profile.onboarding_complete) {
         return NextResponse.redirect(new URL('/onboarding', request.url))
       }

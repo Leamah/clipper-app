@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     // and stop so we never re-extend the period or re-increment a promo.
     const { data: current } = await adminClient
       .from('klippa_subscriptions')
-      .select('status')
+      .select('status, organisation_id, seats')
       .eq('ozow_reference', ozowRef)
       .single()
 
@@ -65,8 +65,6 @@ export async function POST(request: Request) {
       ? addYears(now, 1)
       : addMonths(now, 1)
 
-    const newTier = planToTier(plan)
-
     // 1. Update the subscription record
     await adminClient
       .from('klippa_subscriptions')
@@ -79,15 +77,32 @@ export async function POST(request: Request) {
       })
       .eq('ozow_reference', ozowRef)
 
-    // 2. Upgrade the user's subscription tier on their profile
-    await adminClient
-      .from('klippa_profiles')
-      .update({
-        subscription_tier:    newTier,
-        subscription_ends_at: end.toISOString(),
-        updated_at:           now.toISOString(),
-      })
-      .eq('id', userId)
+    if (current.organisation_id) {
+      // ── B2B seat purchase ── activate the whole organisation. The owner's
+      // personal profile tier is intentionally left untouched (they pay for the
+      // org, not a personal plan). Invited members are covered by these seats.
+      await adminClient
+        .from('klippa_organisations')
+        .update({
+          subscription_status:  'active',
+          subscription_ends_at: end.toISOString(),
+          seat_count:           current.seats ?? 1,
+          updated_at:           now.toISOString(),
+        })
+        .eq('id', current.organisation_id)
+
+      console.log(`[ozow/notify] Org activated: org=${current.organisation_id} seats=${current.seats} amount=${Amount} txn=${TransactionId}`)
+    } else {
+      // ── Solo subscription ── upgrade the user's tier on their profile.
+      await adminClient
+        .from('klippa_profiles')
+        .update({
+          subscription_tier:    planToTier(plan),
+          subscription_ends_at: end.toISOString(),
+          updated_at:           now.toISOString(),
+        })
+        .eq('id', userId)
+    }
 
     // 3. If a discount promo was used, increment its used_count
     const { data: sub } = await adminClient

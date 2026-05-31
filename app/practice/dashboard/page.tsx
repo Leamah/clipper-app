@@ -118,6 +118,7 @@ export default function PracticeDashboard() {
         }),
       })
       const json = await res.json()
+      if (res.status === 402 && json.checkoutUrl) { router.push(json.checkoutUrl); return }
       if (json.error) throw new Error(json.error)
       setShowAdd(false); setForm(EMPTY_FORM)
       await loadClients()

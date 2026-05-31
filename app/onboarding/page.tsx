@@ -8,9 +8,10 @@ import { supabase } from '@/lib/supabase'
 import {
   ShieldCheck, ArrowRight, Loader2, Check,
   Car, Home, Building2, Shuffle,
-  UserRound, Users, BookOpen,
+  UserRound, Users, BookOpen, Minus, Plus,
 } from 'lucide-react'
 import type { EmploymentType, WorkLocation, UserType } from '@/lib/types'
+import { SEAT_PRICE_ANNUAL } from '@/lib/ozow'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -31,6 +32,7 @@ interface OnboardingState {
   user_type:  UserType
   org_name:   string
   org_type:   'company' | 'practice'
+  seat_count: number
   // Freelancer
   employment_type:    EmploymentType
   work_location:      WorkLocation
@@ -51,6 +53,7 @@ export default function OnboardingPage() {
     user_type:           'freelancer',
     org_name:            '',
     org_type:            'company',
+    seat_count:          1,
     employment_type:     'freelance',
     work_location:       'home_only',
     has_vehicle:         null,
@@ -163,8 +166,9 @@ export default function OnboardingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name:     state.org_name.trim(),
-          org_type: state.org_type,
+          name:       state.org_name.trim(),
+          org_type:   state.org_type,
+          seat_count: state.seat_count,
         }),
       })
       const json = await res.json()
@@ -233,6 +237,7 @@ export default function OnboardingPage() {
                     key={opt.type}
                     onClick={() => {
                       setState((s) => ({ ...s, user_type: opt.type, org_type: opt.type === 'practitioner' ? 'practice' : 'company' }))
+                      setStep(0)
                       setPhase(opt.type === 'freelancer' ? 'freelancer' : 'b2b')
                     }}
                     className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-edge hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group"
@@ -266,28 +271,35 @@ export default function OnboardingPage() {
                   </div>
                   <span className="font-semibold text-sm tracking-tight">Klippa</span>
                 </div>
-                <button onClick={() => { setPhase('pick'); setError(null) }} className="text-xs text-ink-2 hover:text-ink-1 transition-colors">
+                <button
+                  onClick={() => {
+                    if (step === 0) { setPhase('pick') } else { setStep(0) }
+                    setError(null)
+                  }}
+                  className="text-xs text-ink-2 hover:text-ink-1 transition-colors"
+                >
                   ← Back
                 </button>
               </div>
               <div className="h-1 rounded-full bg-raised overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-500 transition-all duration-500 w-full" />
+                <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: step === 0 ? '50%' : '100%' }} />
               </div>
             </div>
 
-            <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-6">
-              <div>
-                <h2 className="text-xl font-bold">
-                  {state.user_type === 'practitioner' ? 'Set up your practice' : 'Set up your company'}
-                </h2>
-                <p className="text-sm text-ink-2 mt-1">
-                  {state.user_type === 'practitioner'
-                    ? 'Create your practice workspace. You can invite clients once you\'re in.'
-                    : 'Create your company workspace. You can invite consultants once you\'re in.'}
-                </p>
-              </div>
+            {/* Step 0 — workspace name */}
+            {step === 0 && (
+              <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold">
+                    {state.user_type === 'practitioner' ? 'Set up your practice' : 'Set up your company'}
+                  </h2>
+                  <p className="text-sm text-ink-2 mt-1">
+                    {state.user_type === 'practitioner'
+                      ? 'Create your practice workspace. You can invite clients once you\'re in.'
+                      : 'Create your company workspace. You can invite consultants once you\'re in.'}
+                  </p>
+                </div>
 
-              <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-ink-2">
                     {state.user_type === 'practitioner' ? 'Practice / firm name' : 'Company name'}
@@ -296,29 +308,91 @@ export default function OnboardingPage() {
                     type="text"
                     value={state.org_name}
                     onChange={(e) => setState((s) => ({ ...s, org_name: e.target.value }))}
-                    onKeyDown={(e) => e.key === 'Enter' && handleB2BComplete()}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && state.org_name.trim()) { setError(null); next() } }}
                     placeholder={state.user_type === 'practitioner' ? 'e.g. Smith & Associates' : 'e.g. Klippa Consulting'}
                     className="input"
                     autoFocus
                   />
                 </div>
+
+                {error && (
+                  <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>
+                )}
+
+                <button
+                  onClick={() => { if (!state.org_name.trim()) { setError('Please enter a name'); return } setError(null); next() }}
+                  disabled={!state.org_name.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 disabled:opacity-50 transition-all shadow-lg shadow-emerald-900/30"
+                >
+                  Continue <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
+            )}
 
-              {error && (
-                <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>
-              )}
+            {/* Step 1 — how many seats */}
+            {step === 1 && (
+              <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold">How many seats do you need?</h2>
+                  <p className="text-sm text-ink-2 mt-1">
+                    One seat per {state.user_type === 'practitioner' ? 'team member' : 'consultant'} you invite to your workspace.
+                    You can change this later — you&apos;ll only pay when you {state.user_type === 'practitioner' ? 'add your first client' : 'invite your first consultant'}.
+                  </p>
+                </div>
 
-              <button
-                onClick={handleB2BComplete}
-                disabled={saving || !state.org_name.trim()}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 disabled:opacity-50 transition-all shadow-lg shadow-emerald-900/30"
-              >
-                {saving
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating workspace…</>
-                  : <>Create workspace <ArrowRight className="w-4 h-4" /></>
-                }
-              </button>
-            </div>
+                <div className="flex items-center justify-center gap-6 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setState((s) => ({ ...s, seat_count: Math.max(1, s.seat_count - 1) }))}
+                    disabled={state.seat_count <= 1}
+                    className="w-11 h-11 rounded-xl border border-edge flex items-center justify-center text-ink-1 hover:border-emerald-500/50 disabled:opacity-40 transition-all"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <div className="text-center min-w-[80px]">
+                    <p className="text-4xl font-bold tabular-nums">{state.seat_count}</p>
+                    <p className="text-xs text-ink-2 mt-0.5">{state.seat_count === 1 ? 'seat' : 'seats'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setState((s) => ({ ...s, seat_count: Math.min(500, s.seat_count + 1) }))}
+                    className="w-11 h-11 rounded-xl border border-edge flex items-center justify-center text-ink-1 hover:border-emerald-500/50 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-emerald-600/30 bg-emerald-950/20 px-4 py-3 flex items-center justify-between">
+                  <div className="text-xs">
+                    <p className="font-semibold text-emerald-300">R {SEAT_PRICE_ANNUAL.toLocaleString('en-ZA')} / seat / year</p>
+                    <p className="text-ink-2 mt-0.5">Billed once a year via instant EFT</p>
+                  </div>
+                  <p className="text-lg font-bold text-ink-1">
+                    R {(state.seat_count * SEAT_PRICE_ANNUAL).toLocaleString('en-ZA')}<span className="text-xs font-normal text-ink-2">/yr</span>
+                  </p>
+                </div>
+
+                {state.user_type === 'practitioner' && (
+                  <p className="text-xs text-ink-3">Includes managing up to 50 active clients. Need more? Contact us for enterprise pricing.</p>
+                )}
+
+                {error && (
+                  <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>
+                )}
+
+                <button
+                  onClick={handleB2BComplete}
+                  disabled={saving}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 disabled:opacity-50 transition-all shadow-lg shadow-emerald-900/30"
+                >
+                  {saving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating workspace…</>
+                    : <>Create workspace <ArrowRight className="w-4 h-4" /></>
+                  }
+                </button>
+                <p className="text-xs text-ink-3 text-center">No charge today — set up your workspace first.</p>
+              </div>
+            )}
           </div>
         )}
 

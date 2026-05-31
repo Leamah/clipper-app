@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Check, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
-import { PLANS, type PlanKey, type BillingCycle } from '@/lib/ozow'
+import { Check, ArrowRight, ShieldCheck, Zap, Users, Building2 } from 'lucide-react'
+import { PLANS, SEAT_PRICE_ANNUAL, PRACTICE_CLIENT_CAP, type PlanKey, type BillingCycle } from '@/lib/ozow'
 
 export default function PricingPage() {
   const [cycle, setCycle] = useState<BillingCycle>('monthly')
@@ -140,6 +140,64 @@ export default function PricingPage() {
               </Link>
             </div>
           ))}
+        </div>
+
+        {/* Teams & practices — per-seat */}
+        <div className="border-t border-edge/50 pt-16 space-y-6">
+          <div className="text-center space-y-2 max-w-xl mx-auto">
+            <h2 className="text-2xl font-bold tracking-tight">For teams & accounting practices</h2>
+            <p className="text-ink-2 text-sm leading-relaxed">
+              One simple seat price, billed once a year. Invite your team, manage their work, stay compliant together.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-5">
+            {/* Company */}
+            <div className="rounded-2xl border border-edge bg-surface/40 p-6 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center">
+                  <Users className="w-4.5 h-4.5 text-violet-300" />
+                </div>
+                <p className="text-sm font-semibold">Companies</p>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold">R {SEAT_PRICE_ANNUAL.toLocaleString('en-ZA')}</span>
+                <span className="text-xs text-ink-2">/ seat / year</span>
+              </div>
+              <ul className="space-y-2">
+                {['One seat per consultant you invite', 'Timesheets, approvals & payroll periods', 'Contracts & compliance tracking', 'Pay once a year — no monthly admin'].map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-xs text-ink-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />{f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Practice */}
+            <div className="rounded-2xl border border-emerald-600/40 bg-emerald-950/20 p-6 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                  <Building2 className="w-4.5 h-4.5 text-amber-300" />
+                </div>
+                <p className="text-sm font-semibold">Accounting practices</p>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold">R {SEAT_PRICE_ANNUAL.toLocaleString('en-ZA')}</span>
+                <span className="text-xs text-ink-2">/ seat / year</span>
+              </div>
+              <ul className="space-y-2">
+                {[`Manage up to ${PRACTICE_CLIENT_CAP} active clients`, 'Client document portals & checklists', 'Filing status & deadline tracking', 'Need more clients? Contact us for enterprise'].map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-xs text-ink-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />{f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-ink-3">
+            Set up your workspace free — you only pay when you invite your first team member or add your first client.
+          </p>
         </div>
 
         {/* FAQ row */}

@@ -230,12 +230,12 @@ export default function LandingPage() {
             <div className="absolute -inset-4 bg-emerald-600/10 blur-3xl rounded-full pointer-events-none" />
             <div className="relative rounded-2xl overflow-hidden border border-edge/70 shadow-2xl shadow-emerald-950/40 bg-surface">
               <video
-                className="w-full h-full object-cover"
+                className="w-full h-auto block"
                 autoPlay
                 muted
                 loop
                 playsInline
-                preload="metadata"
+                preload="auto"
                 aria-label="Klippa product preview"
               >
                 <source src="/influencer.mp4" type="video/mp4" />
