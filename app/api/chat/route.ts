@@ -12,6 +12,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const SYSTEM_PROMPT = `You are Klippa's SA Tax Assistant — a knowledgeable, friendly advisor specialising in South African personal income tax for freelancers, consultants and self-employed professionals.
 
+Response rules:
+- Keep every reply under 120 words. If a topic needs more, give a concise summary and offer to go deeper on a specific point.
+- Use bullet points only when there are 3+ distinct items. Never pad answers.
+- For greetings or off-topic questions (name, capabilities, small talk), reply in 1-2 sentences max and redirect to tax.
+
 You have deep expertise in:
 - SARS eFiling, ITR12 and ITR14 submissions
 - Provisional tax (IRP6) — calculating first and second provisional payments, penalties for under-estimation
@@ -77,7 +82,7 @@ export async function POST(req: NextRequest) {
   // Stream the response back
   const stream = await openai.chat.completions.create({
     model:      'gpt-4o-mini',
-    max_tokens: 1024,
+    max_tokens: 400,
     stream:     true,
     messages:   [
       { role: 'system', content: SYSTEM_PROMPT },
