@@ -22,12 +22,12 @@ function SuccessContent() {
         if (user) {
           const { data: profile } = await supabase
             .from('klippa_profiles')
-            .select('org_type')
+            .select('user_type')
             .eq('id', user.id)
             .single()
-          if (profile?.org_type === 'practice') setDashboard('/practice/dashboard')
-          else if (profile?.org_type === 'company') setDashboard('/org/dashboard')
-          // solo consultant → default '/dashboard' stays
+          if (profile?.user_type === 'practitioner')   setDashboard('/practice/dashboard')
+          else if (profile?.user_type === 'company_owner') setDashboard('/org/dashboard')
+          // solo freelancer → default '/dashboard' stays
         }
       } catch { /* keep default */ }
       setReady(true)
