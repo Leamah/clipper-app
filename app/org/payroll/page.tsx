@@ -56,7 +56,7 @@ export default function PayrollPage() {
       .single()
 
     if (!profile?.organisation_id) { router.replace('/dashboard'); return }
-    setIsOwner(profile.org_role === 'owner')
+    setIsOwner(profile.org_role === 'org-admin')
 
     const res  = await fetch('/api/org/payroll')
     const json = await res.json()

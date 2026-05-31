@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
   // Owns a different org — block (an owner can't also be a consultant elsewhere
   // on the same account; they'd lose access to their own org's data).
-  if (profile?.organisation_id && profile.org_role === 'owner') {
+  if (profile?.organisation_id && profile.org_role === 'org-admin') {
     return NextResponse.json(
       { error: 'You own an organisation on this account. Use a different email to join another organisation as a consultant.' },
       { status: 409 },

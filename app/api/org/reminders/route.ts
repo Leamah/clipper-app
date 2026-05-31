@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .single()
 
-  if (!callerProfile?.organisation_id || callerProfile.org_role !== 'owner')
+  if (!callerProfile?.organisation_id || callerProfile.org_role !== 'org-admin')
     return NextResponse.json({ error: 'Owners only' }, { status: 403 })
 
   const orgId = callerProfile.organisation_id
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     .from('klippa_profiles')
     .select('id, full_name')
     .eq('organisation_id', orgId)
-    .neq('org_role', 'owner')
+    .neq('org_role', 'org-admin')
 
   const targets = filterIds
     ? (members ?? []).filter(m => filterIds.includes(m.id))

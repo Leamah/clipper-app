@@ -105,7 +105,7 @@ export default function OrgDashboardPage() {
       .single()
 
     if (!profile?.organisation_id) { router.replace('/dashboard'); return }
-    setIsOwner(profile.org_role === 'owner')
+    setIsOwner(profile.org_role === 'org-admin')
 
     const { data: orgData } = await supabase
       .from('klippa_organisations')

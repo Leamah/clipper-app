@@ -134,7 +134,7 @@ export default function OrgSettingsPage() {
     setTimeout(() => setSaved(false), 2500)
   }
 
-  const isOwner = role === 'owner'
+  const isOwner = role === 'org-admin'
 
   if (loading) {
     return (
@@ -212,7 +212,7 @@ export default function OrgSettingsPage() {
                 </button>
               )}
             </div>
-            {!isOwner && <p className="text-xs text-ink-3 mt-1">Only the org owner can change the name.</p>}
+            {!isOwner && <p className="text-xs text-ink-3 mt-1">Only an org admin can change the name.</p>}
           </Field>
         </div>
 
@@ -276,7 +276,7 @@ export default function OrgSettingsPage() {
                 ) : (
                   <div className="flex items-center gap-1.5 text-ink-3">
                     <ImageIcon className="w-3.5 h-3.5" />
-                    <span className="text-xs">Only the org owner can change the logo.</span>
+                    <span className="text-xs">Only an org admin can change the logo.</span>
                   </div>
                 )}
                 <p className="text-xs text-ink-3">PNG, JPG, WebP or SVG · max 2 MB</p>
@@ -340,7 +340,7 @@ export default function OrgSettingsPage() {
                 </div>
                 <span>{org?.name ?? 'Organisation name'}</span>
               </div>
-              {!isOwner && <p className="text-xs text-ink-3">Only the org owner can change the brand colour.</p>}
+              {!isOwner && <p className="text-xs text-ink-3">Only an org admin can change the brand colour.</p>}
             </div>
           </Field>
         </div>

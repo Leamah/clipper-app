@@ -51,8 +51,8 @@ export async function PATCH(request: Request) {
     .eq('id', user.id)
     .single()
 
-  if (!profile?.organisation_id || profile.org_role !== 'owner') {
-    return NextResponse.json({ error: 'Only org owners can update settings' }, { status: 403 })
+  if (!profile?.organisation_id || profile.org_role !== 'org-admin') {
+    return NextResponse.json({ error: 'Only org admins can update settings' }, { status: 403 })
   }
 
   const body = await request.json()

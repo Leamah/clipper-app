@@ -30,7 +30,7 @@ export async function GET() {
     admin.from('klippa_profiles')
       .select('id, full_name, org_role, created_at')
       .eq('organisation_id', orgId)
-      .neq('org_role', 'owner'),
+      .neq('org_role', 'org-admin'),
 
     admin.from('klippa_payroll_periods')
       .select('*')

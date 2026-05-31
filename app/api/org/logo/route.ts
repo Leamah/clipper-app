@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .single()
 
-  if (!profile?.organisation_id || profile.org_role !== 'owner')
+  if (!profile?.organisation_id || profile.org_role !== 'org-admin')
     return NextResponse.json({ error: 'Owners only' }, { status: 403 })
 
   const formData = await request.formData()
@@ -82,7 +82,7 @@ export async function DELETE() {
     .eq('id', user.id)
     .single()
 
-  if (!profile?.organisation_id || profile.org_role !== 'owner')
+  if (!profile?.organisation_id || profile.org_role !== 'org-admin')
     return NextResponse.json({ error: 'Owners only' }, { status: 403 })
 
   // Remove any logo files for this org

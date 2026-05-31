@@ -36,7 +36,7 @@ export async function GET() {
     .from('klippa_profiles')
     .select('id, full_name, org_role, feature_timesheets, subscription_tier, created_at')
     .eq('organisation_id', orgId)
-    .neq('org_role', 'owner')
+    .neq('org_role', 'org-admin')
     .order('created_at', { ascending: true })
 
   if (membersErr) return NextResponse.json({ error: membersErr.message }, { status: 500 })
@@ -88,15 +88,15 @@ export async function DELETE(request: Request) {
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-  // Caller must be an org owner
+  // Caller must be an org admin
   const { data: callerProfile } = await admin
     .from('klippa_profiles')
     .select('organisation_id, org_role')
     .eq('id', user.id)
     .single()
 
-  if (!callerProfile?.organisation_id || callerProfile.org_role !== 'owner') {
-    return NextResponse.json({ error: 'Only org owners can remove members' }, { status: 403 })
+  if (!callerProfile?.organisation_id || callerProfile.org_role !== 'org-admin') {
+    return NextResponse.json({ error: 'Only org admins can remove members' }, { status: 403 })
   }
 
   // Prevent owner removing themselves

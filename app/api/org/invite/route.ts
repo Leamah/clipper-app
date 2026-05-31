@@ -23,15 +23,15 @@ export async function POST(request: Request) {
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
 
-  // Verify caller is an org owner
+  // Verify caller is an org admin
   const { data: profile } = await admin
     .from('klippa_profiles')
     .select('organisation_id, org_role')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.organisation_id || profile.org_role !== 'owner') {
-    return NextResponse.json({ error: 'Only org owners can send invites' }, { status: 403 })
+  if (!profile?.organisation_id || profile.org_role !== 'org-admin') {
+    return NextResponse.json({ error: 'Only org admins can send invites' }, { status: 403 })
   }
 
   const orgId = profile.organisation_id

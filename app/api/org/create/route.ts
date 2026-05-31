@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     .update({
       user_type:       org_type === 'practice' ? 'practitioner' : 'company_owner',
       organisation_id: org.id,
-      org_role:        'owner',
+      org_role:        'org-admin',
     })
     .eq('id', user.id)
 

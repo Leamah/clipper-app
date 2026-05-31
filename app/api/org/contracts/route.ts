@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   const admin   = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const profile = await getProfile(admin, user.id)
-  if (!profile?.organisation_id || profile.org_role !== 'owner')
+  if (!profile?.organisation_id || profile.org_role !== 'org-admin')
     return NextResponse.json({ error: 'Owners only' }, { status: 403 })
 
   const body = await request.json()
@@ -86,7 +86,7 @@ export async function PATCH(request: Request) {
 
   const admin   = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const profile = await getProfile(admin, user.id)
-  if (!profile?.organisation_id || profile.org_role !== 'owner')
+  if (!profile?.organisation_id || profile.org_role !== 'org-admin')
     return NextResponse.json({ error: 'Owners only' }, { status: 403 })
 
   const { id, ...updates } = await request.json()

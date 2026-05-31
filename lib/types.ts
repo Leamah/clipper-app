@@ -48,7 +48,16 @@ export type OcrStatus = 'pending' | 'processing' | 'complete' | 'failed'
 export type SubscriptionTier = 'free' | 'starter' | 'professional' | 'admin'
 export type UserType         = 'freelancer' | 'company_owner' | 'practitioner'
 export type OrgType          = 'company' | 'practice'
-export type OrgRole          = 'owner' | 'admin' | 'member'
+// 'org-admin' = manages the org (the creator + any invited managers).
+// 'member'    = a consultant who submits timesheets.
+export type OrgRole          = 'org-admin' | 'member'
+export type OrgPlan          = 'tier1' | 'tier2'
+
+// Plan limits — managers ('users') vs consultant seats.
+export const ORG_PLANS: Record<OrgPlan, { label: string; managers: number; seats: number }> = {
+  tier1: { label: 'Team',  managers: 3, seats: 50 },
+  tier2: { label: 'Scale', managers: 5, seats: Infinity },
+}
 
 // ── Database Row Types ─────────────────────────────────────
 
