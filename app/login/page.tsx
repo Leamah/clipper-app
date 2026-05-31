@@ -80,8 +80,14 @@ function LoginForm() {
         body:    JSON.stringify({ email: email.trim(), emailRedirectTo: callbackUrl }),
       })
       if (!otpRes.ok) {
-        const body = await otpRes.json().catch(() => ({}))
-        throw new Error((body as { error?: string }).error ?? 'Failed to send magic link')
+        // Use text() first so an HTML error page never throws a SyntaxError
+        const text = await otpRes.text().catch(() => '')
+        let errMsg = 'Failed to send magic link'
+        try {
+          const body = JSON.parse(text) as { error?: string }
+          if (body.error) errMsg = body.error
+        } catch { /* response was HTML — keep the default message */ }
+        throw new Error(errMsg)
       }
       setSent(true)
     } catch (err: unknown) {

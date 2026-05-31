@@ -1,26 +1,30 @@
 /**
  * POST /api/auth/send-otp
  *
- * Server-side magic-link proxy.  Uses createClient from @supabase/supabase-js
- * (NOT @supabase/ssr) so that:
- *   1. The correct /auth/v1/otp URL is constructed by the SDK (avoids 404 from
- *      manual URL concatenation with a misconfigured SUPABASE_URL).
- *   2. flowType:'implicit' is actually respected — @supabase/ssr's
- *      createBrowserClient hard-codes 'pkce', but @supabase/supabase-js uses
- *      the value you supply.
- *   3. No PKCE code-verifier is generated (server has no browser storage),
- *      so Supabase sends tokens in the URL hash (implicit flow) which our
- *      /auth/callback handles via setSession().
- *   4. No browser CORS restrictions — same-origin call to our own API route.
+ * Server-side magic-link proxy — sends the OTP via a direct server-to-Supabase
+ * HTTP request so the browser never touches Supabase (no CORS, no PKCE).
+ *
+ * We intentionally use a raw fetch (not the @supabase/supabase-js SDK) because
+ * the SDK tries to parse every response as JSON and will throw a SyntaxError if
+ * Supabase returns an HTML error page (e.g. project paused, bad URL).  With a
+ * raw fetch we read text() first so we can log the real body and always return
+ * a clean JSON response to the browser.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient }              from '@supabase/supabase-js'
+
+const SUPABASE_URL  = (process.env.NEXT_PUBLIC_SUPABASE_URL  ?? '').replace(/\/$/, '')
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
 export async function POST(req: NextRequest) {
   try {
+    if (!SUPABASE_URL || !SUPABASE_ANON) {
+      console.error('[send-otp] Missing SUPABASE env vars')
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+
     const { email, emailRedirectTo } = await req.json() as {
-      email: string
+      email?: string
       emailRedirectTo?: string
     }
 
@@ -28,28 +32,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 })
     }
 
-    // createClient from @supabase/supabase-js — NOT createBrowserClient from
-    // @supabase/ssr — so flowType:'implicit' is honoured.
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { auth: { flowType: 'implicit', autoRefreshToken: false, persistSession: false } }
-    )
+    const qs = emailRedirectTo
+      ? '?' + new URLSearchParams({ redirect_to: emailRedirectTo }).toString()
+      : ''
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo,
-        shouldCreateUser: true,
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp${qs}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'apikey':        SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
       },
+      body: JSON.stringify({
+        email,
+        create_user:           true,
+        data:                  {},
+        gotrue_meta_security:  {},
+        // No code_challenge → Supabase sends implicit-flow link (hash tokens)
+      }),
     })
 
-    if (error) {
-      console.error('[send-otp] Supabase error:', error)
-      return NextResponse.json(
-        { error: error.message },
-        { status: (error as any).status ?? 500 }
-      )
+    // Read as text first — if Supabase ever returns HTML (e.g. project paused)
+    // we want to log it rather than throw a SyntaxError.
+    const text = await res.text()
+
+    if (!res.ok) {
+      let msg = `Supabase error ${res.status}`
+      try {
+        const body = JSON.parse(text) as { msg?: string; message?: string; error?: string }
+        msg = body.msg ?? body.message ?? body.error ?? msg
+      } catch {
+        // HTML or non-JSON body — log it so we can debug
+        console.error('[send-otp] Non-JSON error body:', text.slice(0, 500))
+      }
+      return NextResponse.json({ error: msg }, { status: res.status })
     }
 
     return NextResponse.json({ ok: true })

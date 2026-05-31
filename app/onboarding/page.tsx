@@ -171,8 +171,11 @@ export default function OnboardingPage() {
           seat_count: state.seat_count,
         }),
       })
-      const json = await res.json()
+      const text = await res.text().catch(() => '')
+      let json: { error?: string } = {}
+      try { json = JSON.parse(text) } catch { /* non-JSON — leave json empty */ }
       if (json.error) throw new Error(json.error)
+      if (!res.ok) throw new Error('Failed to create organisation')
 
       router.replace(state.user_type === 'practitioner' ? '/practice/dashboard' : '/org/dashboard')
     } catch (e: unknown) {
