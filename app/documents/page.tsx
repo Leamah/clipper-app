@@ -124,7 +124,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-white">Upload document</h3>
+          <h3 className="font-semibold text-ink-1">Upload document</h3>
           <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
         </div>
 
@@ -242,12 +242,12 @@ function DocumentsPage() {
       <AppNav activePage="documents" />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-ink-1">Documents</h1>
-            <p className="text-sm text-ink-2 mt-0.5">{docs.length} documents uploaded</p>
+            <p className="text-sm text-ink-2 mt-1">{docs.length} documents uploaded</p>
           </div>
-          <button onClick={() => setShowUpload(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+          <button onClick={() => setShowUpload(true)} className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
             <Plus className="w-3.5 h-3.5" /> Upload
           </button>
         </div>

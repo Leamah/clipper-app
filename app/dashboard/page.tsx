@@ -195,12 +195,12 @@ export default function Dashboard() {
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
 
         {/* Header row */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-white">Tax year {taxYear}</h1>
-            <p className="text-sm text-ink-2 mt-0.5">ITR12 — Freelancer / Consultant</p>
+            <h1 className="text-2xl font-bold text-ink-1">Tax year {taxYear}</h1>
+            <p className="text-sm text-ink-2 mt-1">ITR12 — Freelancer / Consultant</p>
           </div>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+          <div className={`self-start sm:self-auto flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
             daysLeft > 30
               ? 'bg-raised text-ink-2'
               : daysLeft > 7

@@ -237,7 +237,7 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, onClose, onS
       <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-white">Add expense</h3>
+            <h3 className="font-semibold text-ink-1">Add expense</h3>
             {hasPrefill && (
               <p className="text-xs text-emerald-400 mt-0.5">Receipt scanned — check and confirm</p>
             )}
@@ -437,7 +437,7 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5 max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between flex-shrink-0">
-          <h3 className="font-semibold text-white">Import from CSV</h3>
+          <h3 className="font-semibold text-ink-1">Import from CSV</h3>
           <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
         </div>
 
@@ -615,10 +615,10 @@ function ExpensesPage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-white">Expenses</h1>
-            <p className="text-sm text-ink-2 mt-0.5">
+            <h1 className="text-xl font-bold text-ink-1">Expenses</h1>
+            <p className="text-sm text-ink-2 mt-1">
               {confirmed.length > 0
                 ? `${confirmed.length} confirmed · ${formatRand(totalDeductible)} deductible`
                 : 'No confirmed expenses yet'}
@@ -626,7 +626,7 @@ function ExpensesPage() {
           </div>
 
           {/* Action bar: Capture | CSV | Add */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center flex-wrap gap-1.5">
             <button
               onClick={() => captureRef.current?.click()}
               disabled={capturing}

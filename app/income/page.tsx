@@ -65,7 +65,7 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-white">Add income</h3>
+          <h3 className="font-semibold text-ink-1">Add income</h3>
           <button onClick={onClose} className="text-ink-2 hover:text-ink-1 transition-colors"><X className="w-4 h-4" /></button>
         </div>
 
@@ -221,7 +221,7 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5 max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between flex-shrink-0">
-          <h3 className="font-semibold text-white">Import from bank statement</h3>
+          <h3 className="font-semibold text-ink-1">Import from bank statement</h3>
           <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
         </div>
 
@@ -414,10 +414,10 @@ function IncomePage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-ink-1">Income</h1>
-            <p className="text-sm text-ink-2 mt-0.5">
+            <p className="text-sm text-ink-2 mt-1">
               {records.length > 0 ? `${records.length} records · Total ${formatRand(totalIncome)}` : 'No income records yet'}
             </p>
           </div>

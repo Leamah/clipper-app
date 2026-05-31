@@ -221,7 +221,7 @@ export default function ProvisionalPage() {
 
         {/* Header */}
         <div>
-          <h1 className="text-xl font-bold text-white">Provisional Tax (IRP6)</h1>
+          <h1 className="text-xl font-bold text-ink-1">Provisional Tax (IRP6)</h1>
           <p className="text-sm text-ink-2 mt-1">
             Tax year {runningYear} · 1 March {runningYear - 1} – 28 February {runningYear}
           </p>
