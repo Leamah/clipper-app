@@ -10,13 +10,20 @@ function getClient(): SupabaseClient {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         auth: {
-          flowType:           'implicit', // works on any device — no code-verifier lock
-          detectSessionInUrl: true,       // client reads token from URL hash on callback
+          flowType:           'implicit', // intended — see patch below
+          detectSessionInUrl: true,
           persistSession:     true,
           autoRefreshToken:   true,
         },
       }
     )
+    // @supabase/ssr 0.6.x hard-codes flowType:"pkce" AFTER spreading our auth
+    // options, silently overriding the value above.  Patch it back so that
+    // signInWithOtp() uses implicit flow (tokens in URL hash) and never
+    // generates a PKCE code-verifier — which was the source of "Failed to fetch"
+    // when that storage/crypto step threw before the network request was made.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(_client.auth as any).flowType = 'implicit'
   }
   return _client
 }

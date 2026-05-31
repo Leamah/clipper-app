@@ -70,22 +70,17 @@ function LoginForm() {
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
         : `${window.location.origin}/auth/callback`
 
-      // Send the OTP via a server-side proxy route instead of calling Supabase
-      // directly from the browser. Reasons:
-      //   • @supabase/ssr 0.6.x ignores flowType:'implicit' and hardcodes PKCE,
-      //     causing signInWithOtp to fail if PKCE cookie/crypto setup throws.
-      //   • The proxy bypasses any browser CORS restrictions on /auth/v1/otp.
-      //   • The server call omits code_challenge → Supabase sends an implicit-flow
-      //     link (hash tokens) which our /auth/callback already handles.
-      const otpRes = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), emailRedirectTo: callbackUrl }),
+      // Call Supabase directly via the SDK.
+      // lib/supabase.ts patches the @supabase/ssr client back to flowType:'implicit'
+      // right after construction (the library hard-codes 'pkce' and silently ignores
+      // our config option).  With flowType:'implicit', signInWithOtp() never generates
+      // a PKCE code-verifier — which was the root cause of "Failed to fetch" (the
+      // crypto/storage step threw before the network request was ever made).
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: callbackUrl },
       })
-      if (!otpRes.ok) {
-        const body = await otpRes.json().catch(() => ({}))
-        throw new Error((body as any).error || 'Failed to send magic link')
-      }
+      if (otpError) throw otpError
       setSent(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
