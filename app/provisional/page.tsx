@@ -81,7 +81,7 @@ function DeadlineCard({
         </button>
       </div>
       <div>
-        <p className="text-2xl font-bold text-white tabular-nums">{formatRand(amount)}</p>
+        <p className="text-2xl font-bold text-ink-1 tabular-nums">{formatRand(amount)}</p>
         <p className="text-xs text-ink-2 mt-0.5">{sub}</p>
       </div>
     </div>

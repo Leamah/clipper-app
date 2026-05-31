@@ -471,7 +471,7 @@ function ProfileCompletionCard({ completion }: { completion: ProfileCompletionRe
             className="transition-all duration-700"
           />
         </svg>
-        <span className={`absolute inset-0 flex items-center justify-center text-sm font-bold ${complete ? 'text-emerald-400' : 'text-white'}`}>
+        <span className={`absolute inset-0 flex items-center justify-center text-sm font-bold ${complete ? 'text-emerald-400' : 'text-ink-1'}`}>
           {pct}%
         </span>
       </div>
@@ -534,7 +534,7 @@ function MetricCard({ label, value, sub, color, icon, highlight }: {
         {icon}
         {label}
       </div>
-      <p className="text-2xl font-bold text-white tabular-nums">{value}</p>
+      <p className="text-2xl font-bold text-ink-1 tabular-nums">{value}</p>
       <p className="text-xs text-ink-2" dangerouslySetInnerHTML={{ __html: sub }} />
     </motion.div>
   )
