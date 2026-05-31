@@ -135,7 +135,7 @@ export default function TaxChatbot() {
               </div>
               <div>
                 <p className="text-xs font-semibold text-ink-1">SA Tax Assistant</p>
-                <p className="text-[10px] text-emerald-400">Powered by Claude · SARS-aware</p>
+                <p className="text-[10px] text-emerald-400">Powered by GPT-4o mini · SARS-aware</p>
               </div>
             </div>
             <div className="flex items-center gap-1">

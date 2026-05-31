@@ -4,7 +4,7 @@
  * Streaming Claude-powered SA tax assistant.
  * Requires the user to have a paid subscription tier (starter / professional / admin).
  */
-import Anthropic                from '@anthropic-ai/sdk'
+import OpenAI                   from 'openai'
 import { createServerClient }   from '@supabase/ssr'
 import { createClient }         from '@supabase/supabase-js'
 import { cookies }              from 'next/headers'
@@ -67,19 +67,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 })
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY
-  if (!anthropicKey) {
+  const openaiKey = process.env.OPENAI_API_KEY
+  if (!openaiKey) {
     return NextResponse.json({ error: 'AI not configured' }, { status: 500 })
   }
 
-  const anthropic = new Anthropic({ apiKey: anthropicKey })
+  const openai = new OpenAI({ apiKey: openaiKey })
 
   // Stream the response back
-  const stream = await anthropic.messages.stream({
-    model:      'claude-haiku-4-5',
+  const stream = await openai.chat.completions.create({
+    model:      'gpt-4o-mini',
     max_tokens: 1024,
-    system:     SYSTEM_PROMPT,
-    messages,
+    stream:     true,
+    messages:   [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...messages,
+    ],
   })
 
   const encoder = new TextEncoder()
@@ -87,12 +90,8 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         for await (const chunk of stream) {
-          if (
-            chunk.type === 'content_block_delta' &&
-            chunk.delta.type === 'text_delta'
-          ) {
-            controller.enqueue(encoder.encode(chunk.delta.text))
-          }
+          const text = chunk.choices[0]?.delta?.content ?? ''
+          if (text) controller.enqueue(encoder.encode(text))
         }
       } finally {
         controller.close()
