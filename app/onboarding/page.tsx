@@ -159,7 +159,7 @@ export default function OnboardingPage() {
       const json = await res.json()
       if (json.error) throw new Error(json.error)
 
-      router.replace('/org/dashboard')
+      router.replace(state.user_type === 'practitioner' ? '/practice/dashboard' : '/org/dashboard')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
       setSaving(false)

@@ -352,6 +352,60 @@ export interface OrgIntelligence {
   consultants:         OrgConsultantRow[]
 }
 
+// ── Practice (Accounting) Types ────────────────────────────
+
+export type ClientEntityType = 'individual' | 'sole_prop' | 'company' | 'trust'
+export type ClientReturnType = 'ITR12' | 'IRP6' | 'ITR14' | 'IT12TR'
+export type FilingStatus =
+  | 'not_started' | 'collecting' | 'in_progress' | 'review' | 'filed' | 'assessed'
+
+export const FILING_STATUS_FLOW: FilingStatus[] =
+  ['not_started', 'collecting', 'in_progress', 'review', 'filed', 'assessed']
+
+export const FILING_STATUS_LABELS: Record<FilingStatus, string> = {
+  not_started: 'Not started',
+  collecting:  'Collecting docs',
+  in_progress: 'In progress',
+  review:      'Client review',
+  filed:       'Filed',
+  assessed:    'Assessed',
+}
+
+export const ENTITY_TYPE_LABELS: Record<ClientEntityType, string> = {
+  individual: 'Individual',
+  sole_prop:  'Sole Proprietor',
+  company:    'Company',
+  trust:      'Trust',
+}
+
+export interface KlippaPracticeClient {
+  id:              string
+  organisation_id: string
+  client_user_id:  string | null
+  full_name:       string
+  email:           string | null
+  entity_type:     ClientEntityType
+  tax_number:      string | null
+  return_type:     ClientReturnType
+  tax_year:        number
+  filing_status:   FilingStatus
+  deadline:        string | null
+  fee:             number
+  fee_paid:        boolean
+  status:          'active' | 'archived'
+  notes:           string | null
+  created_at:      string
+  updated_at:      string
+}
+
+export interface PracticeStats {
+  total_clients:    number
+  due_soon:         number   // deadline within 14 days, not yet filed
+  filed_count:      number   // filed or assessed this tax year
+  in_progress:      number   // collecting | in_progress | review
+  outstanding_fees: number   // sum of unpaid fees
+}
+
 // ── Tier Feature Config ────────────────────────────────────
 
 export interface KlippaTierFeature {

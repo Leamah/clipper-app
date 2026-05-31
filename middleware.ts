@@ -61,8 +61,10 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    const isAdmin  = profile?.subscription_tier === 'admin'
-    const isOrgUser = profile?.user_type === 'company_owner' || profile?.user_type === 'practitioner'
+    const isAdmin       = profile?.subscription_tier === 'admin'
+    const isPractitioner = profile?.user_type === 'practitioner'
+    const isOrgUser     = profile?.user_type === 'company_owner' || isPractitioner
+    const orgHome       = isPractitioner ? '/practice/dashboard' : '/org/dashboard'
 
     // Admin routes: require subscription_tier === 'admin'
     if (isAdminRoute || isApiAdminRoute) {
@@ -76,7 +78,7 @@ export async function middleware(request: NextRequest) {
     if (pathname === '/login' && request.nextUrl.searchParams.get('signedout') !== '1') {
       const home = !profile?.onboarding_complete
         ? '/onboarding'
-        : isOrgUser ? '/org/dashboard' : '/dashboard'
+        : isOrgUser ? orgHome : '/dashboard'
       return NextResponse.redirect(new URL(home, request.url))
     }
 

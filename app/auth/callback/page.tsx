@@ -63,7 +63,9 @@ export default function AuthCallback() {
         router.replace('/onboarding')
       } else if (next && next.startsWith('/')) {
         router.replace(next)
-      } else if (profile.user_type === 'company_owner' || profile.user_type === 'practitioner') {
+      } else if (profile.user_type === 'practitioner') {
+        router.replace('/practice/dashboard')
+      } else if (profile.user_type === 'company_owner') {
         router.replace('/org/dashboard')
       } else {
         router.replace('/dashboard')
