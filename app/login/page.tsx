@@ -70,13 +70,22 @@ function LoginForm() {
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
         : `${window.location.origin}/auth/callback`
 
-      const { error: authError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          emailRedirectTo: callbackUrl,
-        },
+      // Send the OTP via a server-side proxy route instead of calling Supabase
+      // directly from the browser. Reasons:
+      //   • @supabase/ssr 0.6.x ignores flowType:'implicit' and hardcodes PKCE,
+      //     causing signInWithOtp to fail if PKCE cookie/crypto setup throws.
+      //   • The proxy bypasses any browser CORS restrictions on /auth/v1/otp.
+      //   • The server call omits code_challenge → Supabase sends an implicit-flow
+      //     link (hash tokens) which our /auth/callback already handles.
+      const otpRes = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), emailRedirectTo: callbackUrl }),
       })
-      if (authError) throw authError
+      if (!otpRes.ok) {
+        const body = await otpRes.json().catch(() => ({}))
+        throw new Error((body as any).error || 'Failed to send magic link')
+      }
       setSent(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')

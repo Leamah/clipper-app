@@ -14,6 +14,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/auth/') ||
     pathname === '/api/payments/ozow/notify' ||
+    pathname === '/api/auth/send-otp' ||   // public: no session needed to request a magic link
     pathname.startsWith('/portal/') ||
     pathname.startsWith('/api/portal/')
   ) {
