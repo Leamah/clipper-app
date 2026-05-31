@@ -2,8 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useSearchParams }       from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams }                 from 'next/navigation'
 import Link                                 from 'next/link'
 import {
   ShieldCheck, ArrowLeft, ArrowRight, Loader2, AlertCircle,
@@ -23,7 +23,7 @@ interface Billing {
   client_cap:           number
 }
 
-export default function OrgBillingPage() {
+function OrgBillingContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const gated        = searchParams.get('gate') === '1'
@@ -201,5 +201,13 @@ export default function OrgBillingPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function OrgBillingPage() {
+  return (
+    <Suspense>
+      <OrgBillingContent />
+    </Suspense>
   )
 }
