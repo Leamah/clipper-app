@@ -340,6 +340,12 @@ export default function TimesheetsPage() {
   const [savingPdf,       setSavingPdf]        = useState(false)
   const [saveMsg,         setSaveMsg]          = useState<string | null>(null)
   const [orgBranding,     setOrgBranding]      = useState<OrgBranding | null>(null)
+  const [showExport,      setShowExport]       = useState(false)
+  const [exportFrom,      setExportFrom]       = useState('')
+  const [exportTo,        setExportTo]         = useState('')
+  const [exporting,       setExporting]        = useState(false)
+  const [exportErr,       setExportErr]        = useState<string | null>(null)
+  const [dupDates,        setDupDates]         = useState<string[]>([])
 
   // ── Load profile & clients ────────────────────────────
   useEffect(() => {
@@ -431,6 +437,79 @@ export default function TimesheetsPage() {
   useEffect(() => {
     loadTimesheet()
   }, [loadTimesheet])
+
+  // ── Detect days logged on another timesheet (double-billing guard) ─
+  useEffect(() => {
+    async function checkDupes() {
+      if (!timesheet || !profile || entries.length === 0) { setDupDates([]); return }
+      const dates = entries.map(e => e.entry_date)
+      const { data } = await supabase
+        .from('klippa_timesheet_entries')
+        .select('entry_date, timesheet_id')
+        .eq('user_id', profile.id)
+        .in('entry_date', dates)
+      const dupes = Array.from(new Set(
+        (data ?? [])
+          .filter(r => r.timesheet_id !== timesheet.id)
+          .map(r => r.entry_date as string)
+      )).sort()
+      setDupDates(dupes)
+    }
+    checkDupes()
+  }, [timesheet, profile, entries])
+
+  // ── Export merged range to PDF ────────────────────────
+  async function generateExport() {
+    if (!activeClient || !profile) return
+    setExporting(true)
+    setExportErr(null)
+    try {
+      const lo = (exportFrom <= exportTo ? exportFrom : exportTo) + '-01'
+      const hi = (exportFrom <= exportTo ? exportTo : exportFrom) + '-01'
+      const { data: sheets } = await supabase
+        .from('klippa_timesheets')
+        .select('*')
+        .eq('client_id', activeClient.id)
+        .gte('month', lo)
+        .lte('month', hi)
+        .order('month')
+      const list = (sheets ?? []) as KlippaTimesheet[]
+      if (list.length === 0) { setExportErr('No timesheets in that range'); return }
+
+      const ids = list.map(s => s.id)
+      const { data: ents } = await supabase
+        .from('klippa_timesheet_entries')
+        .select('*')
+        .in('timesheet_id', ids)
+        .order('entry_date')
+      const allEntries = (ents ?? []) as KlippaTimesheetEntry[]
+      const months = list.map(s => ({
+        monthISO: s.month,
+        entries:  allEntries.filter(e => e.timesheet_id === s.id),
+      }))
+
+      const latest = list[list.length - 1]
+      const { exportMergedTimesheetPDF } = await import('@/lib/pdf-export')
+      await exportMergedTimesheetPDF(
+        {
+          consultant_name:      latest.consultant_name ?? profile.full_name,
+          position:             latest.position ?? activeClient.position,
+          client_name:          activeClient.name,
+          client_contact:       activeClient.contact,
+          hourly_rate:          latest.hourly_rate,
+          consultant_signed_at: latest.consultant_signed_at,
+          client_signed_at:     latest.client_signed_at,
+        },
+        months,
+        { branding: orgBranding ?? undefined },
+      )
+      setShowExport(false)
+    } catch {
+      setExportErr('Export failed — try again')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   // ── Entry map for fast lookup ─────────────────────────
   const entryMap = new Map<string, KlippaTimesheetEntry>()
@@ -588,21 +667,6 @@ export default function TimesheetsPage() {
       setSavingPdf(false)
       setTimeout(() => setSaveMsg(null), 4000)
     }
-  }
-
-  // ── Export PDF ────────────────────────────────────────
-  async function handleExportPDF() {
-    if (!timesheet) return
-    const { exportTimesheetPDF } = await import('@/lib/pdf-export')
-    await exportTimesheetPDF(
-      {
-        ...timesheet,
-        client_name:    activeClient?.name,
-        client_contact: activeClient?.contact ?? undefined,
-      },
-      entries,
-      { branding: orgBranding ?? undefined },
-    )
   }
 
   // ── Handle new client ─────────────────────────────────
@@ -789,6 +853,19 @@ export default function TimesheetsPage() {
           </span>
         </div>
 
+        {/* Double-billing warning */}
+        {dupDates.length > 0 && (
+          <div className="mb-4 flex items-start gap-2 text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>
+              <span className="font-semibold">Heads up — </span>
+              {dupDates.length === 1 ? 'this day is' : 'these days are'} also logged on another timesheet:{' '}
+              {dupDates.map(d => format(new Date(d + 'T00:00:00'), 'd MMM')).join(', ')}.
+              {' '}Check you&apos;re not double-billing.
+            </span>
+          </div>
+        )}
+
         {/* Calendar header — only meaningful in the 7-col week view */}
         <div className="hidden sm:grid grid-cols-7 gap-1.5 mb-1.5">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
@@ -932,7 +1009,10 @@ export default function TimesheetsPage() {
               <span className="text-xs text-emerald-400 mr-1">{saveMsg}</span>
             )}
             <button
-              onClick={handleExportPDF}
+              onClick={() => {
+                const m = format(currentMonth, 'yyyy-MM')
+                setExportFrom(m); setExportTo(m); setExportErr(null); setShowExport(true)
+              }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-edge hover:border-raised text-ink-2 hover:text-ink-1 text-sm transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
@@ -953,6 +1033,66 @@ export default function TimesheetsPage() {
       {/* New client panel */}
       {showNewClient && (
         <NewClientPanel userId={profile!.id} onSave={handleNewClient} onClose={() => setShowNewClient(false)} />
+      )}
+
+      {/* Export range modal */}
+      {showExport && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-surface border border-edge rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-semibold text-base flex items-center gap-2">
+                <Download className="w-4 h-4 text-emerald-400" />
+                Export timesheet
+              </h2>
+              <button onClick={() => setShowExport(false)} className="text-ink-2 hover:text-ink-1">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-ink-2 mb-5">
+              Export <span className="text-ink-1 font-medium">{activeClient?.name}</span>. Pick a single month, or a
+              range to merge consecutive months into one PDF.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-ink-2 mb-1">From</label>
+                <input
+                  type="month"
+                  value={exportFrom}
+                  onChange={e => setExportFrom(e.target.value)}
+                  className="w-full bg-raised border border-edge rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ink-2 mb-1">To</label>
+                <input
+                  type="month"
+                  value={exportTo}
+                  onChange={e => setExportTo(e.target.value)}
+                  className="w-full bg-raised border border-edge rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {exportErr && <p className="text-xs text-red-400 mt-3">{exportErr}</p>}
+
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={() => setShowExport(false)}
+                className="flex-1 px-4 py-2 rounded-lg border border-edge text-sm text-ink-2 hover:text-ink-1 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={generateExport}
+                disabled={exporting || !exportFrom || !exportTo}
+                className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {exporting ? 'Generating…' : 'Generate PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

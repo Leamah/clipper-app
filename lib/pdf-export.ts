@@ -272,6 +272,221 @@ export async function exportTimesheetPDF(
   doc.save(fileName)
 }
 
+// ── Merged (multi-month) Timesheet PDF ────────────────────
+// One client (contractor) across one or more consecutive months,
+// combined into a single document with a period label, per-month
+// sub-tables, a combined total and a single sign-off section.
+
+export async function exportMergedTimesheetPDF(
+  meta: {
+    consultant_name?:      string | null
+    position?:             string | null
+    client_name?:          string | null
+    client_contact?:       string | null
+    hourly_rate?:          number | null
+    consultant_signed_at?: string | null
+    client_signed_at?:     string | null
+  },
+  months:   { monthISO: string; entries: KlippaTimesheetEntry[] }[],
+  options?: { blob?: boolean; branding?: OrgBranding },
+): Promise<void | Blob> {
+  const branding    = options?.branding
+  const ACCENT      = branding?.brandColor ? hexToRgb(branding.brandColor) : EMERALD
+  const logoDataUrl = branding?.logoUrl    ? await fetchImageAsDataUrl(branding.logoUrl) : null
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  const sorted     = [...months].sort((a, b) => a.monthISO.localeCompare(b.monthISO))
+  const firstLabel = sorted.length ? format(new Date(sorted[0].monthISO + 'T00:00:00'), 'MMMM yyyy') : ''
+  const lastLabel  = sorted.length ? format(new Date(sorted[sorted.length - 1].monthISO + 'T00:00:00'), 'MMMM yyyy') : ''
+  const periodLabel = firstLabel === lastLabel ? firstLabel : `${firstLabel} – ${lastLabel}`
+
+  // ── Header block ─────────────────────────────────────────
+  doc.setFillColor(...ZINC900)
+  doc.rect(0, 0, 210, 40, 'F')
+  doc.setFillColor(...ACCENT)
+  doc.rect(0, 0, 6, 40, 'F')
+
+  if (logoDataUrl) {
+    try { doc.addImage(logoDataUrl, 'PNG', 175, 5, 24, 24) } catch { /* skip */ }
+  } else {
+    doc.setFillColor(...ACCENT)
+    doc.roundedRect(175, 8, 22, 22, 3, 3, 'F')
+    doc.setTextColor(...WHITE)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text(branding?.orgName?.charAt(0)?.toUpperCase() ?? 'K', 186, 22, { align: 'center' })
+  }
+
+  doc.setTextColor(...ACCENT)
+  doc.setFontSize(18)
+  doc.setFont('helvetica', 'bold')
+  doc.text('TIMESHEET', 14, 14)
+
+  doc.setTextColor(...WHITE)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`Period: ${periodLabel}`,                          14, 22)
+  doc.text(`Consultant: ${meta.consultant_name ?? ''}`,        14, 28)
+  doc.text(`Position: ${meta.position ?? ''}`,                 14, 34)
+  doc.text(`Client company: ${meta.client_name ?? ''}`,       115, 22)
+  doc.text(`Client contact: ${meta.client_contact ?? ''}`,    115, 28)
+  if (meta.hourly_rate) {
+    doc.text(`Hourly rate: ${fmtRand(meta.hourly_rate)}`,     115, 34)
+  }
+
+  // ── Per-month tables ─────────────────────────────────────
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  let totalHours = 0
+  let startY     = 44
+
+  for (const grp of sorted) {
+    const monthDate = new Date(grp.monthISO + 'T00:00:00')
+    const year      = monthDate.getFullYear()
+    const month0    = monthDate.getMonth()
+    const daysCount = getDaysInMonth(monthDate)
+
+    const entryMap = new Map<string, KlippaTimesheetEntry>()
+    for (const e of grp.entries) entryMap.set(e.entry_date, e)
+
+    const rows: (string | number)[][] = []
+    let monthHours = 0
+
+    for (let d = 1; d <= daysCount; d++) {
+      const dateObj = new Date(year, month0, d)
+      const iso     = format(dateObj, 'yyyy-MM-dd')
+      const dayName = dayNames[getDay(dateObj)]
+      const holiday = getSAHolidayName(iso)
+      const entry   = entryMap.get(iso)
+      const isWkend = getDay(dateObj) === 0 || getDay(dateObj) === 6
+
+      let hoursCell = '', noteCell = ''
+      if (entry) {
+        hoursCell = String(entry.hours)
+        noteCell  = entry.comment ?? ''
+        monthHours += Number(entry.hours)
+      } else if (isWkend) {
+        noteCell = 'Weekend'
+      } else if (holiday) {
+        noteCell = `Public Holiday — ${holiday}`
+      }
+      rows.push([d, iso, dayName, hoursCell, noteCell])
+    }
+    totalHours += monthHours
+
+    autoTable(doc, {
+      startY,
+      head: [
+        [{ content: `${format(monthDate, 'MMMM yyyy')}  —  ${monthHours} hrs`, colSpan: 5 }],
+        ['#', 'Date', 'Day', 'Hours', 'Notes / Comments'],
+      ] as never,
+      body: rows,
+      theme: 'grid',
+      styles:     { fontSize: 8, cellPadding: 2, textColor: [30, 30, 30] },
+      headStyles: { fillColor: ACCENT, textColor: WHITE, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 16, halign: 'center' },
+        4: { cellWidth: 'auto' },
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body') {
+          const note = String(data.row.cells[4]?.raw ?? '')
+          if (note === 'Weekend') {
+            data.cell.styles.fillColor = [240, 240, 240]
+            data.cell.styles.textColor = [160, 160, 160]
+          } else if (note.startsWith('Public Holiday')) {
+            data.cell.styles.fillColor = [254, 243, 199]
+            data.cell.styles.textColor = [146, 64, 14]
+          }
+        }
+      },
+    })
+    startY = (doc as any).lastAutoTable.finalY + 6
+  }
+
+  // ── Combined total + sign-off (page-break safe) ──────────
+  const pageH    = doc.internal.pageSize.getHeight()
+  const boxH     = 36
+  const BLOCK_H  = 8 + 10 + boxH + 8
+  const billable = meta.hourly_rate ? totalHours * meta.hourly_rate : null
+
+  let cursorY = startY + 2
+  if (cursorY + BLOCK_H > pageH - 14) {
+    doc.addPage()
+    cursorY = 20
+  }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(30, 30, 30)
+  doc.text(`Total Hours: ${totalHours}`, 14, cursorY)
+  if (billable !== null) {
+    doc.text(`Billable Amount: ${fmtRand(billable)}`, 80, cursorY)
+  }
+
+  const sigY = cursorY + 10
+  const signBox = (x: number, title: string, line1: string, line2: string, signedAt?: string | null) => {
+    doc.setDrawColor(...ZINC700)
+    doc.setLineWidth(0.3)
+    doc.rect(x, sigY, 87, boxH)
+    doc.setFillColor(...ZINC900)
+    doc.rect(x, sigY, 87, 7, 'F')
+    doc.setTextColor(...WHITE)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text(title, x + 3.5, sigY + 5)
+    doc.setTextColor(30, 30, 30)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.text(line1, x + 3, sigY + 13)
+    doc.text(line2, x + 3, sigY + 18)
+    doc.setDrawColor(120, 120, 120)
+    doc.text('Signature:', x + 3, sigY + 28)
+    doc.line(x + 22, sigY + 28, x + 84, sigY + 28)
+    doc.text('Date:', x + 3, sigY + 34)
+    doc.line(x + 16, sigY + 34, x + 50, sigY + 34)
+    if (signedAt) {
+      const d = new Date(signedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+      doc.setTextColor(...ACCENT)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Digitally signed', x + 24, sigY + 27)
+      doc.text(d, x + 18, sigY + 33)
+      doc.setTextColor(30, 30, 30)
+      doc.setFont('helvetica', 'normal')
+    }
+  }
+
+  signBox(14,  'CONSULTANT',
+    `Name: ${meta.consultant_name ?? ''}`,
+    `Position: ${meta.position ?? ''}`,
+    meta.consultant_signed_at)
+  signBox(109, 'CLIENT / AUTHORISED SIGNATORY',
+    `Name: ${meta.client_contact ?? ''}`,
+    `Company: ${meta.client_name ?? ''}`,
+    meta.client_signed_at)
+
+  // ── Footer branding ──────────────────────────────────────
+  doc.setTextColor(150, 150, 150)
+  doc.setFontSize(7)
+  const footerOrg = branding?.orgName ?? 'Klippa'
+  doc.text(`Generated by ${footerOrg} via Klippa | klippa.co.za`, 14, pageH - 7)
+
+  const orgPrefix = (branding?.orgName ?? 'Klippa').replace(/[^a-zA-Z0-9]/g, '_')
+  const rangeTag  = sorted.length
+    ? `${sorted[0].monthISO.slice(0, 7)}_${sorted[sorted.length - 1].monthISO.slice(0, 7)}`
+    : 'period'
+  const fileName  = `${orgPrefix}_Timesheet_${meta.client_name ?? 'Client'}_${rangeTag}.pdf`
+    .replace(/[^a-zA-Z0-9_.-]/g, '_')
+
+  if (options?.blob) {
+    return doc.output('blob')
+  }
+  doc.save(fileName)
+}
+
 // ── SARS Logbook PDF ──────────────────────────────────────
 
 export async function exportLogbookPDF(
