@@ -40,6 +40,25 @@ export async function POST(request: Request) {
   )
 
   if (Status === 'Complete') {
+    // ── Idempotency guard ─────────────────────────────────────
+    // Ozow retries on non-200 and a captured callback can be replayed. Only
+    // process a 'Complete' once: if this subscription is already active, ack
+    // and stop so we never re-extend the period or re-increment a promo.
+    const { data: current } = await adminClient
+      .from('klippa_subscriptions')
+      .select('status')
+      .eq('ozow_reference', ozowRef)
+      .single()
+
+    if (!current) {
+      console.error(`[ozow/notify] No subscription for ref=${ozowRef} — ignoring`)
+      return NextResponse.json({ received: true })
+    }
+    if (current.status === 'active') {
+      console.log(`[ozow/notify] Replay ignored — ref=${ozowRef} already active`)
+      return NextResponse.json({ received: true, idempotent: true })
+    }
+
     const now   = new Date()
     const start = now
     const end   = billingCycle === 'annual'

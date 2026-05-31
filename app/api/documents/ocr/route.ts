@@ -44,12 +44,24 @@ export async function POST(request: NextRequest) {
 
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
-  const mimeType = file.type || 'image/jpeg'
+  // ── Validate before reading the whole file into memory ────
+  const MAX_BYTES     = 15 * 1024 * 1024  // 15 MB
+  const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp', 'application/pdf']
+  const mimeType = file.type || 'application/octet-stream'
+  if (file.size === 0)
+    return NextResponse.json({ error: 'File is empty' }, { status: 400 })
+  if (file.size > MAX_BYTES)
+    return NextResponse.json({ error: 'File is larger than 15 MB' }, { status: 413 })
+  if (!ALLOWED_MIMES.includes(mimeType))
+    return NextResponse.json({ error: 'Only images and PDF files are allowed' }, { status: 415 })
+
   const buffer   = Buffer.from(await file.arrayBuffer())
   const base64   = buffer.toString('base64')
 
   // ── Store in Supabase Storage ─────────────────────────────
-  const storageKey = `${user.id}/${taxYear ?? 'general'}/${Date.now()}_${file.name}`
+  // Sanitise the filename — never interpolate raw user input into a storage key.
+  const safeName   = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'upload'
+  const storageKey = `${user.id}/${taxYear ?? 'general'}/${Date.now()}_${safeName}`
   const { error: uploadErr } = await supabase.storage
     .from('klippa_documents')
     .upload(storageKey, buffer, { contentType: mimeType, upsert: false })

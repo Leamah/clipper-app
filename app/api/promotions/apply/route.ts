@@ -83,12 +83,7 @@ export async function POST(request: Request) {
       free_submissions_remaining: 0,
     })
 
-    // Increment used_count
-    await adminClient
-      .from('klippa_promotions')
-      .update({ used_count: promo.id }) // use raw SQL increment below
-      .eq('id', promo.id)
-
+    // Increment used_count (atomic; defined as a SECURITY DEFINER rpc)
     await adminClient.rpc('increment_promo_used', { promo_id: promo.id })
 
     return NextResponse.json({
