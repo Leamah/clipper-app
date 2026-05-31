@@ -171,21 +171,21 @@ export default function OrgDashboardPage() {
               </div>
               <span className="font-semibold text-sm tracking-tight">Klippa</span>
             </Link>
-            <span className="text-edge">·</span>
-            <span className="text-sm font-medium text-ink-2">{org?.name ?? 'Organisation'}</span>
+            <span className="text-edge hidden sm:inline">·</span>
+            <span className="text-sm font-medium text-ink-2 hidden sm:inline truncate max-w-[40vw]">{org?.name ?? 'Organisation'}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/org/payroll" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
-              <CalendarDays className="w-3.5 h-3.5" /> Payroll
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link href="/org/payroll" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
+              <CalendarDays className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Payroll</span>
             </Link>
-            <Link href="/org/consultants" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-              <Users className="w-3.5 h-3.5" /> Team
+            <Link href="/org/consultants" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+              <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Team</span>
             </Link>
             <Link href="/org/settings" className="p-2 rounded-lg text-ink-2 hover:text-ink-1 hover:bg-raised border border-edge transition-colors">
               <Settings className="w-3.5 h-3.5" />
             </Link>
-            <Link href="/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" /> My profile
+            <Link href="/dashboard" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">My profile</span>
             </Link>
           </div>
         </div>
@@ -351,7 +351,7 @@ export default function OrgDashboardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-edge/50 bg-surface/40">
                     {['Consultant', 'Contract', 'Compliance', 'Timesheet', ''].map(h => (

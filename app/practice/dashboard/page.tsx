@@ -183,20 +183,20 @@ export default function PracticeDashboard() {
               </div>
               <span className="font-semibold text-sm tracking-tight">Klippa</span>
             </Link>
-            <span className="text-edge">·</span>
-            <span className="text-sm font-medium text-ink-2">{orgName}</span>
+            <span className="text-edge hidden sm:inline">·</span>
+            <span className="text-sm font-medium text-ink-2 hidden sm:inline truncate max-w-[32vw]">{orgName}</span>
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400">PRACTICE</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors">
-              <Plus className="w-3.5 h-3.5" /> Add client
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors">
+              <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Add client</span>
             </button>
             <Link href="/org/settings" className="p-2 rounded-lg text-ink-2 hover:text-ink-1 hover:bg-raised border border-edge transition-colors">
               <FileText className="w-3.5 h-3.5" />
             </Link>
-            <Link href="/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" /> My profile
+            <Link href="/dashboard" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">My profile</span>
             </Link>
           </div>
         </div>
@@ -244,7 +244,7 @@ export default function PracticeDashboard() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-edge/50 bg-surface/40">
                     {['Client', 'Return', 'Status', 'Deadline', 'Fee', ''].map(h => (

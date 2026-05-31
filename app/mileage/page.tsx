@@ -381,7 +381,7 @@ export default function MileagePage() {
                 </div>
                 <div className="rounded-2xl border border-edge bg-surface/40 overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="w-full text-xs min-w-[600px]">
                       <thead>
                         <tr className="border-b border-edge text-ink-2">
                           <th className="text-left px-4 py-3 font-medium">Date</th>

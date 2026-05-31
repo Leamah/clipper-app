@@ -206,8 +206,8 @@ export default function PayrollPage() {
             <p className="text-xs text-ink-3">Create a period to track submission deadlines and send automated reminders.</p>
           </div>
         ) : (
-          <div className="rounded-2xl border border-edge overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-2xl border border-edge overflow-hidden overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b border-edge/50 bg-surface/60">
                   {['Period', 'Dates', 'Deadline', 'Status', ''].map(h => (

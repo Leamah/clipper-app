@@ -315,7 +315,7 @@ export default function ConsultantDetailPage() {
             <p className="px-5 py-12 text-center text-xs text-ink-3">No timesheets submitted yet</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-edge/50 bg-surface/40">
                     {['Month', 'Hours', 'Rate', 'Earnings', 'Status', 'Sign-off', ''].map(h => (
