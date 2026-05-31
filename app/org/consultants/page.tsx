@@ -251,7 +251,8 @@ export default function ConsultantsPage() {
         setInviteMsg(`Invitation emailed to ${invitedTo}`)
         setAcceptUrl(null)               // email sent — no need for manual link
       } else {
-        setInviteMsg(`Invite sent to ${invitedTo} — share the link below so they can accept`)
+        const reason = json.emailError ? ` (${json.emailError})` : ''
+        setInviteMsg(`Invite created for ${invitedTo} — email failed${reason}, share the link below`)
         setAcceptUrl(json.acceptUrl ?? null)
       }
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
