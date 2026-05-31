@@ -9,7 +9,8 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { format, getDaysInMonth, getDay } from 'date-fns'
 import type { KlippaProfile, KlippaMileageTrip, OrgBranding } from '@/lib/types'
-import type { KlippaTimesheet, KlippaTimesheetEntry } from '@/lib/types'
+import type { KlippaTimesheet, KlippaTimesheetEntry, KlippaExpenseRecord } from '@/lib/types'
+import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { getSAHolidayName } from '@/lib/sa-holidays'
 
 // ── Shared helpers ────────────────────────────────────────
@@ -624,4 +625,266 @@ export async function exportLogbookPDF(
 
   const lbPrefix = (branding?.orgName ?? 'Klippa').replace(/[^a-zA-Z0-9]/g, '_')
   doc.save(`${lbPrefix}_Logbook_${taxYear}.pdf`)
+}
+
+// ── SARS Audit Pack PDF ───────────────────────────────────
+// A defence-ready bundle of every confirmed expense: the claim, the SARS
+// rule it rests on, the evidence to keep on file, and the audit triggers
+// SARS would flag. Pure leverage on data already captured at classification.
+
+const RISK_RGB: Record<string, [number, number, number]> = {
+  high:   [220,  38,  38],   // red-600
+  medium: [217, 119,   6],   // amber-600
+  low:    [ 22, 163,  74],   // green-600
+}
+
+export async function exportAuditPackPDF(
+  profile:  Pick<KlippaProfile, 'full_name' | 'tax_number'>,
+  expenses: KlippaExpenseRecord[],
+  taxYear:  number,  // e.g. 2025 = year ending 28 Feb 2025
+  branding?: OrgBranding,
+): Promise<void> {
+  const ACCENT      = branding?.brandColor ? hexToRgb(branding.brandColor) : EMERALD
+  const logoDataUrl = branding?.logoUrl    ? await fetchImageAsDataUrl(branding.logoUrl) : null
+
+  const doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()   // 210
+  const pageH = doc.internal.pageSize.getHeight()  // 297
+
+  const yearEnd      = `28 February ${taxYear}`
+  const totalClaimed = expenses.reduce((s, e) => s + e.amount, 0)
+  const totalDeduct  = expenses.reduce((s, e) => s + e.deductible_amount, 0)
+  const highRisk     = expenses.filter(e => e.ai_audit_risk === 'high').length
+
+  // ── Header ────────────────────────────────────────────────
+  const drawHeader = () => {
+    doc.setFillColor(...ZINC900)
+    doc.rect(0, 0, pageW, 34, 'F')
+    doc.setFillColor(...ACCENT)
+    doc.rect(0, 0, 6, 34, 'F')
+
+    if (logoDataUrl) {
+      try { doc.addImage(logoDataUrl, 'PNG', pageW - 30, 5, 22, 22) } catch { /* skip */ }
+    } else {
+      doc.setFillColor(...ACCENT)
+      doc.roundedRect(pageW - 30, 6, 22, 22, 3, 3, 'F')
+      doc.setTextColor(...WHITE)
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text(branding?.orgName?.charAt(0)?.toUpperCase() ?? 'K', pageW - 19, 19, { align: 'center' })
+    }
+
+    doc.setTextColor(...ACCENT)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('SARS AUDIT PACK', 14, 13)
+
+    doc.setFontSize(8.5)
+    doc.setTextColor(...WHITE)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`For the year ended ${yearEnd}`,            14, 20)
+    doc.text(`Taxpayer: ${profile.full_name ?? ''}`,    14, 26)
+    doc.text(`Tax number: ${profile.tax_number ?? '—'}`, 14, 31)
+  }
+
+  drawHeader()
+
+  // ── Summary band ──────────────────────────────────────────
+  autoTable(doc, {
+    startY: 40,
+    head: [['Confirmed expenses', 'Total claimed', 'Total deductible', 'High audit-risk items']],
+    body: [[
+      String(expenses.length),
+      fmtRand(totalClaimed),
+      fmtRand(totalDeduct),
+      String(highRisk),
+    ]],
+    theme: 'grid',
+    styles: { fontSize: 9, halign: 'center' },
+    headStyles: { fillColor: ZINC700, textColor: WHITE, fontStyle: 'bold' },
+    margin: { left: 14, right: 14 },
+  })
+
+  // ── Schedule of deductions ────────────────────────────────
+  const scheduleRows = expenses.map(e => [
+    e.expense_date ? format(new Date(e.expense_date + 'T00:00:00'), 'dd MMM yyyy') : '—',
+    e.merchant_name ?? e.description ?? '—',
+    EXPENSE_CATEGORY_LABELS[e.category] ?? e.category,
+    fmtRand(e.amount),
+    `${e.deductible_percentage}%`,
+    fmtRand(e.deductible_amount),
+    (e.ai_audit_risk ?? '—').toUpperCase(),
+  ])
+
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY + 6,
+    head: [['Date', 'Merchant', 'Category', 'Amount', 'Claim %', 'Deductible', 'Risk']],
+    body: scheduleRows,
+    theme: 'grid',
+    styles: { fontSize: 7.5, cellPadding: 1.8, valign: 'middle' },
+    headStyles: { fillColor: ACCENT, textColor: WHITE, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 22 },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 22, halign: 'right' },
+      4: { cellWidth: 14, halign: 'right' },
+      5: { cellWidth: 24, halign: 'right' },
+      6: { cellWidth: 16, halign: 'center' },
+    },
+    margin: { left: 14, right: 14 },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.column.index === 6) {
+        const risk = String(data.cell.raw).toLowerCase()
+        const rgb = RISK_RGB[risk]
+        if (rgb) { data.cell.styles.textColor = rgb; data.cell.styles.fontStyle = 'bold' }
+      }
+    },
+  })
+
+  // ── Per-expense evidence dossiers ─────────────────────────
+  doc.addPage()
+  let y = 18
+
+  doc.setTextColor(...ZINC900)
+  doc.setFontSize(13)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Evidence dossier', 14, y)
+  doc.setFontSize(8.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(120, 120, 120)
+  doc.text('One entry per claim — the SARS basis, the evidence to retain, and the triggers an auditor would flag.', 14, y + 5)
+  y += 14
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > pageH - 14) { doc.addPage(); y = 18 }
+  }
+
+  const writeWrapped = (text: string, x: number, maxW: number, lineH = 4.2): number => {
+    const lines = doc.splitTextToSize(text, maxW) as string[]
+    for (const ln of lines) {
+      ensureSpace(lineH + 2)
+      doc.text(ln, x, y)
+      y += lineH
+    }
+    return lines.length
+  }
+
+  expenses.forEach((e, idx) => {
+    ensureSpace(34)
+
+    // Card divider
+    doc.setDrawColor(225, 225, 228)
+    doc.setLineWidth(0.2)
+    doc.line(14, y - 4, pageW - 14, y - 4)
+
+    // Title row: merchant + deductible
+    doc.setTextColor(...ZINC900)
+    doc.setFontSize(10.5)
+    doc.setFont('helvetica', 'bold')
+    const title = `${idx + 1}. ${e.merchant_name ?? e.description ?? 'Expense'}`
+    doc.text(doc.splitTextToSize(title, 120)[0], 14, y)
+
+    doc.setTextColor(...ACCENT)
+    doc.setFontSize(10)
+    doc.text(`${fmtRand(e.deductible_amount)} deductible`, pageW - 14, y, { align: 'right' })
+    y += 5
+
+    // Meta line
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(110, 110, 110)
+    const dateStr = e.expense_date ? format(new Date(e.expense_date + 'T00:00:00'), 'dd MMM yyyy') : '—'
+    const cat     = EXPENSE_CATEGORY_LABELS[e.category] ?? e.category
+    doc.text(`${dateStr}  ·  ${cat}  ·  ${fmtRand(e.amount)} claimed at ${e.deductible_percentage}%  ·  Risk: ${(e.ai_audit_risk ?? '—').toUpperCase()}  ·  Confidence: ${(e.ai_confidence ?? '—').toUpperCase()}`, 14, y)
+    y += 6
+
+    // SARS rule
+    if (e.ai_sars_rule) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...ZINC700)
+      doc.text('SARS basis', 14, y)
+      y += 4
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      writeWrapped(e.ai_sars_rule, 14, pageW - 28)
+      y += 2
+    }
+
+    // Reasoning
+    if (e.ai_reasoning) {
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(8)
+      doc.setTextColor(90, 90, 90)
+      writeWrapped(e.ai_reasoning, 14, pageW - 28)
+      y += 2
+    }
+
+    // Evidence checklist
+    const evidence = e.ai_required_evidence ?? []
+    if (evidence.length) {
+      ensureSpace(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(22, 163, 74)
+      doc.text('Keep on file', 14, y)
+      y += 4.5
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      for (const item of evidence) {
+        ensureSpace(6)
+        // checkbox
+        doc.setDrawColor(150, 150, 150)
+        doc.setLineWidth(0.3)
+        doc.rect(15, y - 3, 3, 3)
+        const before = y
+        writeWrapped(item, 21, pageW - 35)
+        if (y === before) y += 4.2
+        y += 0.5
+      }
+      y += 2
+    }
+
+    // Audit triggers
+    const triggers = e.ai_audit_triggers ?? []
+    if (triggers.length) {
+      ensureSpace(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(217, 119, 6)
+      doc.text('SARS audit triggers', 14, y)
+      y += 4.5
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      for (const item of triggers) {
+        ensureSpace(6)
+        doc.setTextColor(217, 119, 6)
+        doc.text('!', 16, y)
+        doc.setTextColor(60, 60, 60)
+        const before = y
+        writeWrapped(item, 21, pageW - 35)
+        if (y === before) y += 4.2
+        y += 0.5
+      }
+      y += 2
+    }
+
+    y += 4
+  })
+
+  // ── Footer on every page ──────────────────────────────────
+  const footerOrg = branding?.orgName ?? 'Klippa'
+  const pageCount = (doc as any).internal.getNumberOfPages()
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p)
+    doc.setFontSize(7)
+    doc.setTextColor(150, 150, 150)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Generated by ${footerOrg} via Klippa | klippa.co.za`, 14, pageH - 7)
+    doc.text(`Page ${p} of ${pageCount}`, pageW - 14, pageH - 7, { align: 'right' })
+  }
+
+  const apPrefix = (branding?.orgName ?? 'Klippa').replace(/[^a-zA-Z0-9]/g, '_')
+  doc.save(`${apPrefix}_SARS_Audit_Pack_${taxYear}.pdf`)
 }

@@ -8,11 +8,12 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   Plus, FileSpreadsheet, Trash2, Loader2,
-  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, Camera,
+  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera,
 } from 'lucide-react'
-import type { KlippaExpenseRecord, KlippaTaxReturn, ExpenseCategory } from '@/lib/types'
+import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCategory } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
+import { exportAuditPackPDF } from '@/lib/pdf-export'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 2 }).format(n)
@@ -524,6 +525,8 @@ function ExpensesPage() {
   const searchParams = useSearchParams()
   const [records,      setRecords]      = useState<KlippaExpenseRecord[]>([])
   const [taxReturn,    setTaxReturn]    = useState<KlippaTaxReturn | null>(null)
+  const [profile,      setProfile]      = useState<KlippaProfile | null>(null)
+  const [exportingPack, setExportingPack] = useState(false)
   const [loading,      setLoading]      = useState(true)
   const [showAdd,      setShowAdd]      = useState(searchParams.get('add') === '1')
   const [showCSV,      setShowCSV]      = useState(false)
@@ -539,6 +542,8 @@ function ExpensesPage() {
     if (!user) return
     const { data: ret } = await supabase.from('klippa_tax_returns').select('*').eq('user_id', user.id).order('tax_year', { ascending: false }).limit(1).single()
     setTaxReturn(ret as KlippaTaxReturn | null)
+    const { data: prof } = await supabase.from('klippa_profiles').select('*').eq('id', user.id).single()
+    setProfile(prof as KlippaProfile | null)
     const { data } = await supabase.from('klippa_expense_records').select('*').eq('user_id', user.id).order('expense_date', { ascending: false })
     setRecords((data ?? []) as KlippaExpenseRecord[])
     setLoading(false)
@@ -608,6 +613,24 @@ function ExpensesPage() {
     setCapturePreFill(undefined)
   }
 
+  const handleAuditPack = async () => {
+    const confirmedRecs = records.filter((r) => r.classification_status === 'confirmed')
+    if (confirmedRecs.length === 0) return
+    setExportingPack(true)
+    try {
+      const taxYear = taxReturn?.tax_year ?? new Date().getFullYear()
+      await exportAuditPackPDF(
+        { full_name: profile?.full_name ?? '', tax_number: profile?.tax_number ?? null },
+        confirmedRecs,
+        taxYear,
+      )
+    } catch (err) {
+      console.error('Audit pack export failed', err)
+    } finally {
+      setExportingPack(false)
+    }
+  }
+
   const pending   = records.filter((r) => r.classification_status === 'pending')
   const confirmed = records.filter((r) => r.classification_status === 'confirmed')
   const displayed = activeTab === 'pending' ? pending : activeTab === 'confirmed' ? confirmed : records
@@ -656,6 +679,17 @@ function ExpensesPage() {
             >
               <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
             </button>
+            {confirmed.length > 0 && (
+              <button
+                onClick={handleAuditPack}
+                disabled={exportingPack}
+                title="Export a SARS-ready audit pack of every confirmed expense"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised disabled:opacity-50 transition-colors"
+              >
+                {exportingPack ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                {exportingPack ? 'Building…' : 'Audit Pack'}
+              </button>
+            )}
             <button
               onClick={() => setShowAdd(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
