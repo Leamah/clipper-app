@@ -223,7 +223,14 @@ export default function ConsultantsPage() {
     setLoading(false)
   }, [router])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    // Re-fetch when the user navigates back to this tab / page (App Router
+    // caches the previous render and won't re-run effects on soft back).
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
 
   const sendInvite = async () => {
     if (!inviteEmail.trim()) return
@@ -239,11 +246,12 @@ export default function ConsultantsPage() {
       setInvites(prev => [json.invite, ...prev])
       const invitedTo = inviteEmail.trim()
       setInviteEmail('')
+      router.refresh()   // bust App Router cache so back-navigation shows fresh data
       if (json.emailSent) {
         setInviteMsg(`Invitation emailed to ${invitedTo}`)
         setAcceptUrl(null)               // email sent — no need for manual link
       } else {
-        setInviteMsg(`Invite created for ${invitedTo} — email could not be sent, share the link below`)
+        setInviteMsg(`Invite sent to ${invitedTo} — share the link below so they can accept`)
         setAcceptUrl(json.acceptUrl ?? null)
       }
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
@@ -265,6 +273,7 @@ export default function ConsultantsPage() {
     if (json.error) { setError(json.error); setRemovingId(null); return }
     setConsultants(prev => prev.filter(c => c.id !== memberId))
     setRemovingId(null)
+    router.refresh()
   }
 
   const updateCompliance = async (userId: string, field: string, value: boolean) => {
