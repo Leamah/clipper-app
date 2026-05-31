@@ -366,7 +366,7 @@ export default function OrgDashboardPage() {
                     const month = ts ? new Date(ts.month + 'T00:00:00').toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }) : null
 
                     return (
-                      <tr key={c.id} className="border-b border-edge/40 last:border-0 hover:bg-surface/60 transition-colors">
+                      <tr key={c.id} onClick={() => router.push(`/org/consultants/${c.id}`)} className="border-b border-edge/40 last:border-0 hover:bg-surface/60 transition-colors cursor-pointer">
                         <td className="px-5 py-3.5">
                           <p className="font-medium text-sm text-ink-1">{c.full_name ?? c.email}</p>
                           {c.full_name && <p className="text-xs text-ink-3">{c.email}</p>}
@@ -389,9 +389,7 @@ export default function OrgDashboardPage() {
                           )}
                         </td>
                         <td className="px-5 py-3.5">
-                          <Link href="/org/consultants" className="text-ink-3 hover:text-ink-1 transition-colors">
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </Link>
+                          <ChevronRight className="w-3.5 h-3.5 text-ink-3" />
                         </td>
                       </tr>
                     )

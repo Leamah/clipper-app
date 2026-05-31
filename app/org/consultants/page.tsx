@@ -436,7 +436,9 @@ export default function ConsultantsPage() {
                     {/* Main row */}
                     <div className="px-5 py-4 flex items-center gap-4">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-ink-1">{c.full_name ?? c.email}</p>
+                        <Link href={`/org/consultants/${c.id}`} className="text-sm font-medium text-ink-1 hover:text-emerald-500 transition-colors">
+                          {c.full_name ?? c.email}
+                        </Link>
                         {c.full_name && <p className="text-xs text-ink-3">{c.email}</p>}
                       </div>
 
