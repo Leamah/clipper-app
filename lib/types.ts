@@ -378,6 +378,12 @@ export const ENTITY_TYPE_LABELS: Record<ClientEntityType, string> = {
   trust:      'Trust',
 }
 
+export interface ChecklistItem {
+  id:       string
+  label:    string
+  received: boolean
+}
+
 export interface KlippaPracticeClient {
   id:              string
   organisation_id: string
@@ -394,6 +400,8 @@ export interface KlippaPracticeClient {
   fee_paid:        boolean
   status:          'active' | 'archived'
   notes:           string | null
+  doc_checklist:   ChecklistItem[]
+  last_activity_at: string | null
   created_at:      string
   updated_at:      string
 }

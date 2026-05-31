@@ -32,6 +32,36 @@ const VALID_STATUS = ['not_started', 'collecting', 'in_progress', 'review', 'fil
 const VALID_ENTITY = ['individual', 'sole_prop', 'company', 'trust']
 const VALID_RETURN = ['ITR12', 'IRP6', 'ITR14', 'IT12TR']
 
+// GET /api/practice/clients/[id] — full client record + linked tax snapshot
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const ctx = await resolvePracticeContext()
+  if ('error' in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
+  const { admin, orgId } = ctx
+
+  const { data: client } = await admin
+    .from('klippa_practice_clients')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+
+  if (!client || client.organisation_id !== orgId)
+    return NextResponse.json({ error: 'Client not found in your practice' }, { status: 404 })
+
+  // If linked to a Klippa user, surface their return for this tax year
+  let linkedReturn: Record<string, unknown> | null = null
+  if (client.client_user_id) {
+    const { data: ret } = await admin
+      .from('klippa_tax_returns')
+      .select('status, gross_income, total_deductions, taxable_income, net_tax_payable, sars_reference, submitted_at')
+      .eq('user_id', client.client_user_id)
+      .eq('tax_year', client.tax_year)
+      .maybeSingle()
+    linkedReturn = ret ?? null
+  }
+
+  return NextResponse.json({ client, linkedReturn })
+}
+
 // PATCH /api/practice/clients/[id] — update a client (status, fee, details…)
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const ctx = await resolvePracticeContext()
@@ -63,11 +93,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.fee !== undefined)            updates.fee      = Number(body.fee) || 0
   if (typeof body.fee_paid === 'boolean') updates.fee_paid = body.fee_paid
   if (body.status === 'active' || body.status === 'archived') updates.status = body.status
+  if (Array.isArray(body.doc_checklist)) {
+    // Sanitise each checklist item
+    updates.doc_checklist = body.doc_checklist
+      .filter((it: unknown): it is Record<string, unknown> => !!it && typeof it === 'object')
+      .map((it: Record<string, unknown>) => ({
+        id:       String(it.id ?? crypto.randomUUID()),
+        label:    String(it.label ?? '').slice(0, 120),
+        received: !!it.received,
+      }))
+      .filter((it: { label: string }) => it.label.trim().length > 0)
+  }
 
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
-  updates.updated_at = new Date().toISOString()
+  const now = new Date().toISOString()
+  updates.updated_at      = now
+  updates.last_activity_at = now
 
   const { data: client, error } = await admin
     .from('klippa_practice_clients')

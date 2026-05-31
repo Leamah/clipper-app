@@ -259,8 +259,10 @@ export default function PracticeDashboard() {
                     return (
                       <tr key={c.id} className="border-b border-edge/40 last:border-0 hover:bg-surface/60 transition-colors">
                         <td className="px-5 py-3.5">
-                          <p className="font-medium text-ink-1">{c.full_name}</p>
-                          <p className="text-xs text-ink-3">{ENTITY_TYPE_LABELS[c.entity_type]}{c.email ? ` · ${c.email}` : ''}</p>
+                          <Link href={`/practice/clients/${c.id}`} className="group block">
+                            <p className="font-medium text-ink-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{c.full_name}</p>
+                            <p className="text-xs text-ink-3">{ENTITY_TYPE_LABELS[c.entity_type]}{c.email ? ` · ${c.email}` : ''}</p>
+                          </Link>
                         </td>
                         <td className="px-5 py-3.5">
                           <span className="text-xs text-ink-2">{c.return_type}</span>
