@@ -346,6 +346,55 @@ export function daysUntilDeadline(deadline: Date): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24))
 }
 
+// ── Provisional tax "set aside" runway ───────────────────
+// Given the estimated annual tax and which instalments are paid, work out
+// the next IRP6 payment due and how much to set aside per month/week from
+// today to reach it — the proactive deadline-engine nudge.
+
+export interface ProvisionalRunway {
+  instalment: 'first' | 'second'
+  amountDue:  number
+  deadline:   Date
+  daysLeft:   number   // negative = overdue
+  perMonth:   number   // set aside this much each month from now until the deadline
+  perWeek:    number
+}
+
+export function nextProvisionalPayment(input: {
+  taxYear:    number   // tax year ending (e.g. 2027 = Mar 2026–Feb 2027)
+  annualTax:  number   // estimated net annual tax payable
+  firstPaid:  boolean
+  secondPaid: boolean
+}): ProvisionalRunway | null {
+  const { taxYear, annualTax, firstPaid, secondPaid } = input
+  if (annualTax <= 0) return null
+
+  const deadlines    = getIRP6Deadlines(taxYear)
+  const firstAmount  = Math.ceil(annualTax * 0.5)
+  const secondAmount = annualTax - (firstPaid ? firstAmount : 0)
+
+  let instalment: 'first' | 'second'
+  let amountDue:  number
+  let deadline:   Date
+
+  if (!firstPaid) {
+    instalment = 'first';  amountDue = firstAmount;  deadline = deadlines.first
+  } else if (!secondPaid) {
+    instalment = 'second'; amountDue = secondAmount; deadline = deadlines.second
+  } else {
+    return null  // both paid — nothing outstanding
+  }
+
+  const daysLeft   = daysUntilDeadline(deadline)
+  const monthsLeft = Math.max(0.25, daysLeft / 30.44)
+  const weeksLeft  = Math.max(0.5,  daysLeft / 7)
+  // Overdue → set aside the whole thing now.
+  const perMonth   = daysLeft <= 0 ? amountDue : Math.ceil(amountDue / monthsLeft)
+  const perWeek    = daysLeft <= 0 ? amountDue : Math.ceil(amountDue / weeksLeft)
+
+  return { instalment, amountDue, deadline, daysLeft, perMonth, perWeek }
+}
+
 // VAT registration threshold
 export const VAT_THRESHOLD = 1_000_000
 export const VAT_WARNING_THRESHOLD = 800_000

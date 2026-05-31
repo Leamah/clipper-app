@@ -13,8 +13,9 @@ import {
 import type { KlippaProfile } from '@/lib/types'
 import {
   calculateTax, ageFromDob, getIRP6Deadlines, daysUntilDeadline,
-  currentRunningTaxYear, PROVISIONAL_TAX_THRESHOLD
+  currentRunningTaxYear, PROVISIONAL_TAX_THRESHOLD, nextProvisionalPayment
 } from '@/lib/tax-engine'
+import { PiggyBank } from 'lucide-react'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -192,6 +193,13 @@ export default function ProvisionalPage() {
     profile.employment_type !== 'employee' &&
     estimatedIncome > PROVISIONAL_TAX_THRESHOLD
 
+  const runway = nextProvisionalPayment({
+    taxYear:    runningYear,
+    annualTax:  annualTax,
+    firstPaid,
+    secondPaid,
+  })
+
   const featureFlags = {
     timesheets:  profile?.feature_timesheets  ?? false,
     logbook:     profile?.feature_logbook     ?? true,
@@ -307,6 +315,45 @@ export default function ProvisionalPage() {
             </div>
           )}
         </div>
+
+        {/* Set-aside runway */}
+        {taxResult && annualTax > 0 && runway && (
+          <div className={`rounded-2xl border p-5 ${
+            runway.daysLeft < 0
+              ? 'border-red-500/30 bg-red-500/5'
+              : runway.daysLeft <= 30
+                ? 'border-amber-500/30 bg-amber-500/5'
+                : 'border-emerald-500/30 bg-emerald-500/5'
+          }`}>
+            <div className="flex items-start gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                runway.daysLeft < 0 ? 'bg-red-500/15' : runway.daysLeft <= 30 ? 'bg-amber-500/15' : 'bg-emerald-500/15'
+              }`}>
+                <PiggyBank className={`w-5 h-5 ${runway.daysLeft < 0 ? 'text-red-400' : runway.daysLeft <= 30 ? 'text-amber-400' : 'text-emerald-400'}`} />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-ink-2">
+                  Set aside to stay penalty-free
+                </p>
+                {runway.daysLeft < 0 ? (
+                  <p className="text-sm text-ink-1 leading-snug">
+                    Your {runway.instalment} payment of <strong>{formatRand(runway.amountDue)}</strong> was due{' '}
+                    {runway.deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })} —{' '}
+                    <strong className="text-red-400">{Math.abs(runway.daysLeft)} days ago</strong>. Pay it now to limit interest.
+                  </p>
+                ) : (
+                  <p className="text-sm text-ink-1 leading-snug">
+                    Put away <strong className="text-emerald-400">{formatRand(runway.perMonth)}/month</strong>{' '}
+                    <span className="text-ink-2">(≈ {formatRand(runway.perWeek)}/week)</span> and you&apos;ll have the{' '}
+                    {formatRand(runway.amountDue)} {runway.instalment} payment ready by{' '}
+                    {runway.deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })} —{' '}
+                    {runway.daysLeft} days from now.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Payment cards */}
         {taxResult && annualTax > 0 && (

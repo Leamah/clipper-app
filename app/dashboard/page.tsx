@@ -10,11 +10,11 @@ import AppNav from '@/components/AppNav'
 import {
   TrendingUp, AlertCircle, CheckCircle2,
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car, Zap,
-  ShieldCheck, ShieldAlert,
+  ShieldCheck, ShieldAlert, PiggyBank,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
 import { useRouter } from 'next/navigation'
-import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline, VAT_THRESHOLD, VAT_WARNING_THRESHOLD } from '@/lib/tax-engine'
+import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline, nextProvisionalPayment, currentRunningTaxYear, VAT_THRESHOLD, VAT_WARNING_THRESHOLD } from '@/lib/tax-engine'
 import { startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear } from 'date-fns'
 
 function countPendingLogbookWeeks(taxYear: number, reviewedWeekKeys: string[]): number {
@@ -150,6 +150,17 @@ export default function Dashboard() {
   const deadline = getITR12Deadline(taxYear)
   const daysLeft = daysUntilDeadline(deadline)
 
+  // ── Provisional tax nudge ────────────────────────────────
+  const isProvisional = !!profile?.feature_provisional && profile?.employment_type !== 'employee'
+  const provisionalRunway = isProvisional
+    ? nextProvisionalPayment({
+        taxYear:    currentRunningTaxYear(),
+        annualTax:  Math.max(0, taxToSave),
+        firstPaid:  taxReturn?.payment1_status === 'paid',
+        secondPaid: taxReturn?.payment2_status === 'paid',
+      })
+    : null
+
   // ── Profile completion ───────────────────────────────────
 
   const profileCompletion = profile ? calcProfileCompletion(profile) : null
@@ -250,6 +261,39 @@ export default function Dashboard() {
             highlight
           />
         </div>
+
+        {/* Provisional tax deadline nudge */}
+        {provisionalRunway && (
+          <Link
+            href="/provisional"
+            className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all ${
+              provisionalRunway.daysLeft < 0
+                ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
+                : provisionalRunway.daysLeft <= 30
+                  ? 'border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10'
+                  : 'border-edge bg-surface/40 hover:border-emerald-500/30 hover:bg-surface/60'
+            }`}
+          >
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              provisionalRunway.daysLeft < 0 ? 'bg-red-500/15' : provisionalRunway.daysLeft <= 30 ? 'bg-amber-500/15' : 'bg-emerald-500/15'
+            }`}>
+              <PiggyBank className={`w-5 h-5 ${provisionalRunway.daysLeft < 0 ? 'text-red-400' : provisionalRunway.daysLeft <= 30 ? 'text-amber-400' : 'text-emerald-400'}`} />
+            </div>
+            <div className="flex-1 min-w-0 space-y-0.5">
+              <p className="text-sm font-semibold text-ink-1">
+                {provisionalRunway.daysLeft < 0
+                  ? `Provisional payment overdue`
+                  : `Provisional tax — ${provisionalRunway.instalment} payment in ${provisionalRunway.daysLeft} days`}
+              </p>
+              <p className="text-xs text-ink-2 leading-snug">
+                {provisionalRunway.daysLeft < 0
+                  ? <>The {formatRand(provisionalRunway.amountDue)} {provisionalRunway.instalment} instalment was due {provisionalRunway.deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}. Settle it to limit SARS interest.</>
+                  : <>Set aside <strong className="text-emerald-400">{formatRand(provisionalRunway.perMonth)}/month</strong> to have the {formatRand(provisionalRunway.amountDue)} ready by {provisionalRunway.deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}.</>}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 flex-shrink-0 text-ink-3 group-hover:text-emerald-400 transition-colors" />
+          </Link>
+        )}
 
         {/* Profile completion */}
         {profileCompletion && (
