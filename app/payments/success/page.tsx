@@ -3,19 +3,35 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, Suspense } from 'react'
-import { useRouter, useSearchParams }    from 'next/navigation'
-import Link                               from 'next/link'
+import { useSearchParams }               from 'next/navigation'
+import Link                              from 'next/link'
 import { CheckCircle2, Loader2, ArrowRight, ShieldCheck } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 function SuccessContent() {
-  const router       = useRouter()
-  const searchParams = useSearchParams()
-  const ref          = searchParams.get('ref')
-  const [ready, setReady] = useState(false)
+  const searchParams    = useSearchParams()
+  const ref             = searchParams.get('ref')
+  const [ready, setReady]           = useState(false)
+  const [dashboardUrl, setDashboard] = useState('/dashboard')
 
   useEffect(() => {
-    // Give webhook a moment to process, then reload the user session
-    const t = setTimeout(() => setReady(true), 2000)
+    // Give Ozow webhook a moment to process, then detect the user's workspace
+    const t = setTimeout(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('klippa_profiles')
+            .select('org_type')
+            .eq('id', user.id)
+            .single()
+          if (profile?.org_type === 'practice') setDashboard('/practice/dashboard')
+          else if (profile?.org_type === 'company') setDashboard('/org/dashboard')
+          // solo consultant → default '/dashboard' stays
+        }
+      } catch { /* keep default */ }
+      setReady(true)
+    }, 2500)
     return () => clearTimeout(t)
   }, [])
 
@@ -50,7 +66,7 @@ function SuccessContent() {
         {ready && (
           <div className="space-y-3">
             <Link
-              href="/dashboard"
+              href={dashboardUrl}
               className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
             >
               Go to dashboard <ArrowRight className="w-4 h-4" />
