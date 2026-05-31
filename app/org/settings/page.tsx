@@ -12,6 +12,15 @@ import {
 } from 'lucide-react'
 import type { KlippaOrganisation } from '@/lib/types'
 
+type OrgUsage = {
+  plan:           string
+  label:          string
+  managers_used:  number
+  managers_limit: number
+  seats_used:     number
+  seats_limit:    number
+}
+
 const ORG_TYPE_LABELS: Record<string, string> = {
   company:  'Company',
   practice: 'Accounting Practice',
@@ -39,6 +48,36 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+function UsageMeter({ icon, label, used, limit }: {
+  icon:  React.ReactNode
+  label: string
+  used:  number
+  limit: number
+}) {
+  const unlimited = !Number.isFinite(limit)
+  const pct       = unlimited ? 0 : Math.min(100, Math.round((used / Math.max(limit, 1)) * 100))
+  const full      = !unlimited && used >= limit
+  return (
+    <div className="rounded-xl border border-edge bg-raised/40 p-4 space-y-2.5">
+      <div className="flex items-center gap-1.5 text-xs text-ink-2">
+        {icon}<span>{label}</span>
+      </div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-xl font-semibold text-ink-1">{used}</span>
+        <span className="text-xs text-ink-3">/ {unlimited ? '∞' : limit}</span>
+      </div>
+      {!unlimited && (
+        <div className="h-1.5 rounded-full bg-edge overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${full ? 'bg-red-500' : 'bg-emerald-500'}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function OrgSettingsPage() {
   const router  = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -54,6 +93,7 @@ export default function OrgSettingsPage() {
   const [error,        setError]        = useState<string | null>(null)
   const [logoUploading,setLogoUploading]= useState(false)
   const [logoError,    setLogoError]    = useState<string | null>(null)
+  const [usage,        setUsage]        = useState<OrgUsage | null>(null)
 
   const load = useCallback(async () => {
     const res  = await fetch('/api/org/settings')
@@ -65,6 +105,7 @@ export default function OrgSettingsPage() {
     setName(o.name)
     setBrandColor(o.brand_color ?? '#10b981')
     setLogoUrl(o.logo_url ?? null)
+    setUsage(json.usage ?? null)
     setLoading(false)
   }, [router])
 
@@ -215,6 +256,42 @@ export default function OrgSettingsPage() {
             {!isOwner && <p className="text-xs text-ink-3 mt-1">Only an org admin can change the name.</p>}
           </Field>
         </div>
+
+        {/* ── Plan & usage ──────────────────────────────────── */}
+        {usage && (
+          <div className="rounded-2xl border border-edge bg-surface/40 p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Crown className="w-4 h-4 text-amber-400" />
+                <p className="text-sm font-semibold text-ink-1">Plan</p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-900/20 text-amber-300 border border-amber-900/30">
+                {usage.label}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <UsageMeter
+                icon={<ShieldCheck className="w-3.5 h-3.5" />}
+                label="Managers"
+                used={usage.managers_used}
+                limit={usage.managers_limit}
+              />
+              <UsageMeter
+                icon={<Users className="w-3.5 h-3.5" />}
+                label="Consultant seats"
+                used={usage.seats_used}
+                limit={usage.seats_limit}
+              />
+            </div>
+
+            {usage.plan === 'tier1' && (
+              <p className="text-xs text-ink-3">
+                Need more room? The <strong className="text-ink-2">Scale</strong> plan adds up to 5 managers and unlimited consultant seats.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Branding ──────────────────────────────────────── */}
         <div className="rounded-2xl border border-edge bg-surface/40 p-6 space-y-6">

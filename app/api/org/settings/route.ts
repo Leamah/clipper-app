@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient }       from '@supabase/supabase-js'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
+import { ORG_PLANS }          from '@/lib/types'
+import type { OrgPlan }       from '@/lib/types'
 
 export async function GET() {
   const cookieStore = cookies()
@@ -30,7 +32,31 @@ export async function GET() {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ org, role: profile.org_role })
+
+  // Plan usage: managers (org-admins), consultant seats (members) + pending invites
+  const orgId = profile.organisation_id
+  const [{ count: managerCount }, { count: memberCount }, { count: pendingCount }] = await Promise.all([
+    admin.from('klippa_profiles').select('id', { count: 'exact', head: true })
+      .eq('organisation_id', orgId).eq('org_role', 'org-admin'),
+    admin.from('klippa_profiles').select('id', { count: 'exact', head: true })
+      .eq('organisation_id', orgId).eq('org_role', 'member'),
+    admin.from('klippa_org_invites').select('id', { count: 'exact', head: true })
+      .eq('organisation_id', orgId).eq('status', 'pending'),
+  ])
+
+  const planKey = (org.subscription_tier as OrgPlan) ?? 'tier1'
+  const plan    = ORG_PLANS[planKey] ?? ORG_PLANS.tier1
+
+  const usage = {
+    plan:           planKey,
+    label:          plan.label,
+    managers_used:  managerCount ?? 0,
+    managers_limit: plan.managers,
+    seats_used:     (memberCount ?? 0) + (pendingCount ?? 0),
+    seats_limit:    plan.seats,
+  }
+
+  return NextResponse.json({ org, role: profile.org_role, usage })
 }
 
 export async function PATCH(request: Request) {

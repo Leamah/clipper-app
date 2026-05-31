@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient }       from '@supabase/supabase-js'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
+import { ORG_PLANS }          from '@/lib/types'
+import type { OrgPlan }       from '@/lib/types'
 
 export async function POST(request: Request) {
   const cookieStore = cookies()
@@ -47,6 +49,39 @@ export async function POST(request: Request) {
 
   if (existing) {
     return NextResponse.json({ error: 'An invite is already pending for this email' }, { status: 409 })
+  }
+
+  // ── Seat-cap enforcement ──────────────────────────────────
+  // Consultants (org_role='member') + pending invites must stay within the
+  // org's plan seat limit. Managers (org-admins) are counted separately.
+  const { data: planRow } = await admin
+    .from('klippa_organisations')
+    .select('subscription_tier')
+    .eq('id', orgId)
+    .single()
+
+  const plan  = (planRow?.subscription_tier as OrgPlan) ?? 'tier1'
+  const limit = (ORG_PLANS[plan] ?? ORG_PLANS.tier1).seats
+
+  if (Number.isFinite(limit)) {
+    const [{ count: memberCount }, { count: pendingCount }] = await Promise.all([
+      admin.from('klippa_profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('organisation_id', orgId)
+        .eq('org_role', 'member'),
+      admin.from('klippa_org_invites')
+        .select('id', { count: 'exact', head: true })
+        .eq('organisation_id', orgId)
+        .eq('status', 'pending'),
+    ])
+
+    const used = (memberCount ?? 0) + (pendingCount ?? 0)
+    if (used >= limit) {
+      return NextResponse.json(
+        { error: `Your ${ORG_PLANS[plan].label} plan is limited to ${limit} consultant seats (currently ${used} used). Upgrade to add more.` },
+        { status: 402 },
+      )
+    }
   }
 
   // Create the invite with a unique token + 7-day expiry
