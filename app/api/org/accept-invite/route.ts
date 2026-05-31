@@ -79,7 +79,10 @@ export async function POST(request: Request) {
   // A consultant moving from one agency to another — switching is allowed.
   // Their organisation_id is simply re-pointed; the old org no longer sees them.
 
-  // Accept: link user to org + mark invite accepted
+  // Accept: link user to org + mark invite accepted.
+  // Use UPSERT (not UPDATE) so brand-new users who have no profile row yet
+  // (never visited onboarding) still get a valid profile created here.
+  // onboarding_complete = true so they skip the type-selection onboarding flow.
   const [updateInvite, updateProfile] = await Promise.all([
     admin
       .from('klippa_org_invites')
@@ -87,12 +90,13 @@ export async function POST(request: Request) {
       .eq('id', invite.id),
     admin
       .from('klippa_profiles')
-      .update({
-        organisation_id: invite.organisation_id,
-        org_role:        invite.role ?? 'member',
-        user_type:       'freelancer',   // consultant keeps freelancer tax features
-      })
-      .eq('id', user.id),
+      .upsert({
+        id:                  user.id,
+        organisation_id:     invite.organisation_id,
+        org_role:            invite.role ?? 'member',
+        user_type:           'freelancer',   // consultant keeps freelancer tax features
+        onboarding_complete: true,           // bypass the type-selection onboarding step
+      }, { onConflict: 'id' }),
   ])
 
   if (updateInvite.error) {

@@ -101,10 +101,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(home, request.url))
     }
 
-    // Redirect to onboarding if profile not complete (except when already there).
-    // Never redirect API routes to the HTML onboarding page — same JSON-parse
-    // hazard as the unauthenticated case above.
-    if (!isOnboarding && !isPublicRoute && !isApiRoute) {
+    // Redirect to onboarding if profile not complete (except when already there,
+    // on public routes, API routes, or on /invite/* — invited consultants must
+    // reach the invite-acceptance page so accept-invite can set them up properly
+    // and mark onboarding complete; intercepting them here sends them to the
+    // type-selection step which is wrong for invited members).
+    const isInvitePath = pathname.startsWith('/invite/')
+    if (!isOnboarding && !isPublicRoute && !isApiRoute && !isInvitePath) {
       if (!profile || !profile.onboarding_complete) {
         return NextResponse.redirect(new URL('/onboarding', request.url))
       }
