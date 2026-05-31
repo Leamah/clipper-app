@@ -59,7 +59,24 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     linkedReturn = ret ?? null
   }
 
-  return NextResponse.json({ client, linkedReturn })
+  // Documents the client (or practice) has uploaded, newest first, with
+  // short-lived signed URLs for download/preview.
+  const { data: docRows } = await admin
+    .from('klippa_practice_client_documents')
+    .select('*')
+    .eq('client_id', params.id)
+    .order('created_at', { ascending: false })
+
+  const documents = await Promise.all((docRows ?? []).map(async (d) => {
+    let signed_url: string | undefined
+    const { data: signed } = await admin.storage
+      .from('klippa_documents')
+      .createSignedUrl(d.storage_path, 60 * 30)  // 30-minute link
+    signed_url = signed?.signedUrl
+    return { ...d, signed_url }
+  }))
+
+  return NextResponse.json({ client, linkedReturn, documents })
 }
 
 // PATCH /api/practice/clients/[id] — update a client (status, fee, details…)

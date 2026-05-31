@@ -8,8 +8,15 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Skip middleware on /auth/* — avoid disrupting magic-link / signout flows
-  // Also skip the Ozow webhook — it's server-to-server and has no session
-  if (pathname.startsWith('/auth/') || pathname === '/api/payments/ozow/notify') {
+  // Also skip the Ozow webhook — it's server-to-server and has no session.
+  // The practice client portal (/portal/* page + /api/portal/* routes) is a
+  // public, token-authenticated surface — clients have no Klippa session.
+  if (
+    pathname.startsWith('/auth/') ||
+    pathname === '/api/payments/ozow/notify' ||
+    pathname.startsWith('/portal/') ||
+    pathname.startsWith('/api/portal/')
+  ) {
     return NextResponse.next()
   }
 

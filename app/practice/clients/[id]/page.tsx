@@ -8,12 +8,14 @@ import Link from 'next/link'
 import {
   ShieldCheck, ArrowLeft, Loader2, AlertTriangle, Check, X, Plus,
   CalendarClock, Wallet, FileText, Trash2, Save, ListChecks, Hash, Mail,
+  Link2, Copy, ExternalLink, Download, Send, RefreshCw, Inbox,
 } from 'lucide-react'
 import {
   FILING_STATUS_FLOW, FILING_STATUS_LABELS, ENTITY_TYPE_LABELS,
 } from '@/lib/types'
 import type {
   KlippaPracticeClient, FilingStatus, ChecklistItem, ClientReturnType,
+  KlippaPracticeClientDocument,
 } from '@/lib/types'
 
 const zar = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -30,11 +32,16 @@ export default function PracticeClientDetail() {
   const params = useParams()
   const id = params?.id as string
 
-  const [client,  setClient]  = useState<KlippaPracticeClient | null>(null)
-  const [linked,  setLinked]  = useState<LinkedReturn>(null)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState<string | null>(null)
-  const [busy,    setBusy]    = useState(false)
+  const [client,    setClient]    = useState<KlippaPracticeClient | null>(null)
+  const [linked,    setLinked]    = useState<LinkedReturn>(null)
+  const [documents, setDocuments] = useState<KlippaPracticeClientDocument[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState<string | null>(null)
+  const [busy,      setBusy]      = useState(false)
+
+  // portal sharing state
+  const [portalBusy, setPortalBusy] = useState(false)
+  const [copied,     setCopied]     = useState(false)
 
   // editable local state
   const [deadline, setDeadline] = useState('')
@@ -50,6 +57,7 @@ export default function PracticeClientDetail() {
     const c = json.client as KlippaPracticeClient
     setClient(c)
     setLinked(json.linkedReturn ?? null)
+    setDocuments(json.documents ?? [])
     setDeadline(c.deadline ?? '')
     setFee(String(c.fee ?? 0))
     setNotes(c.notes ?? '')
@@ -94,6 +102,51 @@ export default function PracticeClientDetail() {
     const item: ChecklistItem = { id: crypto.randomUUID(), label: newItem.trim(), received: false }
     setNewItem('')
     patch({ doc_checklist: [...client.doc_checklist, item] })
+  }
+
+  // --- Document portal ---
+  const portalUrl = (client?.portal_token && client?.portal_enabled && typeof window !== 'undefined')
+    ? `${window.location.origin}/portal/${client.portal_token}`
+    : null
+
+  const callPortal = async (method: 'POST' | 'PATCH', body?: Record<string, unknown>) => {
+    setPortalBusy(true); setError(null)
+    try {
+      const res  = await fetch(`/api/practice/clients/${id}/portal`, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body:    body ? JSON.stringify(body) : undefined,
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      await load()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Portal update failed') }
+    finally { setPortalBusy(false) }
+  }
+
+  const generatePortal = (rotate = false) => callPortal('POST', rotate ? { rotate: true } : undefined)
+  const disablePortal  = () => callPortal('PATCH', { enabled: false })
+  const enablePortal   = () => callPortal('PATCH', { enabled: true })
+
+  const copyLink = async () => {
+    if (!portalUrl) return
+    try {
+      await navigator.clipboard.writeText(portalUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard unavailable */ }
+  }
+
+  const emailLink = () => {
+    if (!portalUrl || !client) return
+    const subject = encodeURIComponent(`Your secure document portal — ${client.tax_year} ${client.return_type}`)
+    const body    = encodeURIComponent(
+      `Hi ${client.full_name.split(' ')[0]},\n\n` +
+      `Please use the secure link below to upload the documents we need for your ${client.tax_year} ${client.return_type}:\n\n` +
+      `${portalUrl}\n\n` +
+      `The link is private to you — no login required.\n\nThank you.`
+    )
+    window.location.href = `mailto:${client.email ?? ''}?subject=${subject}&body=${body}`
   }
 
   const archive = async () => {
@@ -250,6 +303,97 @@ export default function PracticeClientDetail() {
               <Plus className="w-3.5 h-3.5" /> Add
             </button>
           </div>
+        </div>
+
+        {/* Document portal */}
+        <div className="rounded-2xl border border-edge bg-surface p-5 sm:p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-amber-500" />
+            <p className="text-sm font-semibold">Client document portal</p>
+          </div>
+
+          {portalUrl ? (
+            <>
+              <p className="text-xs text-ink-2">
+                Share this private link so {c.full_name.split(' ')[0]} can upload documents straight onto their checklist. No login required.
+              </p>
+              <div className="flex items-center gap-2 rounded-xl bg-raised/40 border border-edge px-3.5 py-2.5">
+                <code className="flex-1 text-xs text-ink-2 truncate">{portalUrl}</code>
+                <button onClick={copyLink} disabled={portalBusy}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors flex-shrink-0">
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}{copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={emailLink} disabled={portalBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 hover:bg-raised disabled:opacity-50 transition-colors">
+                  <Send className="w-3.5 h-3.5" /> Email to client
+                </button>
+                <a href={portalUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
+                  <ExternalLink className="w-3.5 h-3.5" /> Preview
+                </a>
+                <button onClick={() => generatePortal(true)} disabled={portalBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-amber-500 disabled:opacity-50 transition-colors">
+                  {portalBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Rotate link
+                </button>
+                <button onClick={disablePortal} disabled={portalBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-red-400 hover:border-red-500/40 disabled:opacity-50 transition-colors">
+                  <X className="w-3.5 h-3.5" /> Disable
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-ink-2">
+                Generate a secure, private upload link {c.portal_token ? '(currently disabled)' : ''} so your client can submit their own documents.
+              </p>
+              <button
+                onClick={() => (c.portal_token ? enablePortal() : generatePortal(false))}
+                disabled={portalBusy}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 transition-colors">
+                {portalBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+                {c.portal_token ? 'Re-enable portal' : 'Generate portal link'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Uploaded documents */}
+        <div className="rounded-2xl border border-edge bg-surface p-5 sm:p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Inbox className="w-4 h-4 text-amber-500" />
+            <p className="text-sm font-semibold">Uploaded documents</p>
+            {documents.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-edge text-ink-2">{documents.length}</span>
+            )}
+          </div>
+          {documents.length === 0 ? (
+            <p className="text-xs text-ink-3">Nothing uploaded yet. Documents your client submits through the portal will appear here.</p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map(d => {
+                const item = d.checklist_item_id ? c.doc_checklist.find(i => i.id === d.checklist_item_id) : null
+                return (
+                  <div key={d.id} className="flex items-center gap-3 rounded-xl bg-raised/40 border border-edge px-3.5 py-2.5">
+                    <FileText className="w-4 h-4 text-ink-3 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-ink-1 truncate">{d.file_name}</p>
+                      <p className="text-xs text-ink-3">
+                        {dayLabel(d.created_at)}{item ? ` · ${item.label}` : ''}{d.uploaded_via === 'portal' ? ' · via portal' : ''}
+                      </p>
+                    </div>
+                    {d.signed_url && (
+                      <a href={d.signed_url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors flex-shrink-0">
+                        <Download className="w-3.5 h-3.5" /> Open
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Linked return snapshot */}

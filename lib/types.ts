@@ -401,9 +401,26 @@ export interface KlippaPracticeClient {
   status:          'active' | 'archived'
   notes:           string | null
   doc_checklist:   ChecklistItem[]
+  portal_token:    string | null
+  portal_enabled:  boolean
+  portal_token_created_at: string | null
   last_activity_at: string | null
   created_at:      string
   updated_at:      string
+}
+
+export interface KlippaPracticeClientDocument {
+  id:                string
+  client_id:         string
+  organisation_id:   string
+  checklist_item_id: string | null
+  file_name:         string
+  storage_path:      string
+  mime_type:         string | null
+  size_bytes:        number | null
+  uploaded_via:      'portal' | 'practice'
+  created_at:        string
+  signed_url?:       string   // populated on read for the practice UI
 }
 
 export interface PracticeStats {
