@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { MessageCircle, X, Send, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Send, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
 export default function FeedbackWidget() {
   const [open,    setOpen]    = useState(false)
@@ -10,6 +10,13 @@ export default function FeedbackWidget() {
   const [email,   setEmail]   = useState('')
   const [status,  setStatus]  = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [errMsg,  setErrMsg]  = useState('')
+
+  // Listen for open trigger from sidebar or other components
+  useEffect(() => {
+    const handler = () => { setOpen(true); setStatus('idle') }
+    document.addEventListener('klippa:open-feedback', handler)
+    return () => document.removeEventListener('klippa:open-feedback', handler)
+  }, [])
 
   const send = async () => {
     if (!message.trim()) return
@@ -39,17 +46,7 @@ export default function FeedbackWidget() {
 
   return (
     <>
-      {/* Floating button — bottom-left so it doesn't overlap the chatbot */}
-      <button
-        onClick={() => { setOpen(true); setStatus('idle') }}
-        aria-label="Send feedback or get support"
-        className="fixed bottom-6 left-6 z-50 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface border border-edge text-ink-2 text-xs font-medium shadow-lg hover:border-emerald-500/50 hover:text-ink-1 transition-all"
-      >
-        <MessageCircle className="w-4 h-4" />
-        <span className="hidden sm:inline">Feedback</span>
-      </button>
-
-      {/* Modal */}
+      {/* Modal — opened via klippa:open-feedback event (dispatched from sidebar) */}
       {open && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4">
           {/* Backdrop */}

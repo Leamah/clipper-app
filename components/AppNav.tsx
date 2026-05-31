@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   ShieldCheck, LayoutDashboard, TrendingUp, Receipt, FileText,
   Clock, Car, CalendarDays, ClipboardCheck, Settings, Users,
-  Menu, X, PanelLeftClose, PanelLeftOpen,
+  Menu, X, PanelLeftClose, PanelLeftOpen, MessageCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import UserNav       from '@/components/UserNav'
@@ -191,6 +191,12 @@ export default function AppNav({
               <Link href="/settings" onClick={() => setMobileOpen(false)} className={navCls('settings', activePage, false)}>
                 <Settings className="w-4 h-4 shrink-0" /> Settings
               </Link>
+              <button
+                onClick={() => { setMobileOpen(false); document.dispatchEvent(new Event('klippa:open-feedback')) }}
+                className={NAV_IDLE}
+              >
+                <MessageCircle className="w-4 h-4 shrink-0" /> Feedback
+              </button>
               <div className="px-1 pt-1">
                 <UserNav sidebar />
               </div>
@@ -229,11 +235,18 @@ export default function AppNav({
           <NavLinks collapsed={collapsed} />
         </nav>
 
-        {/* Bottom: Settings, theme toggle + user */}
+        {/* Bottom: Settings, Feedback, theme toggle + user */}
         <div className="px-2 py-3 border-t border-edge/60 space-y-0.5">
           <Link href="/settings" title={collapsed ? 'Settings' : undefined} className={navCls('settings', activePage, collapsed)}>
             <Settings className="w-4 h-4 shrink-0" /> {!collapsed && 'Settings'}
           </Link>
+          <button
+            onClick={() => document.dispatchEvent(new Event('klippa:open-feedback'))}
+            title={collapsed ? 'Feedback' : undefined}
+            className={`${NAV_IDLE} w-full ${collapsed ? 'justify-center px-0' : ''}`}
+          >
+            <MessageCircle className="w-4 h-4 shrink-0" /> {!collapsed && 'Feedback'}
+          </button>
           {!collapsed && (
             <>
               <div className="flex items-center justify-between px-1 pt-1">
