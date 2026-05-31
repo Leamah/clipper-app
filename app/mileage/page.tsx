@@ -11,7 +11,7 @@ import {
   Download, FileText, AlertCircle, ChevronRight, ChevronDown,
   Calendar, CheckCircle2, Clock, MapPin
 } from 'lucide-react'
-import type { KlippaMileageTrip, KlippaProfile, KlippaLogbookReview } from '@/lib/types'
+import type { KlippaMileageTrip, KlippaProfile, KlippaLogbookReview, OrgBranding } from '@/lib/types'
 import { calcTravelDeduction } from '@/lib/tax-engine'
 import {
   format, addDays, startOfWeek, endOfWeek, addWeeks,
@@ -115,6 +115,7 @@ export default function MileagePage() {
   const [openWeekKey,  setOpenWeekKey]  = useState<string | null>(null)
   const [showAddTrip,  setShowAddTrip]  = useState(false)
   const [confirming,   setConfirming]   = useState(false)
+  const [orgBranding,  setOrgBranding]  = useState<OrgBranding | null>(null)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -127,11 +128,25 @@ export default function MileagePage() {
       supabase.from('klippa_logbook_reviews').select('*').eq('user_id', user.id),
     ])
 
-    setProfile(profileRes.data as KlippaProfile | null)
+    const prof = profileRes.data as KlippaProfile | null
+    setProfile(prof)
     setTaxReturnId(returnRes.data?.id ?? null)
     setTrips((tripsRes.data ?? []) as KlippaMileageTrip[])
     setReviews((reviewsRes.data ?? []) as KlippaLogbookReview[])
     setLoading(false)
+
+    // Fetch org branding if user belongs to an org
+    if ((prof as (KlippaProfile & { organisation_id?: string }) | null)?.organisation_id) {
+      const res  = await fetch('/api/org/settings')
+      const json = await res.json()
+      if (json.org) {
+        setOrgBranding({
+          orgName:    json.org.name,
+          brandColor: json.org.brand_color ?? '#10b981',
+          logoUrl:    json.org.logo_url    ?? null,
+        })
+      }
+    }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
@@ -241,7 +256,7 @@ export default function MileagePage() {
   async function handleExportSARSPDF() {
     if (!profile) return
     const { exportLogbookPDF } = await import('@/lib/pdf-export')
-    exportLogbookPDF(profile, trips, taxYear)
+    await exportLogbookPDF(profile, trips, taxYear, orgBranding ?? undefined)
   }
 
   return (

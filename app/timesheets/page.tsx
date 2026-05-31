@@ -15,7 +15,7 @@ import {
   addMonths, subMonths, parseISO,
 } from 'date-fns'
 import type {
-  KlippaProfile, KlippaClient, KlippaTimesheet, KlippaTimesheetEntry,
+  KlippaProfile, KlippaClient, KlippaTimesheet, KlippaTimesheetEntry, OrgBranding,
 } from '@/lib/types'
 import { getSAHolidayName } from '@/lib/sa-holidays'
 import { useRouter } from 'next/navigation'
@@ -339,6 +339,7 @@ export default function TimesheetsPage() {
   const [signingClient,   setSigningClient]    = useState(false)
   const [savingPdf,       setSavingPdf]        = useState(false)
   const [saveMsg,         setSaveMsg]          = useState<string | null>(null)
+  const [orgBranding,     setOrgBranding]      = useState<OrgBranding | null>(null)
 
   // ── Load profile & clients ────────────────────────────
   useEffect(() => {
@@ -352,7 +353,21 @@ export default function TimesheetsPage() {
         .eq('id', user.id)
         .single()
 
-      if (prof) setProfile(prof as KlippaProfile)
+      if (prof) {
+        setProfile(prof as KlippaProfile)
+        // Fetch org branding if user belongs to an org
+        if ((prof as KlippaProfile & { organisation_id?: string }).organisation_id) {
+          const res = await fetch('/api/org/settings')
+          const json = await res.json()
+          if (json.org) {
+            setOrgBranding({
+              orgName:    json.org.name,
+              brandColor: json.org.brand_color ?? '#10b981',
+              logoUrl:    json.org.logo_url    ?? null,
+            })
+          }
+        }
+      }
 
       const { data: cls } = await supabase
         .from('klippa_clients')
@@ -539,10 +554,10 @@ export default function TimesheetsPage() {
       const filename   = `Timesheet_${clientName}_${monthStr}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_')
 
       // Generate PDF as a Blob (no auto-download)
-      const blob = exportTimesheetPDF(
+      const blob = await exportTimesheetPDF(
         { ...timesheet, client_name: activeClient?.name, client_contact: activeClient?.contact ?? undefined },
         entries,
-        { blob: true },
+        { blob: true, branding: orgBranding ?? undefined },
       ) as Blob
 
       // Upload to storage
@@ -579,13 +594,14 @@ export default function TimesheetsPage() {
   async function handleExportPDF() {
     if (!timesheet) return
     const { exportTimesheetPDF } = await import('@/lib/pdf-export')
-    exportTimesheetPDF(
+    await exportTimesheetPDF(
       {
         ...timesheet,
         client_name:    activeClient?.name,
         client_contact: activeClient?.contact ?? undefined,
       },
       entries,
+      { branding: orgBranding ?? undefined },
     )
   }
 

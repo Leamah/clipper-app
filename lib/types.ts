@@ -246,10 +246,18 @@ export interface KlippaOrganisation {
   org_type:          OrgType
   owner_id:          string
   logo_url:          string | null
+  brand_color:       string | null   // hex e.g. '#10b981'
   subscription_tier: string
   seat_count:        number
   created_at:        string
   updated_at:        string
+}
+
+/** Branding passed to PDF / email generators */
+export interface OrgBranding {
+  orgName:    string
+  brandColor: string          // hex e.g. '#10b981'
+  logoUrl:    string | null
 }
 
 export interface KlippaOrgInvite {

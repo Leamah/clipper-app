@@ -68,16 +68,17 @@ export async function POST(request: Request) {
 
   if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 500 })
 
-  // Fetch org name for the acceptance URL
+  // Fetch org name + brand color for the acceptance URL
   const { data: orgRow } = await admin
     .from('klippa_organisations')
-    .select('name')
+    .select('name, brand_color, logo_url')
     .eq('id', orgId)
     .single()
 
-  const siteUrl   = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
-  const acceptUrl = `${siteUrl}/invite/${token}`
-  const orgName   = orgRow?.name ?? 'an organisation'
+  const siteUrl    = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
+  const acceptUrl  = `${siteUrl}/invite/${token}`
+  const orgName    = orgRow?.name        ?? 'an organisation'
+  const brandColor = orgRow?.brand_color ?? '#10b981'
 
   // Send invite email via Brevo (silently skip if key not configured)
   const brevoKey = process.env.BREVO_API_KEY
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
       apiKey:  brevoKey,
       to:      email.trim().toLowerCase(),
       subject: `You've been invited to join ${orgName} on Klippa`,
-      html:    buildInviteEmail({ orgName, inviterName, acceptUrl }),
+      html:    buildInviteEmail({ orgName, inviterName, acceptUrl, brandColor }),
     }).catch((err) => console.error('[org/invite] Brevo error:', err))
   } else {
     console.info(`[org/invite] BREVO_API_KEY not set — invite link: ${acceptUrl}`)
@@ -160,11 +161,13 @@ async function sendBrevoEmail({ apiKey, to, subject, html }: {
 
 // ── Email template ────────────────────────────────────────
 
-function buildInviteEmail({ orgName, inviterName, acceptUrl }: {
+function buildInviteEmail({ orgName, inviterName, acceptUrl, brandColor = '#10b981' }: {
   orgName:     string
   inviterName: string
   acceptUrl:   string
+  brandColor?: string
 }) {
+  const initial = orgName.charAt(0).toUpperCase()
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -173,29 +176,29 @@ function buildInviteEmail({ orgName, inviterName, acceptUrl }: {
     <tr><td align="center">
       <table width="100%" style="max-width:520px;background:#1a1a1a;border-radius:16px;border:1px solid #2a2a2a;overflow:hidden;">
         <!-- Header -->
-        <tr><td style="background:linear-gradient(135deg,#10b981,#0d9488);padding:28px 32px;">
+        <tr><td style="background:${brandColor};padding:28px 32px;">
           <table cellpadding="0" cellspacing="0">
             <tr>
-              <td style="width:32px;height:32px;background:rgba(255,255,255,0.15);border-radius:8px;text-align:center;vertical-align:middle;">
-                <span style="color:#fff;font-size:16px;font-weight:700;">K</span>
+              <td style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:8px;text-align:center;vertical-align:middle;">
+                <span style="color:#fff;font-size:18px;font-weight:700;">${initial}</span>
               </td>
-              <td style="padding-left:10px;color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">Klippa</td>
+              <td style="padding-left:12px;color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">${orgName}</td>
             </tr>
           </table>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:32px;">
-          <p style="margin:0 0 8px;color:#f5f5f5;font-size:22px;font-weight:700;line-height:1.3;">You&rsquo;re invited to join<br><span style="color:#10b981;">${orgName}</span></p>
+          <p style="margin:0 0 8px;color:#f5f5f5;font-size:22px;font-weight:700;line-height:1.3;">You&rsquo;re invited to join<br><span style="color:${brandColor};">${orgName}</span></p>
           <p style="margin:16px 0 0;color:#a0a0a0;font-size:14px;line-height:1.6;">${inviterName} has invited you to their workspace on Klippa — South Africa&rsquo;s freelancer tax platform. Accept the invite to track timesheets, manage expenses, and stay SARS-compliant together.</p>
           <!-- CTA -->
           <table cellpadding="0" cellspacing="0" style="margin:28px 0;">
-            <tr><td style="background:#10b981;border-radius:10px;">
+            <tr><td style="background:${brandColor};border-radius:10px;">
               <a href="${acceptUrl}" style="display:inline-block;padding:14px 28px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;letter-spacing:-0.2px;">Accept invitation →</a>
             </td></tr>
           </table>
-          <p style="margin:0;color:#666;font-size:12px;line-height:1.6;">Or copy this link into your browser:<br><span style="color:#10b981;word-break:break-all;">${acceptUrl}</span></p>
+          <p style="margin:0;color:#666;font-size:12px;line-height:1.6;">Or copy this link into your browser:<br><span style="color:${brandColor};word-break:break-all;">${acceptUrl}</span></p>
           <hr style="border:none;border-top:1px solid #2a2a2a;margin:24px 0;">
-          <p style="margin:0;color:#555;font-size:11px;">This invite expires in 7 days. If you weren&rsquo;t expecting this, you can safely ignore it.</p>
+          <p style="margin:0;color:#555;font-size:11px;">This invite expires in 7 days · Sent by ${orgName} via Klippa</p>
         </td></tr>
       </table>
     </td></tr>

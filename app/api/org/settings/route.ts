@@ -57,7 +57,10 @@ export async function PATCH(request: Request) {
 
   const body = await request.json()
   const updates: Record<string, unknown> = {}
-  if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim()
+  if (typeof body.name        === 'string' && body.name.trim())  updates.name        = body.name.trim()
+  if (typeof body.brand_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.brand_color.trim()))
+    updates.brand_color = body.brand_color.trim().toLowerCase()
+  if (typeof body.logo_url    === 'string')                       updates.logo_url    = body.logo_url || null
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })

@@ -58,9 +58,10 @@ export async function POST(request: Request) {
   const period = periods?.[0]
   if (!period) return NextResponse.json({ error: 'No open payroll period' }, { status: 400 })
 
-  // Get org name
-  const { data: orgRow } = await admin.from('klippa_organisations').select('name').eq('id', orgId).single()
-  const orgName = orgRow?.name ?? 'your organisation'
+  // Get org name + branding
+  const { data: orgRow } = await admin.from('klippa_organisations').select('name, brand_color').eq('id', orgId).single()
+  const orgName    = orgRow?.name        ?? 'your organisation'
+  const brandColor = orgRow?.brand_color ?? '#10b981'
 
   // Get consultants (non-owners)
   const { data: members } = await admin
@@ -99,8 +100,13 @@ export async function POST(request: Request) {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f0f0f;padding:40px 16px;">
     <tr><td align="center">
       <table width="100%" style="max-width:520px;background:#1a1a1a;border-radius:16px;border:1px solid #2a2a2a;overflow:hidden;">
-        <tr><td style="background:linear-gradient(135deg,#10b981,#0d9488);padding:24px 32px;">
-          <span style="color:#fff;font-size:18px;font-weight:700;">Klippa</span>
+        <tr><td style="background:${brandColor};padding:24px 32px;">
+          <table cellpadding="0" cellspacing="0"><tr>
+            <td style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:8px;text-align:center;vertical-align:middle;">
+              <span style="color:#fff;font-size:16px;font-weight:700;">${orgName.charAt(0).toUpperCase()}</span>
+            </td>
+            <td style="padding-left:10px;color:#fff;font-size:17px;font-weight:700;">${orgName}</td>
+          </tr></table>
         </td></tr>
         <tr><td style="padding:32px;">
           <p style="margin:0 0 8px;color:#f5f5f5;font-size:20px;font-weight:700;">Hi ${name},</p>
@@ -110,7 +116,7 @@ export async function POST(request: Request) {
             ${daysLeft > 0 ? `— that&rsquo;s ${daysLeft} day${daysLeft !== 1 ? 's' : ''} from now` : '— <strong style="color:#ef4444;">that&rsquo;s today</strong>'}.
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:24px 0;">
-            <tr><td style="background:#10b981;border-radius:10px;">
+            <tr><td style="background:${brandColor};border-radius:10px;">
               <a href="${siteUrl}/timesheets" style="display:inline-block;padding:13px 26px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">Submit timesheet →</a>
             </td></tr>
           </table>
