@@ -13,13 +13,28 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const SUPABASE_URL  = (process.env.NEXT_PUBLIC_SUPABASE_URL  ?? '').replace(/\/$/, '')
+// Derive base URL: prefer explicit SUPABASE_URL (server-only), then fall back to
+// the public var.  If neither is set we construct from the known project ref.
+const SUPABASE_URL = (() => {
+  const raw =
+    process.env.SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    ''
+  // Strip any path component so we always get just https://<ref>.supabase.co
+  try {
+    const u = new URL(raw.replace(/\/$/, ''))
+    return `${u.protocol}//${u.host}`
+  } catch {
+    return raw.replace(/\/$/, '')
+  }
+})()
+
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
 export async function POST(req: NextRequest) {
   try {
     if (!SUPABASE_URL || !SUPABASE_ANON) {
-      console.error('[send-otp] Missing SUPABASE env vars')
+      console.error('[send-otp] Missing SUPABASE env vars — SUPABASE_URL:', SUPABASE_URL || '(empty)', 'ANON:', SUPABASE_ANON ? '(set)' : '(empty)')
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
     }
 
@@ -36,7 +51,10 @@ export async function POST(req: NextRequest) {
       ? '?' + new URLSearchParams({ redirect_to: emailRedirectTo }).toString()
       : ''
 
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp${qs}`, {
+    const otpEndpoint = `${SUPABASE_URL}/auth/v1/otp${qs}`
+    console.log('[send-otp] calling', otpEndpoint)
+
+    const res = await fetch(otpEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type':  'application/json',
@@ -57,13 +75,13 @@ export async function POST(req: NextRequest) {
     const text = await res.text()
 
     if (!res.ok) {
+      console.error(`[send-otp] Supabase ${res.status} from ${otpEndpoint} — body:`, text.slice(0, 500))
       let msg = `Supabase error ${res.status}`
       try {
         const body = JSON.parse(text) as { msg?: string; message?: string; error?: string }
         msg = body.msg ?? body.message ?? body.error ?? msg
       } catch {
-        // HTML or non-JSON body — log it so we can debug
-        console.error('[send-otp] Non-JSON error body:', text.slice(0, 500))
+        // HTML or non-JSON body — already logged above
       }
       return NextResponse.json({ error: msg }, { status: res.status })
     }
