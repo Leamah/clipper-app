@@ -254,7 +254,7 @@ export default function OrgDashboardPage() {
               {isOwner && (
                 <button
                   onClick={() => sendReminders(missing.map(m => m.id))}
-                  disabled={sending || !process.env.NEXT_PUBLIC_SITE_URL}
+                  disabled={sending}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-white disabled:opacity-50 transition-colors flex-shrink-0"
                 >
                   {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}

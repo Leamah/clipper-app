@@ -4,7 +4,7 @@ import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 
 async function sendBrevoEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
-  const apiKey = process.env.BREVO_API_KEY
+  const apiKey = (process.env.BREVO_API_KEY ?? '').trim()
   if (!apiKey) throw new Error('BREVO_API_KEY not configured')
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method:  'POST',
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   const body  = await request.json().catch(() => ({}))
   const filterIds: string[] | undefined = body.consultant_ids
 
-  // Get current open period
+  // Get current open period (optional — send a general nudge if none exists)
   const { data: periods } = await admin
     .from('klippa_payroll_periods')
     .select('*')
@@ -55,8 +55,7 @@ export async function POST(request: Request) {
     .order('deadline', { ascending: true })
     .limit(1)
 
-  const period = periods?.[0]
-  if (!period) return NextResponse.json({ error: 'No open payroll period' }, { status: 400 })
+  const period = periods?.[0] ?? null
 
   // Get org name + branding
   const { data: orgRow } = await admin.from('klippa_organisations').select('name, brand_color').eq('id', orgId).single()
@@ -80,20 +79,31 @@ export async function POST(request: Request) {
   const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 })
   const emailMap = Object.fromEntries((authData?.users ?? []).map(u => [u.id, u.email ?? '']))
 
-  const siteUrl    = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
-  const deadline   = new Date(period.deadline).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
-  const daysLeft   = Math.ceil((new Date(period.deadline).getTime() - Date.now()) / 86_400_000)
+  const siteUrl  = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
+  const deadline = period ? new Date(period.deadline).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : null
+  const daysLeft = period ? Math.ceil((new Date(period.deadline).getTime() - Date.now()) / 86_400_000) : null
 
-  let sent = 0
+  let sent = 0; let failed = 0
   for (const m of targets) {
     const email = emailMap[m.id]
     if (!email) continue
-    const name  = m.full_name ?? email
+    const name = m.full_name ?? email
 
-    await sendBrevoEmail({
-      to:      email,
-      subject: `⏰ Timesheet due ${daysLeft > 0 ? `in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : 'today'} — ${period.name}`,
-      html: `<!DOCTYPE html>
+    const subject = period
+      ? `⏰ Timesheet due ${daysLeft != null && daysLeft > 0 ? `in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : 'today'} — ${period.name}`
+      : `⏰ Timesheet reminder from ${orgName}`
+
+    const periodLine = period
+      ? `Your timesheet for <strong style="color:#f5f5f5;">${period.name}</strong> hasn&rsquo;t been submitted yet.
+         ${orgName} requires it by <strong style="color:#f59e0b;">${deadline}</strong>
+         ${daysLeft != null && daysLeft > 0 ? `— that&rsquo;s ${daysLeft} day${daysLeft !== 1 ? 's' : ''} from now` : '— <strong style="color:#ef4444;">due today</strong>'}.`
+      : `Your organisation <strong style="color:#f5f5f5;">${orgName}</strong> is reminding you to keep your timesheets up to date.`
+
+    try {
+      await sendBrevoEmail({
+        to: email,
+        subject,
+        html: `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#0f0f0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -110,28 +120,27 @@ export async function POST(request: Request) {
         </td></tr>
         <tr><td style="padding:32px;">
           <p style="margin:0 0 8px;color:#f5f5f5;font-size:20px;font-weight:700;">Hi ${name},</p>
-          <p style="margin:16px 0;color:#a0a0a0;font-size:14px;line-height:1.7;">
-            Your timesheet for <strong style="color:#f5f5f5;">${period.name}</strong> hasn&rsquo;t been submitted yet.
-            ${orgName} requires it by <strong style="color:#f59e0b;">${deadline}</strong>
-            ${daysLeft > 0 ? `— that&rsquo;s ${daysLeft} day${daysLeft !== 1 ? 's' : ''} from now` : '— <strong style="color:#ef4444;">that&rsquo;s today</strong>'}.
-          </p>
+          <p style="margin:16px 0;color:#a0a0a0;font-size:14px;line-height:1.7;">${periodLine}</p>
           <table cellpadding="0" cellspacing="0" style="margin:24px 0;">
             <tr><td style="background:${brandColor};border-radius:10px;">
               <a href="${siteUrl}/timesheets" style="display:inline-block;padding:13px 26px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">Submit timesheet →</a>
             </td></tr>
           </table>
           <hr style="border:none;border-top:1px solid #2a2a2a;margin:24px 0;">
-          <p style="margin:0;color:#555;font-size:11px;">Sent on behalf of ${orgName} via Klippa. Period: ${period.period_start} – ${period.period_end}.</p>
+          <p style="margin:0;color:#555;font-size:11px;">Sent on behalf of ${orgName} via Klippa.${period ? ` Period: ${period.period_start} – ${period.period_end}.` : ''}</p>
         </td></tr>
       </table>
     </td></tr>
   </table>
 </body>
 </html>`,
-    }).catch(e => console.error(`[reminders] Failed to send to ${email}:`, e))
-
-    sent++
+      })
+      sent++
+    } catch (e) {
+      failed++
+      console.error(`[reminders] Failed to send to ${email}:`, e)
+    }
   }
 
-  return NextResponse.json({ sent })
+  return NextResponse.json({ sent, failed })
 }

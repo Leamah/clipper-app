@@ -118,7 +118,7 @@ export async function POST(request: Request) {
   const brandColor = orgRow?.brand_color ?? '#10b981'
 
   // Send invite email via Brevo
-  const brevoKey = process.env.BREVO_API_KEY
+  const brevoKey = (process.env.BREVO_API_KEY ?? '').trim() || null
   let emailSent = false
   let emailError: string | null = null
 
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     }
   } else {
     emailError = 'BREVO_API_KEY not configured'
-    console.info(`[org/invite] BREVO_API_KEY not set — invite link: ${acceptUrl}`)
+    console.warn(`[org/invite] BREVO_API_KEY not set or empty — invite link: ${acceptUrl}`)
   }
 
   return NextResponse.json({ invite, acceptUrl, orgName, emailSent, emailError })
