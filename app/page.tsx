@@ -237,11 +237,13 @@ export default function LandingPage() {
               become visible; a plain div has no such delay. */}
           <div className="relative">
             <div className="absolute -inset-4 bg-emerald-600/10 blur-3xl rounded-full pointer-events-none" />
-            {/* aspect-video keeps the box 16:9 even before video metadata loads */}
-            <div className="relative aspect-video rounded-2xl overflow-hidden border border-edge/70 shadow-2xl shadow-emerald-950/40 bg-surface">
+            {/* aspect-[3/4] gives a portrait-friendly frame for the 9:16 clip.
+                object-top anchors the top of the frame so the person's face
+                is always visible even though the video is taller than the box. */}
+            <div className="relative aspect-[3/4] rounded-2xl overflow-hidden border border-edge/70 shadow-2xl shadow-emerald-950/40 bg-surface">
               <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-top"
                 autoPlay
                 muted
                 loop
