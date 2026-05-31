@@ -84,16 +84,16 @@ export default function Dashboard() {
       setUserId(user.id)
       // Belt-and-suspenders onboarding guard — catches the rare case where
       // the middleware couldn't check the profile (e.g. session not yet in cookies).
+      // Note: org owners / practitioners land on their org home after login
+      // (handled by middleware), but they can still open this personal tax
+      // workspace via the "My profile" link — so we no longer redirect them away.
       supabase
         .from('klippa_profiles')
-        .select('onboarding_complete, user_type')
+        .select('onboarding_complete')
         .eq('id', user.id)
         .single()
         .then(({ data: p }) => {
           if (!p || !p.onboarding_complete) { router.replace('/onboarding'); return }
-          if (p.user_type === 'company_owner' || p.user_type === 'practitioner') {
-            router.replace('/org/dashboard'); return
-          }
           loadData(user.id)
         })
     })

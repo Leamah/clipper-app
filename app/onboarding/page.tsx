@@ -86,6 +86,14 @@ export default function OnboardingPage() {
       const fp = state.financial_products
       const works_from_home = state.work_location !== 'office_only'
 
+      // Auto-enable the optional modules from the answers we already have,
+      // so the user doesn't have to hunt for a separate opt-in in Settings:
+      //  • Logbook/Mileage  → only if they drive for work
+      //  • Timesheets       → consultants who invoice (freelance / mixed)
+      //  • Provisional tax  → non-PAYE earners (freelance / mixed) file IRP6
+      const drivesForWork  = state.has_vehicle ?? false
+      const invoicesClients = state.employment_type === 'freelance' || state.employment_type === 'mixed'
+
       const { error: profileErr } = await supabase
         .from('klippa_profiles')
         .upsert({
@@ -95,6 +103,9 @@ export default function OnboardingPage() {
           work_location:        state.work_location,
           works_from_home,
           has_vehicle:          state.has_vehicle ?? false,
+          feature_logbook:      drivesForWork,
+          feature_timesheets:   invoicesClients,
+          feature_provisional:  invoicesClients,
           has_ra:               fp.has('ra'),
           has_pension:          fp.has('pension'),
           has_medical:          fp.has('medical'),

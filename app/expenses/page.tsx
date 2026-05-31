@@ -39,7 +39,7 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
   onReject: () => void
   loading:  boolean
 }) {
-  const [showEvidence, setShowEvidence] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   const riskColor = {
     high:   'text-red-400 bg-red-500/10',
@@ -58,8 +58,19 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
   const aggressive   = record.ai_aggressive_pct
   const recommended  = record.deductible_percentage
 
+  const hasRange   = !!(isMixed && conservative != null && aggressive != null)
+  const hasDetails = !!(
+    record.ai_sars_rule ||
+    record.ai_reasoning ||
+    record.ai_behavioral_tip ||
+    hasRange ||
+    (record.ai_required_evidence?.length ?? 0) > 0 ||
+    (record.ai_audit_triggers?.length ?? 0) > 0
+  )
+
   return (
     <div className="rounded-xl border border-edge bg-raised/50 p-4 space-y-3">
+      {/* Header — merchant + amount */}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
@@ -76,71 +87,74 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
         </div>
       </div>
 
-      {record.ai_sars_rule && (
-        <div className="rounded-lg bg-surface/80 border border-edge px-3 py-2.5">
-          <p className="text-[10px] font-semibold text-ink-2 uppercase tracking-wide mb-1">SARS says</p>
-          <p className="text-xs text-ink-1 leading-relaxed">{record.ai_sars_rule}</p>
-        </div>
-      )}
+      {/* Decision row — always visible: the number + how sure + risk */}
+      <div className="flex items-center gap-2 flex-wrap px-1">
+        <span className="text-sm font-semibold text-ink-1">{recommended}% deductible</span>
+        {record.ai_confidence && (
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${confidenceColor}`}>
+            {record.ai_confidence}
+          </span>
+        )}
+        {record.ai_audit_risk && (
+          <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${riskColor}`}>
+            <ShieldAlert className="w-3 h-3" />
+            {record.ai_audit_risk} audit risk
+          </span>
+        )}
+      </div>
 
-      {record.ai_reasoning && (
-        <p className="text-xs text-ink-2 leading-relaxed italic px-1">&ldquo;{record.ai_reasoning}&rdquo;</p>
-      )}
-
-      {isMixed && conservative != null && aggressive != null ? (
-        <div className="rounded-lg bg-surface/60 p-3 space-y-2.5">
-          <p className="text-[10px] font-semibold text-ink-2 uppercase tracking-wide">Deductibility range</p>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="space-y-0.5">
-              <p className="text-xs text-ink-2">Conservative</p>
-              <p className="text-sm font-bold text-ink-2">{conservative}%</p>
-              <p className="text-xs text-ink-3">{formatRand(record.amount * conservative / 100)}</p>
-            </div>
-            <div className="space-y-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 py-1">
-              <p className="text-xs text-emerald-400 font-medium">Recommended</p>
-              <p className="text-sm font-bold text-emerald-300">{recommended}%</p>
-              <p className="text-xs text-emerald-500">{formatRand(record.deductible_amount)}</p>
-            </div>
-            <div className="space-y-0.5">
-              <p className="text-xs text-ink-2">Maximum</p>
-              <p className="text-sm font-bold text-ink-2">{aggressive}%</p>
-              <p className="text-xs text-ink-3">{formatRand(record.amount * aggressive / 100)}</p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 flex-wrap px-1">
-          <span className="text-xs text-ink-2">{recommended}% deductible</span>
-          {record.ai_confidence && (
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${confidenceColor}`}>
-              {record.ai_confidence}
-            </span>
-          )}
-          {record.ai_audit_risk && (
-            <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${riskColor}`}>
-              <ShieldAlert className="w-3 h-3" />
-              {record.ai_audit_risk} audit risk
-            </span>
-          )}
-        </div>
-      )}
-
-      {record.ai_behavioral_tip && (
-        <div className="flex items-start gap-2 rounded-lg bg-blue-500/8 border border-blue-500/15 px-3 py-2">
-          <span className="text-blue-400 mt-0.5 flex-shrink-0">💡</span>
-          <p className="text-xs text-blue-300 leading-relaxed">{record.ai_behavioral_tip}</p>
-        </div>
-      )}
-
-      {((record.ai_required_evidence?.length ?? 0) > 0 || (record.ai_audit_triggers?.length ?? 0) > 0) && (
-        <button onClick={() => setShowEvidence((v) => !v)}
+      {/* One disclosure for all the reasoning — keeps the card decision-first */}
+      {hasDetails && (
+        <button onClick={() => setShowDetails((v) => !v)}
           className="text-xs text-ink-2 hover:text-ink-1 transition-colors flex items-center gap-1">
-          <ChevronDown className={`w-3 h-3 transition-transform ${showEvidence ? 'rotate-180' : ''}`} />
-          {showEvidence ? 'Hide' : 'Show'} evidence required &amp; audit triggers
+          <ChevronDown className={`w-3 h-3 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
+          {showDetails ? 'Hide details' : 'Why this number?'}
         </button>
       )}
-      {showEvidence && (
-        <div className="space-y-2 pt-1">
+
+      {showDetails && (
+        <div className="space-y-3 pt-1">
+          {record.ai_sars_rule && (
+            <div className="rounded-lg bg-surface/80 border border-edge px-3 py-2.5">
+              <p className="text-[10px] font-semibold text-ink-2 uppercase tracking-wide mb-1">SARS says</p>
+              <p className="text-xs text-ink-1 leading-relaxed">{record.ai_sars_rule}</p>
+            </div>
+          )}
+
+          {record.ai_reasoning && (
+            <p className="text-xs text-ink-2 leading-relaxed italic px-1">&ldquo;{record.ai_reasoning}&rdquo;</p>
+          )}
+
+          {hasRange && (
+            <div className="rounded-lg bg-surface/60 p-3 space-y-2.5">
+              <p className="text-[10px] font-semibold text-ink-2 uppercase tracking-wide">Deductibility range</p>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="space-y-0.5">
+                  <p className="text-xs text-ink-2">Conservative</p>
+                  <p className="text-sm font-bold text-ink-2">{conservative}%</p>
+                  <p className="text-xs text-ink-3">{formatRand(record.amount * conservative! / 100)}</p>
+                </div>
+                <div className="space-y-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 py-1">
+                  <p className="text-xs text-emerald-400 font-medium">Recommended</p>
+                  <p className="text-sm font-bold text-emerald-300">{recommended}%</p>
+                  <p className="text-xs text-emerald-500">{formatRand(record.deductible_amount)}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-xs text-ink-2">Maximum</p>
+                  <p className="text-sm font-bold text-ink-2">{aggressive}%</p>
+                  <p className="text-xs text-ink-3">{formatRand(record.amount * aggressive! / 100)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {record.ai_behavioral_tip && (
+            <div className="flex items-start gap-2 rounded-lg bg-blue-500/8 border border-blue-500/15 px-3 py-2">
+              <span className="text-blue-400 mt-0.5 flex-shrink-0">💡</span>
+              <p className="text-xs text-blue-300 leading-relaxed">{record.ai_behavioral_tip}</p>
+            </div>
+          )}
+
           {(record.ai_required_evidence?.length ?? 0) > 0 && (
             <div className="space-y-1">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-2">Keep on file</p>
@@ -151,6 +165,7 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
               ))}
             </div>
           )}
+
           {(record.ai_audit_triggers?.length ?? 0) > 0 && (
             <div className="space-y-1">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-2">SARS audit triggers</p>
