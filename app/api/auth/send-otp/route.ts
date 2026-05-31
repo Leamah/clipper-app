@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // Derive base URL: prefer explicit SUPABASE_URL (server-only), then fall back to
 // the public var.  If neither is set we construct from the known project ref.
@@ -47,12 +48,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 })
     }
 
+    // Rate-limit: 5 OTP requests per email address per 15 minutes
+    if (!checkRateLimit(`otp:${email.toLowerCase()}`, 5, 15 * 60_000)) {
+      return NextResponse.json({ error: 'Too many login attempts — try again in 15 minutes.' }, { status: 429 })
+    }
+
     const qs = emailRedirectTo
       ? '?' + new URLSearchParams({ redirect_to: emailRedirectTo }).toString()
       : ''
 
     const otpEndpoint = `${SUPABASE_URL}/auth/v1/otp${qs}`
-    console.log('[send-otp] calling', otpEndpoint)
 
     const res = await fetch(otpEndpoint, {
       method: 'POST',

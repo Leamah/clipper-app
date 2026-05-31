@@ -1,6 +1,7 @@
 // ============================================================
 // Klippa Tax Engine — multi-year SARS ITR12 rules engine
-// Supports: 2024/2025 (taxYear=2025) and 2025/2026 (taxYear=2026)
+// Supports: 2024/2025 (taxYear=2025), 2025/2026 (taxYear=2026),
+//           2026/2027 (taxYear=2027)
 // CRITICAL: This engine is the ONLY source of tax figures.
 //           AI never generates tax calculations.
 // ============================================================
@@ -88,9 +89,25 @@ const RATES_2026: YearRates = {
 }
 
 // ── 2026/2027 tax year ────────────────────────────────────
-// TODO: Update when SARS publishes the February 2026 Budget rates
+// Brackets: gazetted 25 February 2026 Budget (Enoch Godongwana).
+// Rebates, thresholds and medical credits: carry over from 2025/2026
+// pending the full gazette publication — verify at sars.gov.za/tax-rates.
+// Fixed-cost table: carry over from 2025/2026 — SARS typically publishes
+// the updated rates-per-km schedule separately after the Budget.
+const BRACKETS_2027: TaxBracket[] = [
+  { min:         0, max:    245_100, base:         0, rate: 0.18 },
+  { min:   245_101, max:    383_100, base:    44_118, rate: 0.26 },
+  { min:   383_101, max:    530_200, base:    79_998, rate: 0.31 },
+  { min:   530_201, max:    695_800, base:   125_599, rate: 0.36 },
+  { min:   695_801, max:    887_000, base:   185_215, rate: 0.39 },
+  { min:   887_001, max:  1_878_600, base:   259_783, rate: 0.41 },
+  { min: 1_878_601, max:       null, base:   666_339, rate: 0.45 },
+]
+
 const RATES_2027: YearRates = {
-  ...RATES_2025,   // placeholder — replace after February 2026 Budget gazette
+  ...RATES_2025,            // rebates / thresholds / medical / interest carry over
+  brackets:      BRACKETS_2027,
+  fixedCostTable: FIXED_COST_2025,  // update when SARS gazette is published
 }
 
 // ── Rate selector ─────────────────────────────────────────

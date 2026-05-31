@@ -13,7 +13,7 @@ import {
 import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCategory } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
-import { exportAuditPackPDF } from '@/lib/pdf-export'
+// pdf-export lazy-loaded on demand — jsPDF (~300 kB) only needed when user clicks "Export Audit Pack"
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 2 }).format(n)
@@ -619,6 +619,7 @@ function ExpensesPage() {
     setExportingPack(true)
     try {
       const taxYear = taxReturn?.tax_year ?? new Date().getFullYear()
+      const { exportAuditPackPDF } = await import('@/lib/pdf-export')
       await exportAuditPackPDF(
         { full_name: profile?.full_name ?? '', tax_number: profile?.tax_number ?? null },
         confirmedRecs,

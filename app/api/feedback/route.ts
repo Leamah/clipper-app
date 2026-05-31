@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
+  // Rate-limit: 5 submissions per IP per minute
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+  if (!checkRateLimit(`feedback:${ip}`, 5, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests — try again in a minute.' }, { status: 429 })
+  }
+
   try {
     const { subject, message, email, page } = await req.json() as {
       subject?: string

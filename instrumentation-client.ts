@@ -21,3 +21,6 @@ Sentry.init({
   // Don't print Sentry debug logs
   debug: false,
 })
+
+// Instruments client-side navigations for Sentry performance tracing
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
