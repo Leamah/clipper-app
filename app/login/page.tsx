@@ -63,10 +63,17 @@ function LoginForm() {
     setError(null)
     setLoading(true)
     try {
+      // Forward any post-login destination (e.g. accepting an org invite)
+      // through the magic-link redirect so the callback can honour it.
+      const redirectTo = searchParams.get('redirectTo')
+      const callbackUrl = redirectTo
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+        : `${window.location.origin}/auth/callback`
+
       const { error: authError } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: callbackUrl,
         },
       })
       if (authError) throw authError

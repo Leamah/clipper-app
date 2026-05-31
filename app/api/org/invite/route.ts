@@ -80,22 +80,32 @@ export async function POST(request: Request) {
   const orgName    = orgRow?.name        ?? 'an organisation'
   const brandColor = orgRow?.brand_color ?? '#10b981'
 
-  // Send invite email via Brevo (silently skip if key not configured)
+  // Send invite email via Brevo
   const brevoKey = process.env.BREVO_API_KEY
+  let emailSent = false
+  let emailError: string | null = null
+
   if (brevoKey) {
     const { data: callerAuth } = await admin.auth.admin.getUserById(user.id)
     const inviterName = callerAuth?.user?.email ?? 'Your colleague'
-    await sendBrevoEmail({
-      apiKey:  brevoKey,
-      to:      email.trim().toLowerCase(),
-      subject: `You've been invited to join ${orgName} on Klippa`,
-      html:    buildInviteEmail({ orgName, inviterName, acceptUrl, brandColor }),
-    }).catch((err) => console.error('[org/invite] Brevo error:', err))
+    try {
+      await sendBrevoEmail({
+        apiKey:  brevoKey,
+        to:      email.trim().toLowerCase(),
+        subject: `You've been invited to join ${orgName} on Klippa`,
+        html:    buildInviteEmail({ orgName, inviterName, acceptUrl, brandColor }),
+      })
+      emailSent = true
+    } catch (err) {
+      emailError = err instanceof Error ? err.message : 'Email send failed'
+      console.error('[org/invite] Brevo error:', err)
+    }
   } else {
+    emailError = 'BREVO_API_KEY not configured'
     console.info(`[org/invite] BREVO_API_KEY not set — invite link: ${acceptUrl}`)
   }
 
-  return NextResponse.json({ invite, acceptUrl, orgName })
+  return NextResponse.json({ invite, acceptUrl, orgName, emailSent, emailError })
 }
 
 export async function GET() {

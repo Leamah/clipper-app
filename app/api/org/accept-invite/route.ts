@@ -49,21 +49,35 @@ export async function POST(request: Request) {
     )
   }
 
-  // Check the user isn't already in an org
+  // Inspect the user's current org membership
   const { data: profile } = await admin
     .from('klippa_profiles')
-    .select('organisation_id')
+    .select('organisation_id, org_role')
     .eq('id', user.id)
     .single()
 
-  if (profile?.organisation_id) {
-    // Already in an org — mark invite accepted anyway (idempotent)
+  // Already a member of THIS org — idempotent success
+  if (profile?.organisation_id === invite.organisation_id) {
     await admin
       .from('klippa_org_invites')
       .update({ status: 'accepted' })
       .eq('id', invite.id)
-    return NextResponse.json({ success: true, message: 'Already in an organisation' })
+    const { data: sameOrg } = await admin
+      .from('klippa_organisations').select('name').eq('id', invite.organisation_id).single()
+    return NextResponse.json({ success: true, orgName: sameOrg?.name ?? 'your organisation' })
   }
+
+  // Owns a different org — block (an owner can't also be a consultant elsewhere
+  // on the same account; they'd lose access to their own org's data).
+  if (profile?.organisation_id && profile.org_role === 'owner') {
+    return NextResponse.json(
+      { error: 'You own an organisation on this account. Use a different email to join another organisation as a consultant.' },
+      { status: 409 },
+    )
+  }
+
+  // A consultant moving from one agency to another — switching is allowed.
+  // Their organisation_id is simply re-pointed; the old org no longer sees them.
 
   // Accept: link user to org + mark invite accepted
   const [updateInvite, updateProfile] = await Promise.all([

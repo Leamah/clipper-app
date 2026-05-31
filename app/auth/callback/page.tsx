@@ -49,6 +49,10 @@ export default function AuthCallback() {
       if (handled) return
       handled = true
 
+      // Honour an explicit post-login destination (e.g. accepting an invite),
+      // but never let it short-circuit onboarding.
+      const next = qp.get('next')
+
       const { data: profile } = await supabase
         .from('klippa_profiles')
         .select('onboarding_complete, user_type')
@@ -57,6 +61,8 @@ export default function AuthCallback() {
 
       if (!profile || !profile.onboarding_complete) {
         router.replace('/onboarding')
+      } else if (next && next.startsWith('/')) {
+        router.replace(next)
       } else if (profile.user_type === 'company_owner' || profile.user_type === 'practitioner') {
         router.replace('/org/dashboard')
       } else {

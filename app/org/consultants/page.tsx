@@ -236,9 +236,15 @@ export default function ConsultantsPage() {
       const json = await res.json()
       if (json.error) throw new Error(json.error)
       setInvites(prev => [json.invite, ...prev])
+      const invitedTo = inviteEmail.trim()
       setInviteEmail('')
-      setInviteMsg(`Invite created for ${inviteEmail.trim()}`)
-      setAcceptUrl(json.acceptUrl ?? null)
+      if (json.emailSent) {
+        setInviteMsg(`Invitation emailed to ${invitedTo}`)
+        setAcceptUrl(null)               // email sent — no need for manual link
+      } else {
+        setInviteMsg(`Invite created for ${invitedTo} — email could not be sent, share the link below`)
+        setAcceptUrl(json.acceptUrl ?? null)
+      }
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
     finally { setSending(false) }
   }
