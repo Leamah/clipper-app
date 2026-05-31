@@ -10,6 +10,7 @@ import AppNav from '@/components/AppNav'
 import {
   TrendingUp, AlertCircle, CheckCircle2,
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car, Zap,
+  ShieldCheck, ShieldAlert,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
 import { useRouter } from 'next/navigation'
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [expenseRecords, setExpenseRecords] = useState<KlippaExpenseRecord[]>([])
   const [mileageTrips,   setMileageTrips]   = useState<KlippaMileageTrip[]>([])
   const [logbookPending, setLogbookPending] = useState(0)
+  const [pendingExpenses, setPendingExpenses] = useState(0)
   const [userId,         setUserId]         = useState<string | null>(null)
   const [loading,        setLoading]        = useState(true)
   const [showBreakdown,  setShowBreakdown]  = useState(false)
@@ -66,14 +68,16 @@ export default function Dashboard() {
     }
 
     if (ret) {
-      const [incRes, expRes, mileRes] = await Promise.all([
+      const [incRes, expRes, mileRes, pendRes] = await Promise.all([
         supabase.from('klippa_income_records').select('*').eq('tax_return_id', ret.id).order('created_at', { ascending: false }),
         supabase.from('klippa_expense_records').select('*').eq('tax_return_id', ret.id).eq('classification_status', 'confirmed'),
         supabase.from('klippa_mileage_trips').select('*').eq('tax_return_id', ret.id),
+        supabase.from('klippa_expense_records').select('id', { count: 'exact', head: true }).eq('tax_return_id', ret.id).eq('classification_status', 'pending'),
       ])
       setIncomeRecords((incRes.data ?? []) as KlippaIncomeRecord[])
       setExpenseRecords((expRes.data ?? []) as KlippaExpenseRecord[])
       setMileageTrips((mileRes.data ?? []) as KlippaMileageTrip[])
+      setPendingExpenses(pendRes.count ?? 0)
     }
     setLoading(false)
   }, [])
@@ -149,6 +153,15 @@ export default function Dashboard() {
   // ── Profile completion ───────────────────────────────────
 
   const profileCompletion = profile ? calcProfileCompletion(profile) : null
+
+  // ── Audit readiness ──────────────────────────────────────
+  const drivesForWork = !!profile?.feature_logbook && (profile?.commute_km ?? 0) > 0
+  const auditReadiness = computeAuditReadiness({
+    confirmed:      expenseRecords,
+    pendingCount:   pendingExpenses,
+    drivesForWork,
+    logbookPending,
+  })
 
   // ── Return completion % ──────────────────────────────────
 
@@ -241,6 +254,11 @@ export default function Dashboard() {
         {/* Profile completion */}
         {profileCompletion && (
           <ProfileCompletionCard completion={profileCompletion} />
+        )}
+
+        {/* Audit readiness */}
+        {auditReadiness && (
+          <AuditReadinessCard readiness={auditReadiness} />
         )}
 
         {/* Upgrade nudge for free-tier users */}
@@ -508,6 +526,165 @@ function ProfileCompletionCard({ completion }: { completion: ProfileCompletionRe
 
       {/* Arrow */}
       <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${complete ? 'text-emerald-500/50 group-hover:text-emerald-400' : 'text-ink-3 group-hover:text-emerald-400'}`} />
+    </Link>
+  )
+}
+
+// ── Audit readiness ───────────────────────────────────────
+
+interface AuditFactor { label: string; ok: boolean; detail: string }
+interface AuditReadinessResult {
+  pct:     number
+  factors: AuditFactor[]
+}
+
+function computeAuditReadiness(input: {
+  confirmed:     KlippaExpenseRecord[]
+  pendingCount:  number
+  drivesForWork: boolean
+  logbookPending: number
+}): AuditReadinessResult | null {
+  const { confirmed, pendingCount, drivesForWork, logbookPending } = input
+
+  // Nothing to be audit-ready about yet.
+  if (confirmed.length === 0 && pendingCount === 0) return null
+
+  const withReceipt   = confirmed.filter(r => r.receipt_id).length
+  const highRisk      = confirmed.filter(r => r.ai_audit_risk === 'high')
+  const highRiskNoDoc = highRisk.filter(r => !r.receipt_id).length
+
+  let score = 0
+  let max   = 0
+  const factors: AuditFactor[] = []
+
+  // Evidence on file (weight 50)
+  if (confirmed.length > 0) {
+    max += 50
+    score += 50 * (withReceipt / confirmed.length)
+    const gap = confirmed.length - withReceipt
+    factors.push({
+      label:  'Receipts on file',
+      ok:     gap === 0,
+      detail: gap === 0
+        ? `All ${confirmed.length} confirmed expenses have a receipt`
+        : `${gap} of ${confirmed.length} confirmed expenses have no receipt attached`,
+    })
+  }
+
+  // Review backlog (weight 20)
+  max += 20
+  score += pendingCount === 0 ? 20 : Math.max(0, 20 - pendingCount * 5)
+  factors.push({
+    label:  'Nothing awaiting review',
+    ok:     pendingCount === 0,
+    detail: pendingCount === 0
+      ? 'Every captured expense has been classified'
+      : `${pendingCount} expense${pendingCount !== 1 ? 's' : ''} still need accept/reject`,
+  })
+
+  // Logbook current (weight 15) — only if they drive for work
+  if (drivesForWork) {
+    max += 15
+    score += logbookPending === 0 ? 15 : Math.max(0, 15 - logbookPending)
+    factors.push({
+      label:  'Logbook up to date',
+      ok:     logbookPending === 0,
+      detail: logbookPending === 0
+        ? 'No outstanding logbook weeks'
+        : `${logbookPending} week${logbookPending !== 1 ? 's' : ''} of business travel unconfirmed`,
+    })
+  }
+
+  // High-risk items documented (weight 15)
+  if (highRisk.length > 0) {
+    max += 15
+    score += 15 * ((highRisk.length - highRiskNoDoc) / highRisk.length)
+    factors.push({
+      label:  'High-risk claims backed up',
+      ok:     highRiskNoDoc === 0,
+      detail: highRiskNoDoc === 0
+        ? `All ${highRisk.length} high-audit-risk claims have a receipt`
+        : `${highRiskNoDoc} high-risk claim${highRiskNoDoc !== 1 ? 's' : ''} lack supporting documents`,
+    })
+  }
+
+  const pct = max > 0 ? Math.round((score / max) * 100) : 100
+  return { pct, factors }
+}
+
+function AuditReadinessCard({ readiness }: { readiness: AuditReadinessResult }) {
+  const { pct, factors } = readiness
+  const strong = pct >= 85
+  const weak   = pct < 55
+
+  const r    = 15.915
+  const circ = 2 * Math.PI * r
+  const ring = strong ? '#10b981' : weak ? '#ef4444' : '#f59e0b'
+  const tone = strong
+    ? { label: 'Audit-ready',  text: 'text-emerald-400' }
+    : weak
+      ? { label: 'At risk',    text: 'text-red-400' }
+      : { label: 'Building',   text: 'text-amber-400' }
+
+  const failing = factors.filter(f => !f.ok)
+
+  return (
+    <Link
+      href="/expenses"
+      className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all ${
+        strong
+          ? 'border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10'
+          : 'border-edge bg-surface/40 hover:border-emerald-500/30 hover:bg-surface/60'
+      }`}
+    >
+      {/* Donut ring */}
+      <div className="relative flex-shrink-0 w-14 h-14">
+        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+          <circle cx="18" cy="18" r={r} fill="none" stroke="#27272a" strokeWidth="2.5" />
+          <circle
+            cx="18" cy="18" r={r}
+            fill="none" stroke={ring} strokeWidth="2.5" strokeLinecap="round"
+            strokeDasharray={`${(pct / 100) * circ} ${circ}`}
+            className="transition-all duration-700"
+          />
+        </svg>
+        <span className={`absolute inset-0 flex items-center justify-center text-sm font-bold ${tone.text}`}>
+          {pct}
+        </span>
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-ink-1 flex items-center gap-1.5">
+            {strong
+              ? <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              : <ShieldAlert className={`w-4 h-4 ${tone.text}`} />}
+            Audit readiness
+          </p>
+          <span className={`text-xs font-medium flex-shrink-0 ${tone.text}`}>{tone.label}</span>
+        </div>
+
+        {failing.length === 0 ? (
+          <p className="text-xs text-emerald-400">Every confirmed claim is backed by evidence — export your SARS Audit Pack any time</p>
+        ) : (
+          <>
+            <div className="h-1.5 bg-raised rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${pct}%`, backgroundColor: ring }}
+              />
+            </div>
+            <p className="text-xs text-ink-2 leading-snug">
+              <span className="text-ink-2">To improve: </span>
+              {failing[0].detail}
+              {failing.length > 1 && <span className="text-ink-3"> +{failing.length - 1} more</span>}
+            </p>
+          </>
+        )}
+      </div>
+
+      <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${strong ? 'text-emerald-500/50 group-hover:text-emerald-400' : 'text-ink-3 group-hover:text-emerald-400'}`} />
     </Link>
   )
 }
