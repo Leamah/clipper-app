@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -119,16 +119,15 @@ function HeroIllustration() {
 
 export default function LandingPage() {
   const router = useRouter()
-  const [ready, setReady] = useState(false)
 
+  // Redirect logged-in users to the app, but NEVER gate the marketing content on
+  // this check — returning null until the client-side auth call resolves would
+  // serve crawlers (and the initial HTML) a blank page, killing SEO.
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) router.replace('/dashboard')
-      else setReady(true)
     })
   }, [router])
-
-  if (!ready) return null
 
   return (
     <div className="min-h-screen bg-base text-ink-1 overflow-x-hidden">
@@ -221,14 +220,27 @@ export default function LandingPage() {
             </div>
           </Reveal>
 
-          {/* Right: illustration */}
+          {/* Right: hero video */}
           <motion.div
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, ease: 'easeOut', delay: 0.25 }}
-            className="hidden sm:block"
+            className="relative"
           >
-            <HeroIllustration />
+            <div className="absolute -inset-4 bg-emerald-600/10 blur-3xl rounded-full pointer-events-none" />
+            <div className="relative rounded-2xl overflow-hidden border border-edge/70 shadow-2xl shadow-emerald-950/40 bg-surface">
+              <video
+                className="w-full h-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-label="Klippa product preview"
+              >
+                <source src="/influencer.mp4" type="video/mp4" />
+              </video>
+            </div>
           </motion.div>
         </div>
       </section>
@@ -491,6 +503,39 @@ export default function LandingPage() {
                 </div>
               </Reveal>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Your tax co-pilot (illustration) ──────────────── */}
+      <section className="relative z-10 border-t border-edge/50">
+        <div className="max-w-5xl mx-auto px-6 py-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center">
+            <Reveal>
+              <div className="space-y-5">
+                <p className="text-xs text-ink-3 uppercase tracking-widest">Always working in the background</p>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
+                  Your tax co-pilot,{' '}
+                  <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">
+                    always on.
+                  </span>
+                </h2>
+                <p className="text-base text-ink-2 leading-relaxed max-w-md">
+                  While you work, Klippa reads your receipts, sorts every expense, sets aside
+                  your SARS provision, and keeps your evidence trail audit-ready — so there&apos;s
+                  nothing to scramble for when filing season arrives.
+                </p>
+              </div>
+            </Reveal>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true, margin: '-60px' }}
+              transition={{ duration: 0.7, ease: 'easeOut' }}
+              className="hidden sm:block"
+            >
+              <HeroIllustration />
+            </motion.div>
           </div>
         </div>
       </section>

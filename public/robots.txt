@@ -5,3 +5,5 @@ Disallow: /settings/
 Disallow: /api/
 
 Allow: /
+
+Sitemap: https://klippa.co.za/sitemap.xml
