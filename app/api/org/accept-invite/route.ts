@@ -106,12 +106,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: updateProfile.error.message }, { status: 500 })
   }
 
-  // Fetch org name for the success message
+  // Fetch org name for the success message + client auto-create
   const { data: org } = await admin
     .from('klippa_organisations')
     .select('name')
     .eq('id', invite.organisation_id)
     .single()
+
+  // Auto-create a klippa_clients record for the org so the consultant's
+  // timesheets page has a client ready to use immediately.
+  // Use upsert with a do-nothing conflict so repeat accepts are idempotent.
+  if (org?.name) {
+    const { data: existing } = await admin
+      .from('klippa_clients')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', org.name)
+      .single()
+
+    if (!existing) {
+      await admin.from('klippa_clients').insert({
+        user_id:  user.id,
+        name:     org.name,
+        is_active: true,
+      })
+    }
+  }
 
   return NextResponse.json({ success: true, orgName: org?.name ?? 'your organisation' })
 }

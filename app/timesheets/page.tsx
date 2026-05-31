@@ -382,7 +382,24 @@ export default function TimesheetsPage() {
         .eq('is_active', true)
         .order('created_at', { ascending: false })
 
-      const clientList = (cls ?? []) as KlippaClient[]
+      let clientList = (cls ?? []) as KlippaClient[]
+
+      // Org members need a client record for their org to submit timesheets.
+      // Auto-create one if they belong to an org but have no clients yet.
+      if (clientList.length === 0 && (prof as KlippaProfile & { organisation_id?: string }).organisation_id) {
+        const orgRes  = await fetch('/api/org/settings')
+        const orgJson = await orgRes.json()
+        const orgName = orgJson.org?.name as string | undefined
+        if (orgName) {
+          const { data: created } = await supabase
+            .from('klippa_clients')
+            .insert({ user_id: user.id, name: orgName, is_active: true })
+            .select()
+            .single()
+          if (created) clientList = [created as KlippaClient]
+        }
+      }
+
       setClients(clientList)
       if (clientList.length > 0) setActiveClient(clientList[0])
       setLoading(false)
