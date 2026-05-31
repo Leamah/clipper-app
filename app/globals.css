@@ -28,6 +28,24 @@
   --color-ink-3:   82  82  91;    /* zinc-600 */
 }
 
+/* ── App shell: content offset for the fixed side nav ──────────────
+   --nav-w is set by AppNav (13rem expanded / 4rem collapsed).
+   Mobile (<768px): no left offset, top offset for the mobile bar.    */
+:root { --nav-w: 13rem; }
+
+.app-shell {
+  min-height: 100vh;
+  padding-left: 0;
+  padding-top: 3.5rem;          /* h-14 mobile top bar */
+}
+@media (min-width: 768px) {
+  .app-shell {
+    padding-left: var(--nav-w);
+    padding-top: 0;
+    transition: padding-left 0.2s ease;
+  }
+}
+
 /* ── Base styles ─────────────────────────────────────────────────── */
 
 * {

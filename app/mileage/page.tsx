@@ -260,7 +260,7 @@ export default function MileagePage() {
   }
 
   return (
-    <div className="min-h-screen bg-base text-ink-1 pl-52">
+    <div className="app-shell bg-base text-ink-1">
       <AppNav activePage="mileage" featureFlags={featureFlags} logbookPending={pendingWeeks.length} />
 
       {/* Action bar below nav */}

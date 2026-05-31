@@ -54,7 +54,7 @@ export default function UserNav({ sidebar = false }: { sidebar?: boolean }) {
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <div className={sidebar
-              ? 'fixed left-52 bottom-4 z-50 w-56 rounded-xl border border-edge bg-surface shadow-xl shadow-black/40 overflow-hidden'
+              ? 'fixed left-4 md:left-[var(--nav-w)] bottom-4 z-50 w-56 rounded-xl border border-edge bg-surface shadow-xl shadow-black/40 overflow-hidden'
               : 'absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-edge bg-surface shadow-xl shadow-black/40 overflow-hidden'
             }>
               <div className="px-4 py-3 border-b border-edge">

@@ -642,7 +642,7 @@ export default function TimesheetsPage() {
   // ── Feature not enabled ───────────────────────────────
   if (!profile?.feature_timesheets) {
     return (
-      <div className="min-h-screen bg-base text-ink-1 pl-52">
+      <div className="app-shell bg-base text-ink-1">
         <AppNav activePage="timesheets" featureFlags={featureFlags} />
         <div className="max-w-lg mx-auto px-6 py-24 text-center">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
@@ -666,7 +666,7 @@ export default function TimesheetsPage() {
   // ── No clients ────────────────────────────────────────
   if (clients.length === 0) {
     return (
-      <div className="min-h-screen bg-base text-ink-1 pl-52">
+      <div className="app-shell bg-base text-ink-1">
         <AppNav activePage="timesheets" featureFlags={featureFlags} />
         <div className="max-w-lg mx-auto px-6 py-24 text-center">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
@@ -693,7 +693,7 @@ export default function TimesheetsPage() {
 
   // ── Main view ─────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-base text-ink-1 pl-52 pb-32">
+    <div className="app-shell bg-base text-ink-1 pb-32">
       <AppNav activePage="timesheets" featureFlags={featureFlags} />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">

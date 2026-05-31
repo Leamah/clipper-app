@@ -600,7 +600,7 @@ function ExpensesPage() {
   const totalDeductible = confirmed.reduce((s, r) => s + r.deductible_amount, 0)
 
   return (
-    <div className="min-h-screen bg-base text-ink-1 pl-52">
+    <div className="app-shell bg-base text-ink-1">
       <AppNav activePage="expenses" />
 
       {/* Hidden capture file input */}

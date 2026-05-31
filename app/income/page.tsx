@@ -409,7 +409,7 @@ function IncomePage() {
   const totalIncome = records.reduce((s, r) => s + r.amount, 0)
 
   return (
-    <div className="min-h-screen bg-base text-ink-1 pl-52">
+    <div className="app-shell bg-base text-ink-1">
       <AppNav activePage="income" />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
