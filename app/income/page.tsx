@@ -11,6 +11,7 @@ import AppNav from '@/components/AppNav'
 import { Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase } from 'lucide-react'
 import type { KlippaProfile, KlippaIncomeRecord, KlippaTaxReturn, IncomeType } from '@/lib/types'
 import { INCOME_TYPE_LABELS } from '@/lib/types'
+import { isStarterOrAbove, FREE_INCOME_LIMIT } from '@/lib/tier'
 import Papa from 'papaparse'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
 
@@ -408,6 +409,16 @@ function IncomePage() {
 
   const totalIncome = records.reduce((s, r) => s + r.amount, 0)
 
+  // Tier flags
+  const isStarter = isStarterOrAbove(profile)
+
+  // Monthly usage counter for free users
+  const thisMonthCount = !isStarter && !loading ? (() => {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    return records.filter((r) => r.created_at && new Date(r.created_at) >= monthStart).length
+  })() : 0
+
   return (
     <div className="app-shell bg-base text-ink-1">
       <AppNav activePage="income" />
@@ -420,14 +431,25 @@ function IncomePage() {
             <p className="text-sm text-ink-2 mt-1">
               {records.length > 0 ? `${records.length} records · Total ${formatRand(totalIncome)}` : 'No income records yet'}
             </p>
+            {/* Free-tier monthly usage counter */}
+            {!loading && !isStarter && (
+              <p className={`text-xs mt-1 font-medium ${thisMonthCount >= FREE_INCOME_LIMIT ? 'text-red-400' : 'text-ink-3'}`}>
+                {thisMonthCount}/{FREE_INCOME_LIMIT} income records this month
+                {thisMonthCount >= FREE_INCOME_LIMIT && (
+                  <a href="/pricing" className="ml-2 underline text-emerald-400">Upgrade for unlimited</a>
+                )}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowCSV(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
-            </button>
+            {isStarter && (
+              <button
+                onClick={() => setShowCSV(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
+              </button>
+            )}
             <button
               onClick={() => setShowAdd(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
@@ -461,9 +483,11 @@ function IncomePage() {
               <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
                 <Plus className="w-3.5 h-3.5" /> Add manually
               </button>
-              <button onClick={() => setShowCSV(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
-                <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
-              </button>
+              {isStarter && (
+                <button onClick={() => setShowCSV(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
+                </button>
+              )}
             </div>
           </div>
         ) : (

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { classifyExpense } from '@/lib/expense-classifier'
 import { analyzeMixedUse } from '@/lib/mixed-use-classifier'
+import { isFreeUser, isStarterOrAbove, FREE_EXPENSE_LIMIT } from '@/lib/tier'
 import type { KlippaProfile } from '@/lib/types'
 
 function createSupabaseServer() {
@@ -25,6 +26,32 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Fetch tier early — needed for both the cap check and AI gate
+  const { data: tierProfile } = await supabase
+    .from('klippa_profiles')
+    .select('subscription_tier, organisation_id')
+    .eq('id', user.id)
+    .single()
+
+  // Free-tier monthly cap: 15 expenses per calendar month
+  if (isFreeUser(tierProfile)) {
+    const now        = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
+    const { count }  = await supabase
+      .from('klippa_expense_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', monthStart)
+      .lte('created_at', monthEnd)
+    if ((count ?? 0) >= FREE_EXPENSE_LIMIT) {
+      return NextResponse.json(
+        { error: 'free_limit_reached', limit: FREE_EXPENSE_LIMIT, type: 'expense' },
+        { status: 402 }
+      )
+    }
+  }
+
   const body = await request.json()
   const { merchant_name, amount, expense_date, description, category, tax_return_id, classify } = body
 
@@ -35,7 +62,8 @@ export async function POST(request: NextRequest) {
   let classification = null
   let mixedUse       = null
 
-  if (classify) {
+  // AI classification is Starter+ only
+  if (classify && isStarterOrAbove(tierProfile)) {
     const { data: profile } = await supabase
       .from('klippa_profiles')
       .select('employment_type, works_from_home, work_location, has_vehicle, home_office_pct')

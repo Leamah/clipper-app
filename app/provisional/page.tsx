@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   AlertCircle, Clock, ChevronRight, ExternalLink,
-  CheckCircle2, Info, Calculator
+  CheckCircle2, Info, Calculator, Lock
 } from 'lucide-react'
 import type { KlippaProfile } from '@/lib/types'
 import {
@@ -16,6 +16,7 @@ import {
   currentRunningTaxYear, PROVISIONAL_TAX_THRESHOLD, nextProvisionalPayment
 } from '@/lib/tax-engine'
 import { PiggyBank } from 'lucide-react'
+import { isProfessionalOrAbove } from '@/lib/tier'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -213,6 +214,43 @@ export default function ProvisionalPage() {
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      </div>
+    )
+  }
+
+  // Gate: Provisional Tax Planner is Professional+ only
+  if (!isProfessionalOrAbove(profile)) {
+    return (
+      <div className="app-shell bg-base">
+        <AppNav activePage="provisional" featureFlags={featureFlags} />
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+          <div className="rounded-2xl border border-edge bg-surface/40 p-10 flex flex-col items-center text-center space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-raised flex items-center justify-center border border-edge">
+              <Lock className="w-6 h-6 text-ink-3" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-lg font-bold text-ink-1">Provisional Tax Planner</h2>
+              <p className="text-sm text-ink-2 max-w-sm leading-relaxed">
+                Track your IRP6 deadlines, estimate your payments and stay penalty-free.
+                Available on the <strong className="text-ink-1">Premium</strong> plan.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <Link
+                href="/pricing"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
+              >
+                Upgrade to Premium
+              </Link>
+              <Link
+                href="/dashboard"
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-raised text-ink-2 hover:bg-edge transition-all"
+              >
+                Back to dashboard
+              </Link>
+            </div>
+          </div>
+        </main>
       </div>
     )
   }

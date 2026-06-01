@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { extractDocument } from '@/lib/mathpix'
+import { isStarterOrAbove } from '@/lib/tier'
 import type { OcrExtractedReceipt } from '@/lib/types'
 
 function createSupabaseServer() {
@@ -30,6 +31,16 @@ export async function POST(request: NextRequest) {
   const supabase = createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // OCR receipt capture is Starter+ only
+  const { data: tierProfile } = await supabase
+    .from('klippa_profiles')
+    .select('subscription_tier, organisation_id')
+    .eq('id', user.id)
+    .single()
+  if (!isStarterOrAbove(tierProfile)) {
+    return NextResponse.json({ error: 'premium_required' }, { status: 402 })
+  }
 
   let formData: FormData
   try {

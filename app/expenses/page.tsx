@@ -13,6 +13,7 @@ import {
 import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCategory } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
+import { isStarterOrAbove, isProfessionalOrAbove, FREE_EXPENSE_LIMIT } from '@/lib/tier'
 // pdf-export lazy-loaded on demand — jsPDF (~300 kB) only needed when user clicks "Export Audit Pack"
 
 function formatRand(n: number) {
@@ -197,10 +198,11 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
 
 // ── Add Expense Modal ─────────────────────────────────────
 
-function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, onClose, onSaved }: {
+function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, onClose, onSaved }: {
   taxReturnId:     string | null
   prefilled?:      CapturePreFill
   merchantHistory: string[]
+  allowAI:         boolean
   onClose:         () => void
   onSaved:         (r: KlippaExpenseRecord, classify: boolean) => void
 }) {
@@ -212,7 +214,7 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, onClose, onS
     category:      'other' as ExpenseCategory,
     receipt_id:    prefilled?.receipt_id    ?? null as string | null,
   })
-  const [doClassify, setDoClassify] = useState(true)
+  const [doClassify, setDoClassify] = useState(allowAI)
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState<string | null>(null)
 
@@ -322,18 +324,25 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, onClose, onS
             </select>
           </Field>
 
-          <button
-            type="button"
-            onClick={() => setDoClassify((v) => !v)}
-            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all ${
-              doClassify
-                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                : 'border-edge text-ink-2 hover:border-zinc-600'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            {doClassify ? 'AI will classify this expense' : 'Classify manually'}
-          </button>
+          {allowAI ? (
+            <button
+              type="button"
+              onClick={() => setDoClassify((v) => !v)}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                doClassify
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                  : 'border-edge text-ink-2 hover:border-zinc-600'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {doClassify ? 'AI will classify this expense' : 'Classify manually'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-edge text-xs text-ink-3">
+              <Sparkles className="w-3.5 h-3.5" />
+              AI classification · <a href="/pricing" className="underline text-emerald-400">Starter plan</a>
+            </div>
+          )}
 
           {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
 
@@ -638,6 +647,17 @@ function ExpensesPage() {
 
   const totalDeductible = confirmed.reduce((s, r) => s + r.deductible_amount, 0)
 
+  // Tier flags
+  const isStarter = isStarterOrAbove(profile)
+  const isPro     = isProfessionalOrAbove(profile)
+
+  // Monthly usage counter for free users
+  const thisMonthCount = !isStarter && !loading ? (() => {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    return records.filter((r) => r.created_at && new Date(r.created_at) >= monthStart).length
+  })() : 0
+
   return (
     <div className="app-shell bg-base text-ink-1">
       <AppNav activePage="expenses" />
@@ -662,25 +682,38 @@ function ExpensesPage() {
                 ? `${confirmed.length} confirmed · ${formatRand(totalDeductible)} deductible`
                 : 'No confirmed expenses yet'}
             </p>
+            {/* Free-tier monthly usage counter */}
+            {!loading && !isStarter && (
+              <p className={`text-xs mt-1 font-medium ${thisMonthCount >= FREE_EXPENSE_LIMIT ? 'text-red-400' : 'text-ink-3'}`}>
+                {thisMonthCount}/{FREE_EXPENSE_LIMIT} expenses this month
+                {thisMonthCount >= FREE_EXPENSE_LIMIT && (
+                  <a href="/pricing" className="ml-2 underline text-emerald-400">Upgrade for unlimited</a>
+                )}
+              </p>
+            )}
           </div>
 
-          {/* Action bar: Capture | CSV | Add */}
+          {/* Action bar: Capture (Starter+) | CSV (Starter+) | Audit Pack (Pro+) | Add */}
           <div className="flex items-center flex-wrap gap-1.5">
-            <button
-              onClick={() => captureRef.current?.click()}
-              disabled={capturing}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised disabled:opacity-50 transition-colors"
-            >
-              {capturing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-              {capturing ? 'Scanning…' : 'Capture'}
-            </button>
-            <button
-              onClick={() => setShowCSV(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
-            </button>
-            {confirmed.length > 0 && (
+            {isStarter && (
+              <button
+                onClick={() => captureRef.current?.click()}
+                disabled={capturing}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised disabled:opacity-50 transition-colors"
+              >
+                {capturing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                {capturing ? 'Scanning…' : 'Capture'}
+              </button>
+            )}
+            {isStarter && (
+              <button
+                onClick={() => setShowCSV(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
+              </button>
+            )}
+            {isPro && confirmed.length > 0 && (
               <button
                 onClick={handleAuditPack}
                 disabled={exportingPack}
@@ -817,6 +850,7 @@ function ExpensesPage() {
           taxReturnId={taxReturn?.id ?? null}
           prefilled={capturePreFill}
           merchantHistory={merchantHistory}
+          allowAI={isStarter}
           onClose={closeAdd}
           onSaved={(r) => { setRecords((prev) => [r, ...prev]); setActiveTab('pending') }}
         />

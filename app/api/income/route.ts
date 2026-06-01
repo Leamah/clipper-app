@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { isFreeUser, FREE_INCOME_LIMIT } from '@/lib/tier'
 
 function createSupabaseServer() {
   const cookieStore = cookies()
@@ -20,6 +21,32 @@ export async function POST(request: NextRequest) {
   const supabase = createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Fetch tier for cap check
+  const { data: tierProfile } = await supabase
+    .from('klippa_profiles')
+    .select('subscription_tier, organisation_id')
+    .eq('id', user.id)
+    .single()
+
+  // Free-tier monthly cap: 3 income records per calendar month
+  if (isFreeUser(tierProfile)) {
+    const now        = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
+    const { count }  = await supabase
+      .from('klippa_income_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', monthStart)
+      .lte('created_at', monthEnd)
+    if ((count ?? 0) >= FREE_INCOME_LIMIT) {
+      return NextResponse.json(
+        { error: 'free_limit_reached', limit: FREE_INCOME_LIMIT, type: 'income' },
+        { status: 402 }
+      )
+    }
+  }
 
   const body = await request.json()
   const { source_name, income_type, amount, received_date, description, tax_return_id } = body

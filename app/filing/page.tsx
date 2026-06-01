@@ -8,11 +8,12 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   Check, ChevronRight, ChevronLeft, Loader2,
-  FileText, ClipboardList, ExternalLink, Download, AlertCircle
+  FileText, ClipboardList, ExternalLink, Download, AlertCircle, Lock
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
 import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
+import { isProfessionalOrAbove } from '@/lib/tier'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -104,6 +105,43 @@ export default function FilingPage() {
         <div className="flex items-center justify-center py-32">
           <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
         </div>
+      </div>
+    )
+  }
+
+  // Gate: ITR12 Filing Wizard is Professional+ only
+  if (data && !isProfessionalOrAbove(data.profile)) {
+    return (
+      <div className="app-shell bg-base">
+        <AppNav activePage="filing" />
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+          <div className="rounded-2xl border border-edge bg-surface/40 p-10 flex flex-col items-center text-center space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-raised flex items-center justify-center border border-edge">
+              <Lock className="w-6 h-6 text-ink-3" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-lg font-bold text-ink-1">ITR12 Filing Wizard</h2>
+              <p className="text-sm text-ink-2 max-w-sm leading-relaxed">
+                Your personalised eFiling cheat sheet, deduction summary and step-by-step filing guide.
+                Available on the <strong className="text-ink-1">Premium</strong> plan.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <Link
+                href="/pricing"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
+              >
+                Upgrade to Premium
+              </Link>
+              <Link
+                href="/dashboard"
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-raised text-ink-2 hover:bg-edge transition-all"
+              >
+                Back to dashboard
+              </Link>
+            </div>
+          </div>
+        </main>
       </div>
     )
   }
