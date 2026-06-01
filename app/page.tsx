@@ -196,8 +196,8 @@ export default function LandingPage() {
               </h1>
 
               <p className="text-lg text-ink-2 leading-relaxed max-w-md">
-                Organise your receipts, invoices and expenses automatically — and
-                stay ready for SARS all year, not just in October.
+                Organise your receipts, invoices and expenses automatically and
+                stay ready for SARS all year.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -283,7 +283,7 @@ export default function LandingPage() {
                   'Receipts in WhatsApp, email, and a shoebox',
                   '"I\'ll sort it all out in October"',
                   'Guessing what percentage of your phone to claim',
-                  'No logbook — SARS disallows your travel deduction',
+                  'No logbook, SARS disallows your travel deduction',
                   'Discover a large tax bill weeks before the deadline',
                   'Not sure if your records would survive an audit',
                 ].map((item) => (
@@ -309,7 +309,7 @@ export default function LandingPage() {
                   'Your tax position is current right now, not in October',
                   'Exact percentage with SARS reasoning you can defend',
                   'Auto-generated SARS-compliant mileage logbook',
-                  'Tax provision calculated in real time — no surprises',
+                  'Tax provision calculated in real time, no surprises',
                   'Every expense comes with its audit evidence checklist',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-sm text-emerald-300/80">
@@ -338,19 +338,19 @@ export default function LandingPage() {
                 icon:  <Receipt className="w-5 h-5 text-emerald-400" />,
                 from:  'Scattered receipts',
                 to:    'Organized & categorized',
-                body:  'Snap a photo, import a bank CSV, or upload. Klippa categorizes every expense and calculates the deductible amount — no spreadsheets.',
+                body:  'Snap a photo, import a bank CSV, or upload. Klippa categorizes every expense and calculates the deductible amount automatically.',
               },
               {
                 icon:  <TrendingUp className="w-5 h-5 text-emerald-400" />,
                 from:  'Uncertainty',
                 to:    'Exact numbers',
-                body:  'See your real Safe-to-Spend balance after SARS provision, any time. Know your tax number before your accountant does.',
+                body:  'See your real Safe-to-Spend balance after SARS provision, any time.',
               },
               {
                 icon:  <FileCheck className="w-5 h-5 text-emerald-400" />,
                 from:  'October panic',
-                to:    '20-minute filing',
-                body:  'Your personalised eFiling cheat sheet — exact rand values, SARS line numbers, and all supporting documents already attached.',
+                to:    '10-minute filing',
+                body:  'Your personalised eFiling cheat sheet with exact rand values, SARS line numbers, and all supporting documents already attached.',
               },
             ].map((pillar, i) => (
               <Reveal key={i} delay={i * 0.08}>
@@ -381,7 +381,7 @@ export default function LandingPage() {
                 <span className="text-ink-2">Your tax intelligence layer.</span>
               </h2>
               <p className="text-sm text-ink-2 leading-relaxed max-w-lg">
-                Any spreadsheet can add up your income. Klippa knows SARS rules — and applies them to your specific situation automatically.
+                Any spreadsheet can add up your income. Klippa knows SARS rules and applies them to your specific situation automatically.
               </p>
             </div>
           </Reveal>
@@ -391,13 +391,13 @@ export default function LandingPage() {
               {
                 icon:  <Zap className="w-5 h-5 text-amber-400" />,
                 title: 'Mixed-use AI intelligence',
-                body:  'Not "yes it\'s deductible". The exact percentage. Phone: 65%. Laptop: 80%. Home office: 32%. With SARS reasoning you can defend in an audit — not just a number you guessed.',
+                body:  'Not "yes it\'s deductible". The exact percentage. Phone: 65%. Laptop: 80%. Home office: 32%. With SARS reasoning you can defend in any audit.',
                 tag:   'No other SA app does this',
               },
               {
                 icon:  <Car className="w-5 h-5 text-teal-400" />,
                 title: 'Auto mileage logbook',
-                body:  'SARS requires a logbook, not just fuel receipts. Fuel receipts alone get disallowed. Klippa generates your SARS-compliant logbook automatically — one less thing you\'ll forget.',
+                body:  'SARS requires a logbook, not just fuel receipts. Fuel receipts alone get disallowed. Klippa generates your SARS-compliant logbook automatically.',
                 tag:   'Mandatory. Now automatic.',
               },
               {
@@ -459,7 +459,7 @@ export default function LandingPage() {
               {
                 icon:   <AlertCircle className="w-4 h-4 text-emerald-400" />,
                 q:      'If SARS audits me, what will they ask for?',
-                answer: "Every expense in Klippa comes with an audit evidence checklist — before they ask.",
+                answer: "Every expense in Klippa comes with an audit evidence checklist, so you know what to keep before they ask.",
               },
             ].map((ex, i) => (
               <Reveal key={i} delay={i * 0.08}>
@@ -500,7 +500,7 @@ export default function LandingPage() {
                 icon:  <FileCheck className="w-5 h-5 text-emerald-400" />,
                 step:  '03',
                 title: 'File with confidence',
-                body:  'Get your personalised eFiling guide with exact rand values and SARS line numbers. Fill it in under 20 minutes — with proof for every line.',
+                body:  'Get your personalised eFiling guide with exact rand values and SARS line numbers. Fill it in under 10 minutes, with proof for every line.',
               },
             ].map((s, i) => (
               <Reveal key={i} delay={i * 0.1}>
@@ -535,8 +535,8 @@ export default function LandingPage() {
                 </h2>
                 <p className="text-base text-ink-2 leading-relaxed max-w-md">
                   While you work, Klippa reads your receipts, sorts every expense, sets aside
-                  your SARS provision, and keeps your evidence trail audit-ready — so there&apos;s
-                  nothing to scramble for when filing season arrives.
+                  your SARS provision, and keeps your evidence trail audit-ready. Nothing to
+                  scramble for when filing season arrives.
                 </p>
               </div>
             </Reveal>
@@ -554,24 +554,124 @@ export default function LandingPage() {
       </section>
 
       {/* ── Who it's for ──────────────────────────────────── */}
-      <section className="relative z-10 border-t border-edge/50">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+      <section className="relative z-10 border-t border-edge/50 overflow-hidden">
+        <div className="max-w-5xl mx-auto px-6 py-16">
           <Reveal>
-            <p className="text-xs text-ink-3 uppercase tracking-widest mb-5">Who it&apos;s for</p>
-            <div className="flex flex-wrap gap-2.5">
-              {[
-                'Freelancers', 'Contractors', 'Consultants', 'Content creators',
-                'Coaches & trainers', 'Sole traders', 'Commission earners', 'Side-hustlers',
-              ].map((label) => (
-                <span key={label} className="px-3.5 py-1.5 rounded-full border border-edge/60 text-xs text-ink-2 bg-surface/60">
-                  {label}
-                </span>
-              ))}
-              <span className="px-3.5 py-1.5 rounded-full border border-emerald-600/40 text-xs text-emerald-400 bg-emerald-950/40">
-                Anyone who invoices for their work
+            <p className="text-xs text-ink-3 uppercase tracking-widest mb-3">Who it&apos;s for</p>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+              Any role.{' '}
+              <span className="bg-gradient-to-r from-violet-400 via-pink-400 to-amber-400 bg-clip-text text-transparent">
+                Any hustle.
               </span>
-            </div>
+              {' '}One app.
+            </h2>
+            <p className="text-sm text-ink-2 mb-10 max-w-lg leading-relaxed">
+              Whether you invoice monthly or daily, manage one client or twenty. If SARS expects a return from you, Klippa keeps you ahead of it.
+            </p>
           </Reveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 items-center">
+
+            {/* Left: colorful animated role badges */}
+            <div className="flex flex-wrap gap-3">
+              {[
+                { label: 'Freelancer',        emoji: '💻', cls: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
+                { label: 'Influencer',        emoji: '📸', cls: 'bg-violet-500/15 border-violet-500/40 text-violet-300' },
+                { label: 'Consultant',        emoji: '📊', cls: 'bg-amber-500/15 border-amber-500/40 text-amber-300' },
+                { label: 'Content Creator',   emoji: '🎬', cls: 'bg-sky-500/15 border-sky-500/40 text-sky-300' },
+                { label: 'Coach',             emoji: '🎯', cls: 'bg-rose-500/15 border-rose-500/40 text-rose-300' },
+                { label: 'Contractor',        emoji: '🔧', cls: 'bg-teal-500/15 border-teal-500/40 text-teal-300' },
+                { label: 'Side-hustler',      emoji: '🚀', cls: 'bg-orange-500/15 border-orange-500/40 text-orange-300' },
+                { label: 'Sole Trader',       emoji: '🛍️', cls: 'bg-fuchsia-500/15 border-fuchsia-500/40 text-fuchsia-300' },
+                { label: 'Commission Earner', emoji: '📈', cls: 'bg-lime-500/15 border-lime-500/40 text-lime-300' },
+                { label: 'Tutor',             emoji: '📚', cls: 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' },
+                { label: 'Creative',          emoji: '🎨', cls: 'bg-pink-500/15 border-pink-500/40 text-pink-300' },
+              ].map((role, i) => (
+                <motion.span
+                  key={role.label}
+                  initial={{ opacity: 0, scale: 0.7, y: 14 }}
+                  whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                  whileHover={{ scale: 1.1, y: -3 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.06, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] as [number, number, number, number] }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border cursor-default ${role.cls}`}
+                >
+                  <span>{role.emoji}</span>
+                  {role.label}
+                </motion.span>
+              ))}
+            </div>
+
+            {/* Right: playful illustration — diverse people, light mood */}
+            <div className="relative h-64 flex items-center justify-center select-none">
+              {/* Multi-color background glow */}
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/8 via-emerald-500/8 to-amber-500/8 rounded-3xl" />
+              <div className="absolute inset-0 border border-edge/30 rounded-3xl" />
+
+              {/* Three diverse people */}
+              <div className="relative z-10 flex items-end gap-4 pb-2">
+                <motion.div
+                  animate={{ y: [0, -7, 0] }}
+                  transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut', delay: 0 }}
+                  className="flex flex-col items-center gap-1.5"
+                >
+                  <span className="text-5xl">👩🏾‍💼</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[10px] font-semibold text-amber-300">Consultant</span>
+                </motion.div>
+
+                <motion.div
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+                  className="flex flex-col items-center gap-1.5 -mb-2"
+                >
+                  <span className="text-6xl">🧑🏼‍💻</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-semibold text-emerald-300">Freelancer</span>
+                </motion.div>
+
+                <motion.div
+                  animate={{ y: [0, -6, 0] }}
+                  transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+                  className="flex flex-col items-center gap-1.5"
+                >
+                  <span className="text-5xl">👨🏽‍🎨</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-[10px] font-semibold text-violet-300">Creator</span>
+                </motion.div>
+              </div>
+
+              {/* Floating outcome badges */}
+              <motion.div
+                animate={{ y: [0, -8, 0], rotate: [-3, 3, -3] }}
+                transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+                className="absolute top-4 left-5 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-emerald-300"
+              >
+                ✅ Tax filed
+              </motion.div>
+
+              <motion.div
+                animate={{ y: [0, -10, 0], rotate: [3, -3, 3] }}
+                transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+                className="absolute top-4 right-5 bg-amber-500/15 border border-amber-500/30 rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-amber-300"
+              >
+                💰 Provision set
+              </motion.div>
+
+              <motion.div
+                animate={{ y: [0, -7, 0], rotate: [-2, 3, -2] }}
+                transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1.6 }}
+                className="absolute bottom-5 left-5 bg-violet-500/15 border border-violet-500/30 rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-violet-300"
+              >
+                📸 Receipt logged
+              </motion.div>
+
+              <motion.div
+                animate={{ y: [0, -9, 0], rotate: [4, -2, 4] }}
+                transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.7 }}
+                className="absolute bottom-5 right-5 bg-sky-500/15 border border-sky-500/30 rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-sky-300"
+              >
+                🛡️ Audit ready
+              </motion.div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -597,7 +697,7 @@ export default function LandingPage() {
                     href="/login"
                     className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all shadow-xl shadow-emerald-900/30"
                   >
-                    Get started — it&apos;s free <ArrowRight className="w-4 h-4" />
+                    Get started, it&apos;s free <ArrowRight className="w-4 h-4" />
                   </Link>
                 </motion.div>
                 <span className="text-sm text-ink-3">No credit card · No accountant needed</span>

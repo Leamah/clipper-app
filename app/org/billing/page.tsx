@@ -7,7 +7,7 @@ import { useRouter, useSearchParams }                 from 'next/navigation'
 import Link                                 from 'next/link'
 import {
   ShieldCheck, ArrowLeft, ArrowRight, Loader2, AlertCircle,
-  Minus, Plus, Check, Users, Calendar,
+  Minus, Plus, Check, Users, Calendar, RefreshCw, Building2,
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 
@@ -28,11 +28,16 @@ function OrgBillingContent() {
   const searchParams = useSearchParams()
   const gated        = searchParams.get('gate') === '1'
 
-  const [data,   setData]   = useState<Billing | null>(null)
-  const [seats,  setSeats]  = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [paying, setPaying] = useState(false)
-  const [error,  setError]  = useState<string | null>(null)
+  const [data,         setData]         = useState<Billing | null>(null)
+  const [seats,        setSeats]        = useState(1)
+  const [loading,      setLoading]      = useState(true)
+  const [paying,       setPaying]       = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
+  const [showCustom,   setShowCustom]   = useState(false)
+  const [customNotes,  setCustomNotes]  = useState('')
+  const [customEmail,  setCustomEmail]  = useState('')
+  const [submitting,   setSubmitting]   = useState(false)
+  const [customDone,   setCustomDone]   = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -47,13 +52,42 @@ function OrgBillingContent() {
 
   useEffect(() => { load() }, [load])
 
+  const submitCustomLead = async () => {
+    setSubmitting(true)
+    try {
+      await fetch('/api/leads', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_type:     'custom_org_pricing',
+          notes:         customNotes.trim() || undefined,
+          contact_email: customEmail.trim() || undefined,
+          metadata:      { org_name: data?.name, current_seats: data?.seat_count, org_type: data?.org_type },
+        }),
+      })
+      setCustomDone(true)
+    } catch {
+      // silent — lead DB write may have succeeded even if email failed
+      setCustomDone(true)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const startPayment = async () => {
     setPaying(true); setError(null)
     try {
       const r = await fetch('/api/payments/ozow/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'org_seats', seats }),
+        body: JSON.stringify({
+          kind: 'org_seats',
+          seats,
+          // Pass current period end so renewal extends cleanly (no lost days)
+          renewFrom: data?.entitled && data?.subscription_ends_at
+            ? data.subscription_ends_at
+            : undefined,
+        }),
       })
       const d = await r.json()
       if (!r.ok) { setError(d.error); setPaying(false); return }
@@ -126,7 +160,7 @@ function OrgBillingContent() {
               <div className="rounded-xl border border-emerald-600/40 bg-emerald-950/20 px-4 py-3 flex items-start gap-2.5">
                 <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
                 <div className="text-xs">
-                  <p className="font-semibold text-emerald-300">Workspace active — {data.seat_count} seats</p>
+                  <p className="font-semibold text-emerald-300">Workspace active, {data.seat_count} seats</p>
                   <p className="text-ink-2 mt-0.5 flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
                     Renews {data.subscription_ends_at ? format(parseISO(data.subscription_ends_at), 'd MMM yyyy') : '—'}
@@ -186,17 +220,80 @@ function OrgBillingContent() {
                 disabled={paying}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-sm font-semibold transition-all shadow-lg shadow-emerald-900/30"
               >
-                {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                {paying ? 'Redirecting to payment…' : `Pay R ${total.toLocaleString('en-ZA')} via Ozow`}
+                {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : data?.entitled ? <RefreshCw className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+                {paying ? 'Redirecting to payment…' : data?.entitled ? `Renew R ${total.toLocaleString('en-ZA')} via Ozow` : `Pay R ${total.toLocaleString('en-ZA')} via Ozow`}
               </button>
               <p className="text-xs text-ink-3 text-center">Instant EFT via Ozow · Secure · No card needed</p>
             </div>
 
-            {isPractice && (
-              <p className="text-xs text-ink-3 text-center">
-                Managing more than {data.client_cap} clients? <a href="mailto:hello@klippa.co.za" className="text-emerald-400 hover:underline">Contact us</a> for enterprise pricing.
-              </p>
-            )}
+            {/* Renewal expiry warning */}
+            {data.entitled && data.subscription_ends_at && (() => {
+              const days = Math.ceil((new Date(data.subscription_ends_at).getTime() - Date.now()) / 86_400_000)
+              return days <= 30 && days >= 0 ? (
+                <div className="flex items-start gap-2 text-xs bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3 text-amber-200">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                  <span>Workspace subscription expires in <strong>{days} day{days !== 1 ? 's' : ''}</strong>. Renew above to avoid interruption for your team.</span>
+                </div>
+              ) : null
+            })()}
+
+            {/* Custom / Enterprise option */}
+            <div className="rounded-2xl border border-edge bg-surface/30 p-5 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-4 h-4 text-violet-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Custom / Enterprise pricing</p>
+                  <p className="text-xs text-ink-2 mt-0.5">Variable contract lengths, bulk discounts, or more than 50 seats</p>
+                </div>
+              </div>
+
+              {customDone ? (
+                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-4 py-3">
+                  <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                  Request received. Our team will be in touch within 1 business day.
+                </div>
+              ) : showCustom ? (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-ink-2">Best email to reach you</label>
+                    <input
+                      type="email"
+                      value={customEmail}
+                      onChange={e => setCustomEmail(e.target.value)}
+                      placeholder="you@company.co.za"
+                      className="input w-full"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-ink-2">What do you need? (optional)</label>
+                    <textarea
+                      value={customNotes}
+                      onChange={e => setCustomNotes(e.target.value)}
+                      placeholder="e.g. 12 consultants on 6-month rolling contracts, need custom billing cycle…"
+                      rows={3}
+                      className="input w-full resize-none"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowCustom(false)} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={submitCustomLead} disabled={submitting || !customEmail.trim()}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors">
+                      {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
+                      {submitting ? 'Sending…' : 'Request pricing'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setShowCustom(true)}
+                  className="w-full py-2.5 rounded-xl text-xs font-medium border border-edge text-ink-2 hover:border-violet-500/50 hover:text-ink-1 transition-colors">
+                  Get a custom quote →
+                </button>
+              )}
+            </div>
           </>
         )}
       </div>

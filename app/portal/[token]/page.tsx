@@ -178,7 +178,7 @@ export default function ClientPortalPage({ params }: { params: { token: string }
           <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-3">
             <div>
               <p className="text-sm font-semibold">{received} of {total} documents in</p>
-              <p className="text-xs text-zinc-500">{allDone ? 'All done — thank you!' : 'Tap an item below to upload'}</p>
+              <p className="text-xs text-zinc-500">{allDone ? 'All done, thank you!' : 'Tap an item below to upload'}</p>
             </div>
             <div className="relative w-11 h-11 flex-shrink-0">
               <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">

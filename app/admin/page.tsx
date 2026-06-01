@@ -448,7 +448,7 @@ export default function AdminPage() {
             <div className="rounded-xl border border-edge bg-surface/30 px-5 py-4">
               <p className="text-xs font-medium text-ink-1 mb-1">Per-user overrides</p>
               <p className="text-xs text-ink-2">
-                To override features for a specific user (bypassing their tier defaults), go to the <button onClick={() => setTab('users')} className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Users tab</button>, change their plan — the feature flags will sync automatically. Once a user has a manual override (<code className="text-ink-2">feature_overrides = true</code>), tier-level changes won't affect them until the override is cleared.
+                To override features for a specific user (bypassing their tier defaults), go to the <button onClick={() => setTab('users')} className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Users tab</button>, change their plan and the feature flags will sync automatically. Once a user has a manual override (<code className="text-ink-2">feature_overrides = true</code>), tier-level changes won't affect them until the override is cleared.
               </p>
             </div>
           </div>

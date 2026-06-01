@@ -7,7 +7,7 @@ import { useRouter, useSearchParams }                 from 'next/navigation'
 import Link                                            from 'next/link'
 import {
   ShieldCheck, ArrowLeft, Check, Loader2, AlertCircle,
-  Tag, Zap, ArrowRight, Calendar, XCircle, ChevronDown,
+  Tag, Zap, ArrowRight, Calendar, XCircle, ChevronDown, RefreshCw, Pencil,
 } from 'lucide-react'
 import { supabase }                                   from '@/lib/supabase'
 import { PLANS, getPlanAmount, type PlanKey, type BillingCycle } from '@/lib/ozow'
@@ -121,11 +121,15 @@ function SubscriptionContent() {
       setProfile(prev => prev ? { ...prev, subscription_tier: 'free' } : prev)
       setShowCancel(false)
     } catch {
-      setCancelError('Could not reach server — please try again.')
+      setCancelError('Could not reach server. Please try again.')
     } finally {
       setCancelling(false)
     }
   }
+
+  // True when the user is renewing the same plan they're already on
+  const isRenewal = hasActiveSub && !cancelDone &&
+    activeSub?.plan === plan && activeSub?.billing_cycle === cycle
 
   const startPayment = async () => {
     setPaying(true)
@@ -134,7 +138,15 @@ function SubscriptionContent() {
       const r = await fetch('/api/payments/ozow/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, billingCycle: cycle, promoCode: promoCode.trim() || undefined }),
+        body: JSON.stringify({
+          plan,
+          billingCycle:  cycle,
+          promoCode:     promoCode.trim() || undefined,
+          // Pass current period end so renewal extends cleanly from it (no lost days)
+          renewFrom:     isRenewal && activeSub?.current_period_end
+                           ? activeSub.current_period_end
+                           : undefined,
+        }),
       })
       const d = await r.json()
       if (!r.ok) { setError(d.error); return }
@@ -158,10 +170,16 @@ function SubscriptionContent() {
     }
   }
 
-  const finalAmount = getPlanAmount(plan, cycle, discount)
+  const finalAmount  = getPlanAmount(plan, cycle, discount)
   const selectedPlan = PLANS[plan]
   const isOnTrial    = profile?.trial_ends_at && new Date(profile.trial_ends_at) > new Date()
   const hasActiveSub = activeSub?.status === 'active'
+
+  // Days until renewal — used for expiry warning
+  const daysUntilRenewal = activeSub?.current_period_end
+    ? Math.ceil((new Date(activeSub.current_period_end).getTime() - Date.now()) / 86_400_000)
+    : null
+  const expiringSoon = daysUntilRenewal !== null && daysUntilRenewal <= 14 && daysUntilRenewal >= 0
 
   return (
     <div className="min-h-screen bg-base text-ink-1">
@@ -213,11 +231,22 @@ function SubscriptionContent() {
               {/* Active subscription banner + cancel flow */}
               {cancelDone && (
                 <div className="rounded-xl border border-edge bg-surface/50 px-4 py-3 text-xs text-ink-2">
-                  Subscription cancelled — you&apos;re now on the <span className="font-semibold text-ink-1">Free</span> plan.
+                  Subscription cancelled. You&apos;re now on the <span className="font-semibold text-ink-1">Free</span> plan.
                 </div>
               )}
               {hasActiveSub && !cancelDone && (
                 <div className="rounded-xl border border-edge bg-surface/50 p-4 space-y-3">
+                  {/* Expiry warning */}
+                  {expiringSoon && (
+                    <div className="flex items-start gap-2 text-xs bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2.5 text-amber-200">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Your plan expires in <strong>{daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}</strong>.
+                        Renew now to avoid losing access.
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-2.5">
                     <Calendar className="w-4 h-4 text-ink-2 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 text-xs">
@@ -235,6 +264,28 @@ function SubscriptionContent() {
                     >
                       <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCancel ? 'rotate-180' : ''}`} />
                       Cancel
+                    </button>
+                  </div>
+
+                  {/* Quick renew / change plan buttons */}
+                  <div className="flex gap-2 pt-0.5">
+                    <button
+                      onClick={() => {
+                        setPlan(activeSub.plan as PlanKey)
+                        setCycle(activeSub.billing_cycle as BillingCycle)
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Renew same plan
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Scroll to plan picker so user can choose a different one
+                        document.querySelector('[data-plan-picker]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 hover:border-zinc-500 transition-colors"
+                    >
+                      <Pencil className="w-3 h-3" /> Change plan
                     </button>
                   </div>
 
@@ -271,8 +322,10 @@ function SubscriptionContent() {
               )}
 
               {/* Plan picker */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-ink-2">Choose a plan</p>
+              <div className="space-y-2" data-plan-picker>
+                <p className="text-xs font-medium text-ink-2">
+                  {isRenewal ? 'Renewing your plan' : 'Choose a plan'}
+                </p>
                 <div className="grid grid-cols-2 gap-3">
                   {(Object.entries(PLANS) as [PlanKey, typeof PLANS[PlanKey]][]).map(([key, p]) => (
                     <button
@@ -351,8 +404,8 @@ function SubscriptionContent() {
                 disabled={paying}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-sm font-semibold transition-all shadow-lg shadow-emerald-900/30"
               >
-                {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                {paying ? 'Redirecting to payment…' : `Pay R ${finalAmount.toFixed(2)} via Ozow`}
+                {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : isRenewal ? <RefreshCw className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+                {paying ? 'Redirecting to payment…' : isRenewal ? `Renew for R ${finalAmount.toFixed(2)} via Ozow` : `Pay R ${finalAmount.toFixed(2)} via Ozow`}
               </button>
               <p className="text-xs text-ink-3 text-center">
                 Instant EFT via Ozow · Secure · No card needed

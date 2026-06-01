@@ -11,6 +11,7 @@ import {
   Mail, Check, X, Trash2, AlertCircle, Clock,
   UserRound, ChevronDown, ChevronUp, Shield,
   FileText, CreditCard, IdCard, CheckCircle2,
+  RefreshCw, ArrowRight,
 } from 'lucide-react'
 import type {
   KlippaOrganisation, KlippaOrgInvite,
@@ -191,12 +192,18 @@ export default function ConsultantsPage() {
   const [sending,        setSending]        = useState(false)
   const [inviteMsg,      setInviteMsg]      = useState<string | null>(null)
   const [acceptUrl,      setAcceptUrl]      = useState<string | null>(null)
-  const [deletingId,     setDeletingId]     = useState<string | null>(null)
-  const [removingId,     setRemovingId]     = useState<string | null>(null)
-  const [currentUserId,  setCurrentUserId]  = useState<string | null>(null)
-  const [isOwner,        setIsOwner]        = useState(false)
-  const [expandedId,     setExpandedId]     = useState<string | null>(null)
-  const [contractFormId, setContractFormId] = useState<string | null>(null)
+  const [deletingId,       setDeletingId]       = useState<string | null>(null)
+  const [removingId,       setRemovingId]       = useState<string | null>(null)
+  const [currentUserId,    setCurrentUserId]    = useState<string | null>(null)
+  const [isOwner,          setIsOwner]          = useState(false)
+  const [expandedId,       setExpandedId]       = useState<string | null>(null)
+  const [contractFormId,   setContractFormId]   = useState<string | null>(null)
+  const [inviteAccessUntil, setInviteAccessUntil] = useState('')       // optional seat end date
+  const [reassignId,       setReassignId]       = useState<string | null>(null)  // member being reassigned
+  const [reassignNotes,    setReassignNotes]    = useState('')
+  const [reassignEmail,    setReassignEmail]    = useState('')
+  const [reassigning,      setReassigning]      = useState(false)
+  const [reassignDone,     setReassignDone]     = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -239,13 +246,41 @@ export default function ConsultantsPage() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [load])
 
+  const handleReassign = async (memberId: string, memberName: string) => {
+    setReassigning(true)
+    try {
+      await fetch('/api/leads', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_type:     'seat_reassignment',
+          notes:         reassignNotes.trim() || undefined,
+          contact_email: reassignEmail.trim() || undefined,
+          metadata:      { member_id: memberId, member_name: memberName, org_name: org?.name },
+        }),
+      })
+      setReassignDone(memberId)
+      setReassignId(null)
+      setReassignNotes('')
+      setReassignEmail('')
+    } catch {
+      setReassignDone(memberId)
+      setReassignId(null)
+    } finally {
+      setReassigning(false)
+    }
+  }
+
   const sendInvite = async () => {
     if (!inviteEmail.trim()) return
     setSending(true); setError(null); setInviteMsg(null); setAcceptUrl(null)
     try {
       const res  = await fetch('/api/org/invite', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim() }),
+        body: JSON.stringify({
+          email:             inviteEmail.trim(),
+          seat_access_until: inviteAccessUntil || undefined,
+        }),
       })
       const json = await res.json()
       if (res.status === 402 && json.checkoutUrl) { router.push(json.checkoutUrl); return }
@@ -259,7 +294,7 @@ export default function ConsultantsPage() {
         setAcceptUrl(null)               // email sent — no need for manual link
       } else {
         const reason = json.emailError ? ` (${json.emailError})` : ''
-        setInviteMsg(`Invite created for ${invitedTo} — email failed${reason}, share the link below`)
+        setInviteMsg(`Invite created for ${invitedTo}. Email failed${reason}, share the link below.`)
         setAcceptUrl(json.acceptUrl ?? null)
       }
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
@@ -365,6 +400,18 @@ export default function ConsultantsPage() {
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                 Send invite
               </button>
+            </div>
+            {/* Optional: fixed contract end date for this seat */}
+            <div className="flex items-center gap-3">
+              <div className="space-y-1 flex-1">
+                <label className="text-xs text-ink-3">Seat access until (optional, for fixed-term contracts)</label>
+                <input type="date" value={inviteAccessUntil}
+                  onChange={e => setInviteAccessUntil(e.target.value)}
+                  className="input w-full sm:w-48 text-xs" />
+              </div>
+              {inviteAccessUntil && (
+                <button onClick={() => setInviteAccessUntil('')} className="text-xs text-ink-3 hover:text-ink-2 mt-4">Clear</button>
+              )}
             </div>
 
             {acceptUrl && (
@@ -513,13 +560,63 @@ export default function ConsultantsPage() {
                           {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
                         {isOwner && c.id !== currentUserId && (
-                          <button onClick={() => removeMember(c.id)} disabled={removingId === c.id}
-                            className="p-1.5 text-ink-3 hover:text-red-400 transition-colors">
-                            {removingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                          </button>
+                          <>
+                            {reassignDone === c.id ? (
+                              <span className="text-[10px] text-emerald-400 px-1.5">Logged ✓</span>
+                            ) : (
+                              <button
+                                onClick={() => { setReassignId(reassignId === c.id ? null : c.id); setReassignNotes(''); setReassignEmail('') }}
+                                title="Reassign this seat"
+                                className="p-1.5 text-ink-3 hover:text-violet-400 transition-colors"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button onClick={() => removeMember(c.id)} disabled={removingId === c.id}
+                              className="p-1.5 text-ink-3 hover:text-red-400 transition-colors">
+                              {removingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
+
+                    {/* Reassign seat panel */}
+                    {isOwner && reassignId === c.id && (
+                      <div className="px-5 pb-4 bg-violet-500/5 border-t border-violet-500/15 space-y-3 pt-3">
+                        <p className="text-xs font-semibold text-violet-300">Reassign seat, handled by our team</p>
+                        <p className="text-xs text-ink-3">
+                          Seat reassignment is managed off-system. Leave us the details and we&apos;ll action it within 1 business day.
+                        </p>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-xs text-ink-2">Your contact email</label>
+                            <input type="email" value={reassignEmail}
+                              onChange={e => setReassignEmail(e.target.value)}
+                              placeholder="you@company.co.za" className="input text-xs" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs text-ink-2">Notes (new consultant name, reason, etc.)</label>
+                            <input type="text" value={reassignNotes}
+                              onChange={e => setReassignNotes(e.target.value)}
+                              placeholder="Reassign to Jane Doe. John resigned." className="input text-xs" />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => setReassignId(null)}
+                            className="flex-1 py-2 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleReassign(c.id, c.full_name ?? c.email ?? '')}
+                            disabled={reassigning || !reassignEmail.trim()}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-50 transition-colors">
+                            {reassigning ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
+                            {reassigning ? 'Sending…' : 'Send request'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Contract form */}
                     {showContract && isOwner && (

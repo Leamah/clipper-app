@@ -11,6 +11,10 @@ export const metadata: Metadata = {
     default:  'Klippa | SARS-Ready Tax & Expense Tracking for SA Freelancers',
     template: '%s | Klippa',
   },
+  icons: {
+    icon:  [{ url: '/icon', type: 'image/png', sizes: '32x32' }],
+    apple: [{ url: '/apple-icon', type: 'image/png', sizes: '180x180' }],
+  },
   description:
     'Klippa is the South African tax app for freelancers, consultants and accountants. Auto-categorise expenses, calculate mixed-use deductions, generate a SARS-compliant mileage logbook, and file your ITR12 in minutes — audit-ready all year.',
   keywords: [
@@ -54,7 +58,7 @@ const jsonLd = {
       '@id':   `${SITE_URL}/#organization`,
       name:    'Klippa',
       url:     SITE_URL,
-      logo:    `${SITE_URL}/og.png`,
+      logo:    `${SITE_URL}/Klippa Logo.png`,
       description: 'SARS-ready tax and expense tracking for South African freelancers, consultants and accountants.',
       areaServed: 'ZA',
     },

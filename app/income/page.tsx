@@ -57,14 +57,14 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
         return
       }
       if (res.status === 401) {
-        setError('Your session has expired — please refresh the page.')
+        setError('Your session has expired. Please refresh the page.')
         return
       }
       if (!res.ok) throw new Error(data.error ?? 'Failed to save')
       onSaved(data.record)
       onClose()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong — please try again.')
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     } finally {
       setSaving(false)
     }

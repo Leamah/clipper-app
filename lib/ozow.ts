@@ -96,6 +96,7 @@ export interface OzowPaymentParams {
   userId:         string   // passed in Optional1 for webhook matching
   plan:           string   // Optional2
   billingCycle:   string   // Optional3
+  renewFrom?:     string   // Optional4: ISO date of current period end (renewals only)
 }
 
 export interface OzowRequestPayload {
@@ -130,7 +131,8 @@ export function buildOzowRequest(
   if (params.userId)       hashFields.Optional1 = params.userId
   if (params.plan)         hashFields.Optional2 = params.plan
   if (params.billingCycle) hashFields.Optional3 = params.billingCycle
-  // Optional4 and Optional5 not used — omitted
+  if (params.renewFrom)    hashFields.Optional4 = params.renewFrom  // renewal: extend from this date
+  // Optional5 not used — omitted
 
   // URLs then IsTest (table positions 13-17)
   hashFields.CancelUrl  = params.cancelUrl

@@ -241,10 +241,10 @@ export default function OrgDashboardPage() {
                 <div>
                   <p className="text-sm font-semibold text-ink-1">
                     {deadline != null && deadline <= 0
-                      ? `Payroll deadline passed — ${period.name}`
+                      ? `Payroll deadline passed: ${period.name}`
                       : deadline === 0
-                      ? `Payroll closes today — ${period.name}`
-                      : `Payroll closes in ${deadline} day${deadline !== 1 ? 's' : ''} — ${period.name}`}
+                      ? `Payroll closes today: ${period.name}`
+                      : `Payroll closes in ${deadline} day${deadline !== 1 ? 's' : ''}: ${period.name}`}
                   </p>
                   <p className="text-xs text-ink-2 mt-0.5">
                     {missing.length} consultant{missing.length !== 1 ? 's haven\'t' : ' hasn\'t'} submitted yet
@@ -318,7 +318,7 @@ export default function OrgDashboardPage() {
                   <span className={`px-2 py-0.5 rounded-full font-medium ${
                     c.days_left <= 7 ? 'bg-red-500/15 text-red-500' : 'bg-amber-500/15 text-amber-600 dark:text-amber-300'
                   }`}>
-                    {c.days_left === 0 ? 'Today' : `${c.days_left}d — ${formatDate(c.end_date)}`}
+                    {c.days_left === 0 ? 'Today' : `${c.days_left}d · ${formatDate(c.end_date)}`}
                   </span>
                 </div>
               ))}

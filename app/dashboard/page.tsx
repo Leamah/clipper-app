@@ -222,7 +222,7 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-ink-1">Tax year {taxYear}</h1>
-            <p className="text-sm text-ink-2 mt-1">ITR12 — Freelancer / Consultant</p>
+            <p className="text-sm text-ink-2 mt-1">ITR12: Freelancer / Consultant</p>
           </div>
           <div className={`self-start sm:self-auto flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
             daysLeft > 30
@@ -248,7 +248,7 @@ export default function Dashboard() {
           <MetricCard
             label="Tax Provision"
             value={formatRand(Math.max(0, taxToSave))}
-            sub={taxResult ? `${((taxResult.taxPayable / Math.max(1, totalIncome)) * 100).toFixed(1)}% effective rate — set this aside` : 'Add income to calculate'}
+            sub={taxResult ? `${((taxResult.taxPayable / Math.max(1, totalIncome)) * 100).toFixed(1)}% effective rate, set this aside` : 'Add income to calculate'}
             color="amber"
             icon={<AlertCircle className="w-4 h-4" />}
           />
@@ -283,7 +283,7 @@ export default function Dashboard() {
               <p className="text-sm font-semibold text-ink-1">
                 {provisionalRunway.daysLeft < 0
                   ? `Provisional payment overdue`
-                  : `Provisional tax — ${provisionalRunway.instalment} payment in ${provisionalRunway.daysLeft} days`}
+                  : `Provisional tax: ${provisionalRunway.instalment} payment in ${provisionalRunway.daysLeft} days`}
               </p>
               <p className="text-xs text-ink-2 leading-snug">
                 {provisionalRunway.daysLeft < 0
@@ -548,7 +548,7 @@ function ProfileCompletionCard({ completion }: { completion: ProfileCompletionRe
         </div>
 
         {complete ? (
-          <p className="text-xs text-emerald-400">All details filled in — your tax calculations are accurate</p>
+          <p className="text-xs text-emerald-400">All details filled in, your tax calculations are accurate</p>
         ) : (
           <>
             <div className="h-1.5 bg-raised rounded-full overflow-hidden">
@@ -710,7 +710,7 @@ function AuditReadinessCard({ readiness }: { readiness: AuditReadinessResult }) 
         </div>
 
         {failing.length === 0 ? (
-          <p className="text-xs text-emerald-400">Every confirmed claim is backed by evidence — export your SARS Audit Pack any time</p>
+          <p className="text-xs text-emerald-400">Every confirmed claim is backed by evidence. Export your SARS Audit Pack any time.</p>
         ) : (
           <>
             <div className="h-1.5 bg-raised rounded-full overflow-hidden">

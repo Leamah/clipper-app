@@ -80,6 +80,8 @@ export async function POST(request: Request) {
 
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
 
+    const orgRenewFrom = (bodyJson as { renewFrom?: string }).renewFrom
+
     const payload = buildOzowRequest(
       {
         transactionRef: ref,
@@ -92,6 +94,7 @@ export async function POST(request: Request) {
         userId:         user.id,
         plan:           'team',
         billingCycle:   'annual',
+        renewFrom:      orgRenewFrom,
       },
       siteCode,
       privateKey,
@@ -101,7 +104,7 @@ export async function POST(request: Request) {
   }
 
   // ── Solo subscription purchase ────────────────────────────
-  const { plan, billingCycle, promoCode } = bodyJson
+  const { plan, billingCycle, promoCode, renewFrom } = bodyJson as typeof bodyJson & { renewFrom?: string }
 
   if (!plan || !billingCycle) {
     return NextResponse.json({ error: 'plan and billingCycle are required' }, { status: 400 })
@@ -155,6 +158,7 @@ export async function POST(request: Request) {
       userId:        user.id,
       plan,
       billingCycle,
+      renewFrom:     renewFrom ?? undefined,  // Optional4: existing period end for renewals
     },
     siteCode,
     privateKey,

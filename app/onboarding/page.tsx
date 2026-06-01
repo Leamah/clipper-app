@@ -209,7 +209,7 @@ export default function OnboardingPage() {
             <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-8">
               <div>
                 <h2 className="text-xl font-bold">How will you use Klippa?</h2>
-                <p className="text-sm text-ink-2 mt-1">Choose the option that best describes you — your experience is tailored accordingly.</p>
+                <p className="text-sm text-ink-2 mt-1">Choose the option that best describes you. Your experience is tailored accordingly.</p>
               </div>
 
               <div className="space-y-3">
@@ -224,7 +224,7 @@ export default function OnboardingPage() {
                   {
                     type:  'company_owner' as UserType,
                     icon:  <Users className="w-6 h-6 text-violet-400" />,
-                    label: 'Company — manage consultants',
+                    label: 'Company: manage consultants',
                     sub:   'Onboard my team, track their timesheets, and approve work',
                     badge: 'B2B',
                   },
@@ -339,7 +339,7 @@ export default function OnboardingPage() {
                   <h2 className="text-xl font-bold">How many seats do you need?</h2>
                   <p className="text-sm text-ink-2 mt-1">
                     One seat per {state.user_type === 'practitioner' ? 'team member' : 'consultant'} you invite to your workspace.
-                    You can change this later — you&apos;ll only pay when you {state.user_type === 'practitioner' ? 'add your first client' : 'invite your first consultant'}.
+                    You can change this later. You&apos;ll only pay when you {state.user_type === 'practitioner' ? 'add your first client' : 'invite your first consultant'}.
                   </p>
                 </div>
 
@@ -393,7 +393,7 @@ export default function OnboardingPage() {
                     : <>Create workspace <ArrowRight className="w-4 h-4" /></>
                   }
                 </button>
-                <p className="text-xs text-ink-3 text-center">No charge today — set up your workspace first.</p>
+                <p className="text-xs text-ink-3 text-center">No charge today. Set up your workspace first.</p>
               </div>
             )}
           </div>
@@ -472,19 +472,19 @@ export default function OnboardingPage() {
                         value: 'home_only' as WorkLocation,
                         icon: <Home className="w-5 h-5 text-emerald-400" />,
                         label: 'Fully Remote',
-                        sub: 'I work exclusively from home — eligible for full home office deduction',
+                        sub: 'I work exclusively from home, eligible for full home office deduction',
                       },
                       {
                         value: 'hybrid' as WorkLocation,
                         icon: <Shuffle className="w-5 h-5 text-amber-400" />,
                         label: 'Hybrid',
-                        sub: 'Some days home, some days office — partial home office deduction may apply',
+                        sub: 'Some days home, some days office. Partial home office deduction may apply.',
                       },
                       {
                         value: 'office_only' as WorkLocation,
                         icon: <Building2 className="w-5 h-5 text-ink-2" />,
                         label: 'Office / On-site',
-                        sub: 'I work at a fixed employer or client premises — no home office deduction',
+                        sub: 'I work at a fixed employer or client premises, no home office deduction',
                       },
                     ]).map((opt) => (
                       <button key={opt.value}
@@ -530,12 +530,12 @@ export default function OnboardingPage() {
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-xl font-bold">Which financial products do you have?</h2>
-                    <p className="text-sm text-ink-2 mt-1">Select all that apply — each one unlocks relevant deductions or exemptions.</p>
+                    <p className="text-sm text-ink-2 mt-1">Select all that apply. Each one unlocks relevant deductions or exemptions.</p>
                   </div>
                   <div className="space-y-2.5">
                     {([
                       { key: 'ra'               as FinancialProduct, label: 'Retirement Annuity (RA)',         sub: 'Deductible up to 27.5% of income or R350,000 (Section 11F)', badge: 'Deduction' },
-                      { key: 'pension'          as FinancialProduct, label: 'Pension Fund',                    sub: 'Combined with RA under Section 11F — employer + employee contributions', badge: 'Deduction' },
+                      { key: 'pension'          as FinancialProduct, label: 'Pension Fund',                    sub: 'Combined with RA under Section 11F: employer + employee contributions', badge: 'Deduction' },
                       { key: 'medical'          as FinancialProduct, label: 'Medical Aid',                     sub: 'Monthly tax credit: R364 per member (first 2), R246 each additional', badge: 'Tax Credit' },
                       { key: 'tfsa'             as FinancialProduct, label: 'Tax-Free Savings Account (TFSA)', sub: 'Returns are tax-free (not a deduction but no tax on growth/interest)', badge: 'Tax-free' },
                       { key: 'interest_savings' as FinancialProduct, label: 'Interest-Bearing Savings Account',sub: 'First R23,800/year (under 65) or R34,500 (65+) of interest is exempt', badge: 'Exemption' },

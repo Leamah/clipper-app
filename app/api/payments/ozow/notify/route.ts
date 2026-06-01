@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     Optional1: userId,
     Optional2: plan,
     Optional3: billingCycle,
+    Optional4: renewFrom,    // ISO date of old period end — present on renewals
   } = body
 
   // Use service role to update records regardless of RLS
@@ -61,9 +62,13 @@ export async function POST(request: Request) {
 
     const now   = new Date()
     const start = now
+    // Renewal: extend from the end of the current period (not from now) so
+    // users who renew early don't lose any days they've already paid for.
+    // If renewFrom is in the past (lapsed sub), fall back to now.
+    const base  = renewFrom && new Date(renewFrom) > now ? new Date(renewFrom) : now
     const end   = billingCycle === 'annual'
-      ? addYears(now, 1)
-      : addMonths(now, 1)
+      ? addYears(base, 1)
+      : addMonths(base, 1)
 
     // 1. Update the subscription record
     await adminClient

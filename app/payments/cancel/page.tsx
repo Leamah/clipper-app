@@ -26,7 +26,7 @@ function CancelContent() {
           <p className="text-sm text-ink-2 leading-relaxed">
             {isError
               ? 'Something went wrong with your payment. Your card was not charged. Please try again.'
-              : 'No worries — your payment was cancelled and nothing was charged.'}
+              : 'No worries, your payment was cancelled and nothing was charged.'}
           </p>
           {ref && (
             <p className="text-xs text-ink-3 font-mono">Ref: {ref.slice(0, 8)}…</p>

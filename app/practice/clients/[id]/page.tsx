@@ -139,12 +139,12 @@ export default function PracticeClientDetail() {
 
   const emailLink = () => {
     if (!portalUrl || !client) return
-    const subject = encodeURIComponent(`Your secure document portal — ${client.tax_year} ${client.return_type}`)
+    const subject = encodeURIComponent(`Your secure document portal: ${client.tax_year} ${client.return_type}`)
     const body    = encodeURIComponent(
       `Hi ${client.full_name.split(' ')[0]},\n\n` +
       `Please use the secure link below to upload the documents we need for your ${client.tax_year} ${client.return_type}:\n\n` +
       `${portalUrl}\n\n` +
-      `The link is private to you — no login required.\n\nThank you.`
+      `The link is private to you. No login required.\n\nThank you.`
     )
     window.location.href = `mailto:${client.email ?? ''}?subject=${subject}&body=${body}`
   }
@@ -399,7 +399,7 @@ export default function PracticeClientDetail() {
         {/* Linked return snapshot */}
         {linked && (
           <div className="rounded-2xl border border-edge bg-surface p-5 sm:p-6 space-y-4">
-            <p className="text-sm font-semibold">Linked Klippa return — {c.tax_year}</p>
+            <p className="text-sm font-semibold">Linked Klippa return: {c.tax_year}</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <div><p className="text-xs text-ink-3">Gross income</p><p className="font-semibold tabular-nums">{zar(linked.gross_income)}</p></div>
               <div><p className="text-xs text-ink-3">Deductions</p><p className="font-semibold tabular-nums">{zar(linked.total_deductions)}</p></div>

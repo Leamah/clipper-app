@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { merchant_name, amount, expense_date, description, category, tax_return_id, classify } = body
+  const { merchant_name, amount, expense_date, description, category, receipt_id, tax_return_id, classify } = body
 
   if (!amount || isNaN(parseFloat(amount))) {
     return NextResponse.json({ error: 'amount is required' }, { status: 400 })
@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
       deductible_percentage: deductiblePct,
       expense_date:          expense_date ?? null,
       description:           description ?? null,
+      receipt_id:            receipt_id   ?? null,
       classification_status: classify ? 'pending' : 'confirmed',
       ai_confidence:         mixedUse?.confidence        ?? classification?.confidence ?? null,
       ai_reasoning:          mixedUse?.reasoning         ?? classification?.reasoning  ?? null,

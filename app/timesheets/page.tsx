@@ -743,7 +743,7 @@ export default function TimesheetsPage() {
       )
       setShowExport(false)
     } catch {
-      setExportErr('Export failed — try again')
+      setExportErr('Export failed. Try again.')
     } finally {
       setExporting(false)
     }
@@ -918,7 +918,7 @@ export default function TimesheetsPage() {
 
       setSaveMsg('Saved to Documents ✓')
     } catch {
-      setSaveMsg('Save failed — try again')
+      setSaveMsg('Save failed. Try again.')
     } finally {
       setSavingPdf(false)
       setTimeout(() => setSaveMsg(null), 4000)
@@ -1127,7 +1127,7 @@ export default function TimesheetsPage() {
           <div className="mb-4 flex items-start gap-2 text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
             <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
             <span>
-              <span className="font-semibold">Heads up — </span>
+              <span className="font-semibold">Heads up: </span>
               {dupDates.length === 1 ? 'this day is' : 'these days are'} also logged on another timesheet:{' '}
               {dupDates.map(d => format(new Date(d + 'T00:00:00'), 'd MMM')).join(', ')}.
               {' '}Check you&apos;re not double-billing.
@@ -1264,8 +1264,8 @@ export default function TimesheetsPage() {
         )}
       </div>
 
-      {/* Sticky footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-edge/60 bg-base/90 backdrop-blur-sm">
+      {/* Sticky footer — offset by sidebar width on desktop so it never covers nav items */}
+      <div className="fixed bottom-0 left-0 md:left-[var(--nav-w)] right-0 z-30 border-t border-edge/60 bg-base/90 backdrop-blur-sm transition-[left] duration-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
           {/* Totals */}
           <div className="flex items-center gap-4">

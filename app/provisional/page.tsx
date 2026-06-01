@@ -281,14 +281,14 @@ export default function ProvisionalPage() {
           </div>
           <p className="text-sm text-ink-2 leading-relaxed">
             If you earn income outside a regular salary (freelance, consulting, rental, commission),
-            SARS requires you to pay your estimated annual tax in two instalments — one mid-year and one at year end.
+            SARS requires you to pay your estimated annual tax in two instalments: one mid-year and one at year end.
             This prevents a large lump-sum payment at assessment time.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             {[
               { label: 'Who must register', value: 'Any person with non-employment taxable income above R30,000/year' },
-              { label: 'First payment', value: 'By 31 August — 50% of estimated annual tax' },
-              { label: 'Second payment', value: 'By 28 February — balance of estimated annual tax' },
+              { label: 'First payment', value: 'By 31 August: 50% of estimated annual tax' },
+              { label: 'Second payment', value: 'By 28 February: balance of estimated annual tax' },
             ].map((item) => (
               <div key={item.label} className="rounded-xl bg-raised/60 px-4 py-3 space-y-1">
                 <p className="text-xs font-semibold text-ink-2">{item.label}</p>

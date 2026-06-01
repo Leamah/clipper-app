@@ -231,7 +231,7 @@ export default function FilingPage() {
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm text-ink-1">Employees&apos; tax paid (PAYE)</p>
-                  <p className="text-xs text-ink-3 mt-0.5">From your IRP5 — leave R0 if fully self-employed</p>
+                  <p className="text-xs text-ink-3 mt-0.5">From your IRP5. Leave R0 if fully self-employed.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-ink-3">R</span>
@@ -261,7 +261,7 @@ export default function FilingPage() {
             {!profile.date_of_birth && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Date of birth not set — age-based rebates (65 and 75+) may be incorrect.{' '}
+                <span>Date of birth not set. Age-based rebates (65 and 75+) may be incorrect.{' '}
                   <Link href="/settings" className="underline">Update in Settings →</Link>
                 </span>
               </div>
@@ -270,7 +270,7 @@ export default function FilingPage() {
             {profile.works_from_home && !profile.home_expenses_annual && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-sm text-amber-300">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Annual home running costs are R0 — your home office deduction is R0.{' '}
+                <span>Annual home running costs are R0, so your home office deduction is R0.{' '}
                   <Link href="/settings" className="underline">Update in Settings →</Link>
                 </span>
               </div>
@@ -304,7 +304,7 @@ export default function FilingPage() {
 
             <div className="rounded-2xl border border-edge overflow-hidden">
               <div className="px-4 py-3 bg-surface/60 border-b border-edge">
-                <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Income (ITR12 — Local income)</p>
+                <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Income (ITR12: Local income)</p>
               </div>
               {incomeRecords.reduce((groups, r) => {
                 const existing = groups.find((g) => g.type === r.income_type)
@@ -380,9 +380,9 @@ export default function FilingPage() {
                 { n: '01', title: 'Log in to SARS eFiling', body: 'Go to secure.sarsefiling.co.za and log in with your username and password. If you haven\'t registered, click "Register" and complete the process.', link: 'https://secure.sarsefiling.co.za/app/login', linkLabel: 'Open eFiling portal' },
                 { n: '02', title: 'Select "Returns" → "Returns Issued" → "Personal Income Tax (ITR12)"', body: 'From your dashboard, navigate to the Returns menu. Find the ITR12 for the current tax year and click "Open."' },
                 { n: '03', title: 'Enter your income', body: `In the "Income" section, find "Local income" and enter your freelance/consulting income. Use the values from your cheat sheet:\n• Code 3699 (Freelance): ${formatRand(totalIncome)}` },
-                { n: '04', title: 'Enter your deductions', body: `In the "Deductions" section, enter your business expense deductions:\n${taxResult.section11fRa > 0 ? `• Code 4001 (RA / Section 11F): ${formatRand(taxResult.section11fRa)}\n` : ''}${taxResult.homeOffice > 0 ? `• Code 4011 (Home office): ${formatRand(taxResult.homeOffice)}\n` : ''}${taxResult.travel > 0 ? `• Code 4016 (Travel — fixed cost): ${formatRand(taxResult.travel)}\n` : ''}${taxResult.otherDeductions > 0 ? `• Code 4018 (Other business expenses): ${formatRand(taxResult.otherDeductions)}` : ''}` },
+                { n: '04', title: 'Enter your deductions', body: `In the "Deductions" section, enter your business expense deductions:\n${taxResult.section11fRa > 0 ? `• Code 4001 (RA / Section 11F): ${formatRand(taxResult.section11fRa)}\n` : ''}${taxResult.homeOffice > 0 ? `• Code 4011 (Home office): ${formatRand(taxResult.homeOffice)}\n` : ''}${taxResult.travel > 0 ? `• Code 4016 (Travel, fixed cost): ${formatRand(taxResult.travel)}\n` : ''}${taxResult.otherDeductions > 0 ? `• Code 4018 (Other business expenses): ${formatRand(taxResult.otherDeductions)}` : ''}` },
                 { n: '05', title: 'Review the calculated tax', body: 'SARS eFiling will automatically calculate your tax. Compare it against your cheat sheet. If the figures differ significantly, review your entries.' },
-                { n: '06', title: 'Submit your return', body: 'Once satisfied, click "File Return" and confirm. Save your SARS reference number — you\'ll need it in the next step.' },
+                { n: '06', title: 'Submit your return', body: 'Once satisfied, click "File Return" and confirm. Save your SARS reference number. You\'ll need it in the next step.' },
               ].map((s) => (
                 <div key={s.n} className="rounded-xl border border-edge p-4 space-y-3">
                   <div className="flex items-start gap-3">

@@ -297,7 +297,7 @@ export default function PracticeDashboard() {
                               : c.fee_paid ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                               : 'bg-amber-500/15 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25'
                             }`}
-                            title={c.fee === 0 ? '' : c.fee_paid ? 'Paid — click to mark unpaid' : 'Unpaid — click to mark paid'}
+                            title={c.fee === 0 ? '' : c.fee_paid ? 'Paid, click to mark unpaid' : 'Unpaid, click to mark paid'}
                           >
                             {c.fee === 0 ? '—' : `${zar(c.fee)}${c.fee_paid ? ' ✓' : ''}`}
                           </button>

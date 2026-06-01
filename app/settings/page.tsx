@@ -158,31 +158,31 @@ function ProfileNudges({ profile }: { profile: KlippaProfile }) {
   const nudges: Nudge[] = []
 
   if (!profile.date_of_birth) {
-    nudges.push({ type: 'tip', text: 'Add your date of birth — affects rebate tier if you are 65 or older' })
+    nudges.push({ type: 'tip', text: 'Add your date of birth (affects rebate tier if you are 65 or older)' })
   }
   if (profile.has_ra && (profile.ra_contributions ?? 0) === 0) {
-    nudges.push({ type: 'warn', text: 'RA is switched on but no amount entered — your Section 11F deduction is R0' })
+    nudges.push({ type: 'warn', text: 'RA is switched on but no amount entered, so your Section 11F deduction is R0' })
   }
   if (profile.has_pension && (profile.pension_contributions ?? 0) === 0) {
     nudges.push({ type: 'warn', text: 'Pension fund is switched on but no contribution amount entered' })
   }
   if (profile.has_vehicle && (profile.vehicle_value ?? 0) === 0) {
-    nudges.push({ type: 'warn', text: 'Vehicle travel is switched on but no purchase value entered — travel deduction will be R0' })
+    nudges.push({ type: 'warn', text: 'Vehicle travel is switched on but no purchase value entered, so your travel deduction will be R0' })
   }
   if (profile.has_vehicle && (profile.commute_km ?? 0) === 0) {
-    nudges.push({ type: 'warn', text: 'Vehicle enabled but commute distance is 0 — logbook auto-generation is off' })
+    nudges.push({ type: 'warn', text: 'Vehicle enabled but commute distance is 0, so logbook auto-generation is off' })
   }
   if (!profile.has_ra && !profile.has_pension) {
     nudges.push({ type: 'tip', text: 'Do you pay into a Retirement Annuity or pension? This is usually the biggest single deduction for self-employed people' })
   }
   if (!profile.has_medical) {
-    nudges.push({ type: 'tip', text: 'Medical aid? SARS gives you a direct tax credit (not just a deduction) — worth up to R4,368/yr for a single member' })
+    nudges.push({ type: 'tip', text: 'Medical aid? SARS gives you a direct tax credit (not just a deduction), worth up to R4,368/yr for a single member' })
   }
   if (!profile.has_vehicle && profile.employment_type !== 'employee') {
-    nudges.push({ type: 'tip', text: 'If you drive for work, enable vehicle travel — SARS allows a fixed-cost deduction based on your car value and km driven' })
+    nudges.push({ type: 'tip', text: 'If you drive for work, enable vehicle travel. SARS allows a fixed-cost deduction based on your car value and km driven.' })
   }
   if (profile.works_from_home && (profile.home_expenses_annual ?? 0) === 0) {
-    nudges.push({ type: 'warn', text: 'Works from home is on but annual home running costs are R0 — your home office deduction will be R0. Enter your annual bond interest/rent + rates + electricity + levies below.' })
+    nudges.push({ type: 'warn', text: 'Works from home is on but annual home running costs are R0, so your home office deduction will be R0. Enter your annual bond interest/rent + rates + electricity + levies below.' })
   }
 
   if (nudges.length === 0) return null
@@ -355,7 +355,7 @@ export default function SettingsPage() {
               placeholder="Your name as on your ID" className="input w-full" />
           </Field>
 
-          <Field label="Date of birth" hint="Used to apply the correct SARS rebate — only matters if you are 65 or older.">
+          <Field label="Date of birth" hint="Used to apply the correct SARS rebate (only matters if you are 65 or older).">
             <DobPicker value={profile.date_of_birth} onChange={(v) => update('date_of_birth', v as KlippaProfile['date_of_birth'])} />
           </Field>
         </Section>
@@ -406,11 +406,11 @@ export default function SettingsPage() {
         </Section>
 
         {/* ── Retirement savings ── */}
-        <Section title="Retirement savings" hint="Section 11F — often the biggest single deduction for self-employed people.">
+        <Section title="Retirement savings" hint="Section 11F: often the biggest single deduction for self-employed people.">
           <ToggleRow
             label="I contribute to a Retirement Annuity (RA)"
             sub="Up to 27.5% of income or R350,000 per year, whichever is lower"
-            impact="Switch on to unlock — could save you R10,000+ in tax depending on income"
+            impact="Switch on to unlock. Could save you R10,000+ in tax depending on income."
             value={profile.has_ra} onChange={(v) => update('has_ra', v)}
           />
           {profile.has_ra && (
@@ -436,11 +436,11 @@ export default function SettingsPage() {
         </Section>
 
         {/* ── Medical aid ── */}
-        <Section title="Medical aid" hint="Section 6A credits come directly off what you owe SARS — not just a deduction.">
+        <Section title="Medical aid" hint="Section 6A credits come directly off what you owe SARS, not just a deduction.">
           <ToggleRow
             label="I have medical aid"
             sub="R364/month credit for first 2 members, R246 each additional member"
-            impact="Switch on — a single-member plan saves R4,368/yr off your actual tax bill"
+            impact="Switch on. A single-member plan saves R4,368/yr off your actual tax bill."
             value={profile.has_medical} onChange={(v) => update('has_medical', v)}
           />
           {profile.has_medical && (
@@ -451,7 +451,7 @@ export default function SettingsPage() {
                     const credit = (n <= 2 ? n * 364 : 2 * 364 + (n - 2) * 246) * 12
                     return (
                       <option key={n} value={n}>
-                        {n === 1 ? 'Just me' : `${n} members`} — R{credit.toLocaleString('en-ZA')}/yr credit
+                        {n === 1 ? 'Just me' : `${n} members`}, R{credit.toLocaleString('en-ZA')}/yr credit
                       </option>
                     )
                   })}
@@ -465,7 +465,7 @@ export default function SettingsPage() {
         <Section title="Vehicle & travel" hint="SARS allows a fixed-cost travel deduction based on your vehicle value and business km driven.">
           <ToggleRow
             label="I use my vehicle for work"
-            sub="Enables the SARS fixed-cost travel deduction — requires a logbook"
+            sub="Enables the SARS fixed-cost travel deduction (requires a logbook)"
             impact="Switch on if you drive to clients, sites, or a regular office location"
             value={profile.has_vehicle} onChange={(v) => update('has_vehicle', v)}
           />
@@ -488,7 +488,7 @@ export default function SettingsPage() {
                 <NumInput value={profile.vehicle_value ?? 0} onChange={(v) => update('vehicle_value', v)} step={5000} placeholder="e.g. 350000" />
               </Field>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Registration number" hint="e.g. GP 123-456 — printed on your logbook PDF.">
+                <Field label="Registration number" hint="e.g. GP 123-456, printed on your logbook PDF.">
                   <input
                     type="text"
                     value={profile.vehicle_registration ?? ''}
@@ -511,7 +511,7 @@ export default function SettingsPage() {
         </Section>
 
         {/* ── Commute & logbook ── */}
-        <Section title="Logbook setup" hint="Set this up once. Klippa auto-fills your logbook each week — you just confirm it.">
+        <Section title="Logbook setup" hint="Set this up once. Klippa auto-fills your logbook each week and you just confirm it.">
           <Field label="Home suburb or area">
             <input type="text" value={profile.home_suburb ?? ''} onChange={(e) => update('home_suburb', e.target.value)}
               placeholder="e.g. Midrand" className="input w-full" />
@@ -549,7 +549,7 @@ export default function SettingsPage() {
             <NumInput value={profile.opening_odometer ?? 0} onChange={(v) => update('opening_odometer', v)} step={10} placeholder="e.g. 48250" />
           </Field>
 
-          <Field label="Closing odometer (km at 28 February — end of tax year)" hint="Required for SARS logbook. Total km driven this tax year = closing − opening odometer.">
+          <Field label="Closing odometer (km at 28 February, end of tax year)" hint="Required for SARS logbook. Total km driven this tax year = closing minus opening odometer.">
             <NumInput value={profile.closing_odometer ?? 0} onChange={(v) => update('closing_odometer', v)} step={10} placeholder="e.g. 64500" />
           </Field>
 
@@ -570,7 +570,7 @@ export default function SettingsPage() {
         <Section title="Savings & investments">
           <ToggleRow
             label="Tax-Free Savings Account (TFSA)"
-            sub="Returns are tax-free — annual limit R36,000, lifetime R500,000"
+            sub="Returns are tax-free. Annual limit R36,000, lifetime R500,000."
             value={profile.has_tfsa} onChange={(v) => update('has_tfsa', v)}
           />
           <ToggleRow
@@ -585,7 +585,7 @@ export default function SettingsPage() {
           <ToggleRow
             label="Timesheets"
             sub="Track billable hours per client and export professional timecards to PDF"
-            impact="Useful if you bill clients by the hour — consultants, contractors, developers"
+            impact="Useful if you bill clients by the hour: consultants, contractors, developers"
             value={profile.feature_timesheets ?? false}
             onChange={(v) => update('feature_timesheets', v)}
           />
@@ -609,7 +609,7 @@ export default function SettingsPage() {
           <Field label="Tax year">
             <select value={profile.tax_year} onChange={(e) => update('tax_year', parseInt(e.target.value))} className="input w-full">
               {[new Date().getFullYear(), new Date().getFullYear() - 1].map((y) => (
-                <option key={y} value={y}>Tax year {y} (Mar {y - 1} — Feb {y})</option>
+                <option key={y} value={y}>Tax year {y} (Mar {y - 1} to Feb {y})</option>
               ))}
             </select>
           </Field>
@@ -657,7 +657,7 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm text-ink-1">Delete account</p>
                 <p className="text-xs text-ink-3 mt-0.5">
-                  Permanently deletes all your data — expenses, income, timesheets, documents and your profile.
+                  Permanently deletes all your data: expenses, income, timesheets, documents and your profile.
                 </p>
               </div>
               <button

@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 
   if ((activeClients ?? 0) >= PRACTICE_CLIENT_CAP) {
     return NextResponse.json(
-      { error: `You've reached the ${PRACTICE_CLIENT_CAP}-client fair-use limit. Contact us at hello@klippa.co.za for enterprise pricing.`, gate: 'contact' },
+      { error: `You've reached the ${PRACTICE_CLIENT_CAP}-client fair-use limit. Contact us at info@leamah.co.za for enterprise pricing.`, gate: 'contact' },
       { status: 402 },
     )
   }

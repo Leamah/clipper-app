@@ -267,7 +267,7 @@ export default function MileagePage() {
       {isConfigured && (
         <div className="border-b border-edge/40 bg-base/60">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 h-11 flex items-center gap-2">
-            <span className="text-xs text-ink-2 mr-auto">Mileage Logbook — Tax Year {taxYear}</span>
+            <span className="text-xs text-ink-2 mr-auto">Mileage Logbook, Tax Year {taxYear}</span>
             <button onClick={exportLogbook} disabled={trips.length === 0}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:border-edge hover:text-ink-1 disabled:opacity-40 transition-all">
               <Download className="w-3 h-3" /> CSV
@@ -494,7 +494,7 @@ function WeekReviewCard({
         </div>
         <div className="flex-1">
           <p className="text-sm font-medium text-ink-1">
-            {fmtDate(week.start)} — {fmtDate(week.end)}
+            {fmtDate(week.start)} to {fmtDate(week.end)}
           </p>
           <p className="text-xs text-ink-2 mt-0.5">
             {selectedCount > 0
@@ -692,7 +692,7 @@ function AddTripModal({ taxReturnId, profile, onClose, onSaved, lastOdometerEnd 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-ink-2">
                 Distance (km)
-                {odoKm && <span className="text-ink-3 font-normal"> — auto from odometer</span>}
+                {odoKm && <span className="text-ink-3 font-normal"> (auto from odometer)</span>}
               </label>
               <input
                 type="number" min="0.1" step="0.1"

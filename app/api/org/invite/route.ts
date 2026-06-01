@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await anon.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { email, role = 'member' } = await request.json()
+  const { email, role = 'member', seat_access_until } = await request.json()
   if (!email?.trim()) return NextResponse.json({ error: 'email required' }, { status: 400 })
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -93,12 +93,16 @@ export async function POST(request: Request) {
   const { data: invite, error: inviteErr } = await admin
     .from('klippa_org_invites')
     .insert({
-      organisation_id: orgId,
-      invited_email:   email.trim().toLowerCase(),
-      invited_by:      user.id,
+      organisation_id:  orgId,
+      invited_email:    email.trim().toLowerCase(),
+      invited_by:       user.id,
       role,
       token,
-      expires_at:      expiresAt,
+      expires_at:       expiresAt,
+      // Optional: custom seat end date for fixed-term contractors
+      seat_access_until: seat_access_until
+        ? new Date(seat_access_until).toISOString()
+        : null,
     })
     .select()
     .single()

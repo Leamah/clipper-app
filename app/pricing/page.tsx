@@ -165,7 +165,7 @@ export default function PricingPage() {
                 <span className="text-xs text-ink-2">/ seat / year</span>
               </div>
               <ul className="space-y-2">
-                {['One seat per consultant you invite', 'Timesheets, approvals & payroll periods', 'Contracts & compliance tracking', 'Pay once a year — no monthly admin'].map((f) => (
+                {['One seat per consultant you invite', 'Timesheets, approvals & payroll periods', 'Contracts & compliance tracking', 'Pay once a year, no monthly admin'].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-xs text-ink-1">
                     <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />{f}
                   </li>
@@ -196,7 +196,7 @@ export default function PricingPage() {
           </div>
 
           <p className="text-center text-xs text-ink-3">
-            Set up your workspace free — you only pay when you invite your first team member or add your first client.
+            Set up your workspace free. You only pay when you invite your first team member or add your first client.
           </p>
         </div>
 
@@ -204,7 +204,7 @@ export default function PricingPage() {
         <div className="border-t border-edge/50 pt-12 grid sm:grid-cols-3 gap-8">
           {[
             { q: 'Can I cancel any time?',  a: 'Yes. Cancel before your next billing date and you won\'t be charged again. Your data stays intact.' },
-            { q: 'Do you offer a free trial?', a: 'Yes — ask us for a promo code or check your email when you sign up. We regularly run 7 and 30-day trials.' },
+            { q: 'Do you offer a free trial?', a: 'Yes. Ask us for a promo code or check your email when you sign up. We regularly run 7 and 30-day trials.' },
             { q: 'Is my payment secure?', a: 'Payments are processed by Ozow, a regulated South African payment provider. We never store your banking details.' },
           ].map(({ q, a }) => (
             <div key={q} className="space-y-2">
