@@ -528,6 +528,41 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
   )
 }
 
+// ── Image compression helper ──────────────────────────────
+// Resizes phone photos to max 1600 px and re-encodes as JPEG 85%.
+// Keeps the payload well under Vercel's 4.5 MB serverless body limit.
+// PDFs are passed through unchanged.
+function compressImage(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX = 1600
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width >= height) { height = Math.round(height * MAX / width); width = MAX }
+        else                 { width  = Math.round(width  * MAX / height); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(file); return }
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(
+        (blob) => resolve(blob
+          ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+          : file
+        ),
+        'image/jpeg',
+        0.85,
+      )
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+    img.src = url
+  })
+}
+
 // ── Main page ─────────────────────────────────────────────
 
 function ExpensesPage() {
@@ -566,26 +601,39 @@ function ExpensesPage() {
     [records]
   )
 
-  // ── Capture: file → OCR → pre-fill Add modal ─────────────
+  // ── Capture: file → compress → OCR → pre-fill Add modal ─────
   const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setCapturing(true)
     setCaptureError(null)
     try {
+      // Compress images before upload — phone photos can be 5-8 MB which
+      // exceeds Vercel's 4.5 MB serverless body limit and returns a plain-text
+      // "Request Entity Too Large" that breaks res.json(). Cap at 1600 px wide,
+      // JPEG 85% — enough for OCR, typically < 400 KB.
+      const fileToUpload = file.type.startsWith('image/') ? await compressImage(file) : file
+
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', fileToUpload)
       if (taxReturn?.id) fd.append('tax_return_id', taxReturn.id)
       const res  = await fetch('/api/documents/ocr', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'OCR failed')
 
-      const ext = data.extracted
+      // Guard against non-JSON responses (e.g. Vercel 413 as plain HTML)
+      let data: Record<string, unknown> = {}
+      try { data = await res.json() } catch { /* non-JSON body */ }
+      if (!res.ok) throw new Error(
+        data.error === 'premium_required'
+          ? 'Receipt scanning requires a Starter plan or above'
+          : (data.error as string) ?? 'OCR failed — please try again'
+      )
+
+      const ext = data.extracted as Record<string, unknown> | null ?? {}
       setCapturePreFill({
-        merchant_name: ext.merchant_name ?? '',
+        merchant_name: (ext.merchant_name as string) ?? '',
         amount:        ext.amount != null ? String(ext.amount) : '',
-        expense_date:  ext.expense_date ?? '',
-        receipt_id:    data.document_id ?? null,
+        expense_date:  (ext.expense_date as string) ?? '',
+        receipt_id:    (data.document_id as string) ?? null,
       })
       setShowAdd(true)
     } catch (err) {
