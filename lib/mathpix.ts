@@ -1,7 +1,11 @@
 // ============================================================
-// Mathpix OCR client for Klippa
-// Used for: receipts, IRP5/IT3 certificates, bank statements
+// Receipt & document OCR — powered by OpenAI GPT-4o-mini vision
+// Replaced original Mathpix integration (math-OCR, not receipt OCR)
+// with GPT-4o-mini which is already configured for the chatbot and
+// handles SA receipt formats reliably.
 // ============================================================
+
+import OpenAI from 'openai'
 
 interface MathpixResult {
   text:             string
@@ -15,152 +19,62 @@ interface MathpixOptions {
 
 export async function extractDocument(
   base64Image: string,
-  mimeType: string,
-  options: MathpixOptions
+  mimeType:    string,
+  options:     MathpixOptions,
 ): Promise<MathpixResult> {
-  const appId  = process.env.MATHPIX_APP_ID!
-  const appKey = process.env.MATHPIX_APP_KEY!
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-  const body = {
-    src:                  `data:${mimeType};base64,${base64Image}`,
-    formats:              ['text', 'data'],
-    data_options:         { include_tables_html: true },
-    ocr:                  ['math', 'text'],
-  }
+  const prompt = buildPrompt(options.document_type)
 
-  const response = await fetch('https://api.mathpix.com/v3/text', {
-    method:  'POST',
-    headers: {
-      'app_id':       appId,
-      'app_key':      appKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
+  const response = await openai.chat.completions.create({
+    model:    'gpt-4o-mini',
+    messages: [
+      {
+        role:    'user',
+        content: [
+          { type: 'text',      text: prompt },
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}`, detail: 'auto' } },
+        ],
+      },
+    ],
+    max_tokens:      400,
+    response_format: { type: 'json_object' },
   })
 
-  if (!response.ok) {
-    throw new Error(`Mathpix API error: ${response.status}`)
-  }
-
-  const raw = await response.json()
-  const fullText: string = raw.text ?? ''
-
+  const raw  = response.choices[0]?.message?.content ?? '{}'
   let extracted_fields: Record<string, string | number | null> = {}
-
-  if (options.document_type === 'irp5') {
-    extracted_fields = parseIRP5Fields(fullText)
-  } else if (options.document_type === 'receipt') {
-    extracted_fields = parseReceiptFields(fullText)
-  } else if (options.document_type === 'bank_statement') {
-    extracted_fields = parseBankStatementFields(fullText)
-  }
-
-  // Confidence: Mathpix returns latex_confidence or text_confidence (0-1)
-  const confidence = raw.latex_confidence ?? raw.text_confidence ?? 0.5
+  try { extracted_fields = JSON.parse(raw) } catch { /* malformed JSON — leave empty */ }
 
   return {
-    text:             fullText,
-    confidence:       confidence,
+    text:             raw,
+    confidence:       0.85,
     extracted_fields,
   }
 }
 
-// ── IRP5 field extraction ─────────────────────────────────
-// Maps SARS source codes found in OCR text to structured fields
+// ── Prompt builders ───────────────────────────────────────
 
-function parseIRP5Fields(text: string): Record<string, string | number | null> {
-  const fields: Record<string, string | number | null> = {}
+function buildPrompt(documentType: MathpixOptions['document_type']): string {
+  if (documentType === 'receipt') {
+    return `You are an OCR assistant reading a South African receipt or tax invoice.
+Extract the following fields and respond with valid JSON only — no explanation, no markdown.
+Use null for any field you cannot find. Amounts are in South African Rand (R / ZAR).
 
-  // Common IRP5 source codes
-  const codes = [
-    '3601', '3602', '3605', '3606', '3610', '3616', '3699',  // income
-    '4001', '4002', '4003', '4005', '4006',                   // deductions
-    '4101', '4102', '4115', '4116',                           // employees' tax
-    '4141', '4150',                                            // medical aid
-  ]
-
-  for (const code of codes) {
-    // Try to find "3601 R 123,456.00" or "3601: 123456" patterns
-    const patterns = [
-      new RegExp(`${code}[\\s:,]*R?\\s*([\\d,]+(?:\\.\\d{1,2})?)`, 'i'),
-      new RegExp(`${code}[\\s]*([\\d]+[\\d,\\.]*)`),
-    ]
-
-    for (const pattern of patterns) {
-      const match = text.match(pattern)
-      if (match) {
-        const raw = match[1].replace(/,/g, '')
-        const value = parseFloat(raw)
-        if (!isNaN(value)) {
-          fields[`sars_${code}`] = value
-          break
-        }
-      }
-    }
+{
+  "merchant_name": "store or business name (string or null)",
+  "amount": <total amount as a plain number, e.g. 349.99, or null>,
+  "date": "date in DD/MM/YYYY format or null",
+  "vat_amount": <VAT amount as a plain number or null>
+}`
   }
 
-  // Extract employer name
-  const employerMatch = text.match(/employer[:\s]+([A-Za-z\s&()\-]+)/i)
-  if (employerMatch) fields['employer_name'] = employerMatch[1].trim()
-
-  // Extract tax year
-  const yearMatch = text.match(/tax year[:\s]*(\d{4})/i) ?? text.match(/period[:\s]*(\d{4})/i)
-  if (yearMatch) fields['tax_year'] = parseInt(yearMatch[1])
-
-  return fields
-}
-
-// ── Receipt field extraction ──────────────────────────────
-
-function parseReceiptFields(text: string): Record<string, string | number | null> {
-  const fields: Record<string, string | number | null> = {}
-
-  // Total amount
-  const totalPatterns = [
-    /total[:\s]*R?\s*([\d,]+\.?\d*)/i,
-    /amount[:\s]*R?\s*([\d,]+\.?\d*)/i,
-    /grand total[:\s]*R?\s*([\d,]+\.?\d*)/i,
-  ]
-  for (const pattern of totalPatterns) {
-    const match = text.match(pattern)
-    if (match) {
-      const value = parseFloat(match[1].replace(/,/g, ''))
-      if (!isNaN(value)) { fields['amount'] = value; break }
-    }
+  if (documentType === 'irp5') {
+    return `You are an OCR assistant reading a South African IRP5 tax certificate.
+Extract all SARS source codes and their amounts plus the employer name and tax year.
+Respond with valid JSON only — no explanation, no markdown.
+Format: { "employer_name": "...", "tax_year": 2026, "sars_3601": 480000, "sars_4001": 22000, ... }
+Use null for fields you cannot find. Amounts are numbers only (no R or commas).`
   }
 
-  // Date
-  const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/
-  const dateMatch = text.match(datePattern)
-  if (dateMatch) fields['date'] = dateMatch[1]
-
-  // VAT
-  const vatPattern = /VAT[:\s]*R?\s*([\d,]+\.?\d*)/i
-  const vatMatch = text.match(vatPattern)
-  if (vatMatch) {
-    const value = parseFloat(vatMatch[1].replace(/,/g, ''))
-    if (!isNaN(value)) fields['vat_amount'] = value
-  }
-
-  // First line often contains merchant/store name
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
-  if (lines[0]) fields['merchant_name'] = lines[0].substring(0, 100)
-
-  return fields
-}
-
-// ── Bank statement field extraction ──────────────────────
-
-function parseBankStatementFields(text: string): Record<string, string | number | null> {
-  const fields: Record<string, string | number | null> = {}
-
-  // Account number
-  const accMatch = text.match(/account[:\s]*(?:no\.?\s*)?(\d[\d\s]{6,15}\d)/i)
-  if (accMatch) fields['account_number'] = accMatch[1].replace(/\s/g, '')
-
-  // Period
-  const periodMatch = text.match(/(?:statement period|from)[:\s]*(\d{1,2}[\/\-]\w+[\/\-]\d{2,4})/i)
-  if (periodMatch) fields['period'] = periodMatch[1]
-
-  return fields
+  return `Extract the key fields from this document and respond with valid JSON only.`
 }

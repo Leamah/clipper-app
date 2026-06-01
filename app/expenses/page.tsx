@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   Plus, FileSpreadsheet, Trash2, Loader2,
-  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera,
+  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera, Zap,
 } from 'lucide-react'
 import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCategory } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
@@ -238,11 +238,19 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, onC
         }),
       })
       const data = await res.json()
+      if (res.status === 402 && data.error === 'free_limit_reached') {
+        setError('limit_reached')
+        return
+      }
+      if (res.status === 401) {
+        setError('Your session has expired — please refresh the page.')
+        return
+      }
       if (!res.ok) throw new Error(data.error ?? 'Failed to save')
       onSaved(data.record, doClassify)
       onClose()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to save')
+      setError(e instanceof Error ? e.message : 'Something went wrong — please try again.')
     } finally {
       setSaving(false)
     }
@@ -344,14 +352,33 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, onC
             </div>
           )}
 
-          {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
+          {error === 'limit_reached' ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <p className="text-sm font-semibold text-amber-300">Monthly limit reached</p>
+              </div>
+              <p className="text-xs text-amber-300/80 leading-relaxed">
+                Free plan includes {FREE_EXPENSE_LIMIT} expense records per month.
+                Upgrade to Starter for unlimited tracking + AI classification.
+              </p>
+              <a
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold transition-colors"
+              >
+                <Zap className="w-3 h-3" /> Upgrade now
+              </a>
+            </div>
+          ) : error ? (
+            <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>
+          ) : null}
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
               Cancel
             </button>
-            <button type="submit" disabled={saving}
+            <button type="submit" disabled={saving || error === 'limit_reached'}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               {saving ? (doClassify ? 'Classifying…' : 'Saving…') : 'Add expense'}
@@ -629,6 +656,12 @@ function ExpensesPage() {
       )
 
       const ext = data.extracted as Record<string, unknown> | null ?? {}
+
+      // If OCR failed server-side, warn the user but still open the form
+      if (data.ocr_failed) {
+        setCaptureError('OCR couldn\'t read the receipt — please fill in the details manually.')
+      }
+
       setCapturePreFill({
         merchant_name: (ext.merchant_name as string) ?? '',
         amount:        ext.amount != null ? String(ext.amount) : '',
