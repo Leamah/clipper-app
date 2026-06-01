@@ -2,13 +2,8 @@
  * POST /api/subscription/cancel
  *
  * Cancels the user's active subscription immediately and downgrades
- * their profile tier back to 'free'. No partial-period refunds — the
- * user retains access until the current_period_end shown on the plan
- * page; from there they revert to free features.
- *
- * Note: Ozow EFT doesn't support automated recurring billing or refunds,
- * so cancellation here is purely a tier downgrade.  For annual plans where
- * the user is entitled to a partial refund they should email support.
+ * their profile tier back to 'free'. All payments are non-refundable.
+ * Cancellation is a tier downgrade only — no refunds are issued.
  */
 import { createServerClient }      from '@supabase/ssr'
 import { createClient }            from '@supabase/supabase-js'

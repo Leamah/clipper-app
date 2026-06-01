@@ -244,9 +244,7 @@ function SubscriptionContent() {
                       <div className="flex items-start gap-2 text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
                         <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400" />
                         <span>
-                          Cancelling immediately downgrades you to the <strong>Free</strong> plan.
-                          {activeSub.billing_cycle === 'annual' &&
-                            ' For an annual refund on unused months, email support@klippa.co.za after cancelling.'}
+                          Cancelling immediately downgrades you to the <strong>Free</strong> plan. All payments are non-refundable.
                         </span>
                       </div>
                       {cancelError && (
