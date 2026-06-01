@@ -214,6 +214,18 @@ export default function PricingPage() {
           ))}
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-edge/40 mt-8">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-ink-3">© 2026 Klippa. Built for South African taxpayers.</p>
+          <div className="flex items-center gap-4 text-xs text-ink-3">
+            <Link href="/terms" className="hover:text-ink-2 transition-colors">Terms &amp; Conditions</Link>
+            <Link href="/privacy" className="hover:text-ink-2 transition-colors">Privacy Policy</Link>
+            <a href="mailto:support@klippa.co.za" className="hover:text-ink-2 transition-colors">Contact</a>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

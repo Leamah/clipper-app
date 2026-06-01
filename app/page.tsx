@@ -609,14 +609,18 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-edge/40">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-md bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
               <ShieldCheck className="w-2.5 h-2.5 text-white" />
             </div>
-            <span className="text-xs font-medium text-ink-3">Klippa</span>
+            <span className="text-xs font-medium text-ink-3">© 2026 Klippa. Built for South African taxpayers.</span>
           </div>
-          <p className="text-xs text-ink-3">© 2025 Klippa. Built for South African taxpayers.</p>
+          <div className="flex items-center gap-4 text-xs text-ink-3">
+            <Link href="/terms" className="hover:text-ink-2 transition-colors">Terms &amp; Conditions</Link>
+            <Link href="/privacy" className="hover:text-ink-2 transition-colors">Privacy Policy</Link>
+            <a href="mailto:support@klippa.co.za" className="hover:text-ink-2 transition-colors">Contact</a>
+          </div>
         </div>
       </footer>
 
