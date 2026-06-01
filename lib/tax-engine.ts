@@ -89,11 +89,10 @@ const RATES_2026: YearRates = {
 }
 
 // ── 2026/2027 tax year ────────────────────────────────────
-// Brackets: gazetted 25 February 2026 Budget (Enoch Godongwana).
-// Rebates, thresholds and medical credits: carry over from 2025/2026
-// pending the full gazette publication — verify at sars.gov.za/tax-rates.
-// Fixed-cost table: carry over from 2025/2026 — SARS typically publishes
-// the updated rates-per-km schedule separately after the Budget.
+// Brackets, rebates and thresholds: gazetted 25 February 2026 Budget.
+// Medical aid credits and interest exemptions: carry over from 2025/2026
+// pending full gazette — verify at sars.gov.za/tax-rates.
+// Fixed-cost table: carry over — SARS publishes rates-per-km separately.
 const BRACKETS_2027: TaxBracket[] = [
   { min:         0, max:    245_100, base:         0, rate: 0.18 },
   { min:   245_101, max:    383_100, base:    44_118, rate: 0.26 },
@@ -105,9 +104,16 @@ const BRACKETS_2027: TaxBracket[] = [
 ]
 
 const RATES_2027: YearRates = {
-  ...RATES_2025,            // rebates / thresholds / medical / interest carry over
-  brackets:      BRACKETS_2027,
-  fixedCostTable: FIXED_COST_2025,  // update when SARS gazette is published
+  ...RATES_2025,                    // medical credits / interest exemptions carry over
+  brackets:               BRACKETS_2027,
+  // Rebates & thresholds: gazetted 25 February 2026
+  primaryRebate:          17_820,
+  secondaryRebate:         9_765,
+  tertiaryRebate:          3_249,
+  threshold_under65:      99_000,
+  threshold_65_74:       153_250,
+  threshold_75plus:      171_300,
+  fixedCostTable:         FIXED_COST_2025, // update when SARS rates-per-km gazette is published
 }
 
 // ── Rate selector ─────────────────────────────────────────

@@ -39,8 +39,8 @@ Brackets gazetted 25 February 2026:
   R695 801 – R887 000  R185 215 + 39% above R695 800
   R887 001 – R1 878 600  R259 783 + 41% above R887 000
   R1 878 601+          R666 339 + 45% above R1 878 600
-Rebates: Primary R17 235 · Secondary (65+) R9 444 · Tertiary (75+) R3 145
-Tax-free threshold: R95 750 (under 65) · R148 217 (65–74) · R165 689 (75+)
+Rebates: Primary R17 820 · Secondary (65+) R9 765 · Tertiary (75+) R3 249
+Tax-free threshold: R99 000 (under 65) · R153 250 (65–74) · R171 300 (75+)
 Medical aid credits: R364/month (main + 1st dependant) · R246/month (each additional)
 VAT: 15% standard rate · Registration threshold R1 million turnover
 
