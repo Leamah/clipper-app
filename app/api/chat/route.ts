@@ -88,7 +88,13 @@ export async function POST(req: NextRequest) {
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const { data: profile } = await admin
     .from('klippa_profiles')
-    .select('subscription_tier, organisation_id')
+    .select(`
+      subscription_tier, organisation_id,
+      full_name, employment_type, works_from_home, home_office_pct,
+      has_vehicle, has_ra, ra_contributions,
+      has_medical, medical_aid_members,
+      tax_year
+    `)
     .eq('id', user.id)
     .single()
 
@@ -111,6 +117,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'AI not configured' }, { status: 500 })
   }
 
+  // ── Build personalised user context block ─────────────────
+  const userContext = profile ? `
+
+━━ THIS USER'S KLIPPA PROFILE ━━
+Tailor your answers to their specific situation.
+Name: ${profile.full_name ?? 'not set'}
+Employment: ${profile.employment_type ?? 'unknown'}
+Works from home: ${profile.works_from_home ? `Yes — ${profile.home_office_pct ?? 0}% home office` : 'No'}
+Has work vehicle: ${profile.has_vehicle ? 'Yes' : 'No'}
+Retirement Annuity: ${profile.has_ra ? `Yes — R${(profile.ra_contributions ?? 0).toLocaleString('en-ZA')}/yr` : 'No'}
+Medical aid: ${profile.has_medical ? `Yes — ${profile.medical_aid_members ?? 1} member(s)` : 'No'}
+Current plan: ${profile.subscription_tier}
+Tax year: ${profile.tax_year ?? 2026}
+If the user's question relates to their own situation, reference the above to make your answer concrete.` : ''
+
+  const fullSystemPrompt = SYSTEM_PROMPT + userContext
+
+  // Window conversation to last 20 messages to bound token cost
+  const windowedMessages = messages.slice(-20)
+
   const openai = new OpenAI({ apiKey: openaiKey })
 
   // Stream the response back
@@ -119,8 +145,8 @@ export async function POST(req: NextRequest) {
     max_tokens: 400,
     stream:     true,
     messages:   [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...messages,
+      { role: 'system', content: fullSystemPrompt },
+      ...windowedMessages,
     ],
   })
 

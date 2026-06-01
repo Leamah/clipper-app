@@ -7,7 +7,7 @@ import { useRouter, useSearchParams }                 from 'next/navigation'
 import Link                                            from 'next/link'
 import {
   ShieldCheck, ArrowLeft, Check, Loader2, AlertCircle,
-  Tag, Zap, ArrowRight, Calendar,
+  Tag, Zap, ArrowRight, Calendar, XCircle, ChevronDown,
 } from 'lucide-react'
 import { supabase }                                   from '@/lib/supabase'
 import { PLANS, getPlanAmount, type PlanKey, type BillingCycle } from '@/lib/ozow'
@@ -44,9 +44,13 @@ function SubscriptionContent() {
   const [loading,    setLoading]    = useState(false)
   const [paying,     setPaying]     = useState(false)
   const [error,      setError]      = useState<string | null>(null)
-  const [activeSub,  setActiveSub]  = useState<ActiveSub | null>(null)
-  const [promos,     setPromos]     = useState<ActivePromo[]>([])
-  const [profile,    setProfile]    = useState<{ subscription_tier: string; trial_ends_at: string | null } | null>(null)
+  const [activeSub,      setActiveSub]      = useState<ActiveSub | null>(null)
+  const [promos,         setPromos]         = useState<ActivePromo[]>([])
+  const [profile,        setProfile]        = useState<{ subscription_tier: string; trial_ends_at: string | null } | null>(null)
+  const [showCancel,     setShowCancel]     = useState(false)
+  const [cancelling,     setCancelling]     = useState(false)
+  const [cancelError,    setCancelError]    = useState<string | null>(null)
+  const [cancelDone,     setCancelDone]     = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -102,6 +106,24 @@ function SubscriptionContent() {
       loadData()
     } catch {
       setPromoMsg({ text: 'Could not apply promo code.', ok: false })
+    }
+  }
+
+  const cancelSub = async () => {
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      const r = await fetch('/api/subscription/cancel', { method: 'POST' })
+      const d = await r.json()
+      if (!r.ok) { setCancelError(d.error ?? 'Cancellation failed'); return }
+      setCancelDone(true)
+      setActiveSub(null)
+      setProfile(prev => prev ? { ...prev, subscription_tier: 'free' } : prev)
+      setShowCancel(false)
+    } catch {
+      setCancelError('Could not reach server — please try again.')
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -188,18 +210,65 @@ function SubscriptionContent() {
                 </div>
               )}
 
-              {/* Active subscription banner */}
-              {hasActiveSub && (
-                <div className="rounded-xl border border-edge bg-surface/50 px-4 py-3 flex items-start gap-2.5">
-                  <Calendar className="w-4 h-4 text-ink-2 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-ink-1">
-                      {activeSub.plan.charAt(0).toUpperCase() + activeSub.plan.slice(1)} plan active
-                    </p>
-                    <p className="text-ink-2 mt-0.5">
-                      Renews {activeSub.current_period_end ? format(parseISO(activeSub.current_period_end), 'd MMM yyyy') : '—'}
-                    </p>
+              {/* Active subscription banner + cancel flow */}
+              {cancelDone && (
+                <div className="rounded-xl border border-edge bg-surface/50 px-4 py-3 text-xs text-ink-2">
+                  Subscription cancelled — you&apos;re now on the <span className="font-semibold text-ink-1">Free</span> plan.
+                </div>
+              )}
+              {hasActiveSub && !cancelDone && (
+                <div className="rounded-xl border border-edge bg-surface/50 p-4 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <Calendar className="w-4 h-4 text-ink-2 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 text-xs">
+                      <p className="font-semibold text-ink-1">
+                        {activeSub.plan.charAt(0).toUpperCase() + activeSub.plan.slice(1)} plan active
+                      </p>
+                      <p className="text-ink-2 mt-0.5">
+                        {activeSub.billing_cycle === 'annual' ? 'Annual' : 'Monthly'} · renews{' '}
+                        {activeSub.current_period_end ? format(parseISO(activeSub.current_period_end), 'd MMM yyyy') : '—'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { setShowCancel(c => !c); setCancelError(null) }}
+                      className="flex items-center gap-1 text-xs text-ink-3 hover:text-ink-2 transition-colors"
+                    >
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCancel ? 'rotate-180' : ''}`} />
+                      Cancel
+                    </button>
                   </div>
+
+                  {/* Cancel confirmation */}
+                  {showCancel && (
+                    <div className="border-t border-edge pt-3 space-y-3">
+                      <div className="flex items-start gap-2 text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                        <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400" />
+                        <span>
+                          Cancelling immediately downgrades you to the <strong>Free</strong> plan.
+                          {activeSub.billing_cycle === 'annual' &&
+                            ' For an annual refund on unused months, email support@klippa.co.za after cancelling.'}
+                        </span>
+                      </div>
+                      {cancelError && (
+                        <p className="text-xs text-red-400">{cancelError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowCancel(false)}
+                          className="flex-1 py-2 rounded-xl text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 transition-colors"
+                        >
+                          Keep my plan
+                        </button>
+                        <button
+                          onClick={cancelSub}
+                          disabled={cancelling}
+                          className="flex-1 py-2 rounded-xl text-xs font-semibold bg-red-600/80 hover:bg-red-600 text-white disabled:opacity-50 transition-colors"
+                        >
+                          {cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Yes, cancel plan'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

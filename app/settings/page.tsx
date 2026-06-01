@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Loader2, Check, Save, AlertCircle, ChevronRight, Info } from 'lucide-react'
+import { Loader2, Check, Save, AlertCircle, ChevronRight, Info, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import type { KlippaProfile, EmploymentType, WorkLocation } from '@/lib/types'
 import { WORK_LOCATION_LABELS } from '@/lib/types'
 
@@ -214,11 +215,19 @@ function ProfileNudges({ profile }: { profile: KlippaProfile }) {
 // ── Main page ─────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const router = useRouter()
+
   const [profile, setProfile] = useState<KlippaProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+
+  // Delete account state
+  const [showDeleteZone,  setShowDeleteZone]  = useState(false)
+  const [deleteConfirm,   setDeleteConfirm]   = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteError,     setDeleteError]     = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -234,6 +243,31 @@ export default function SettingsPage() {
   const update = <K extends keyof KlippaProfile>(key: K, value: KlippaProfile[K]) => {
     setProfile((p) => p ? { ...p, [key]: value } : p)
     setSaved(false)
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm !== 'DELETE') return
+    setDeletingAccount(true)
+    setDeleteError(null)
+    try {
+      const r = await fetch('/api/account/delete', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ confirm: 'DELETE' }),
+      })
+      const d = await r.json()
+      if (!r.ok) {
+        setDeleteError(d.error ?? 'Failed to delete account')
+        setDeletingAccount(false)
+        return
+      }
+      // Sign out then redirect to home — auth session is now gone
+      await supabase.auth.signOut()
+      router.replace('/')
+    } catch {
+      setDeleteError('Could not reach server. Please try again.')
+      setDeletingAccount(false)
+    }
   }
 
   const handleSave = async () => {
@@ -583,7 +617,7 @@ export default function SettingsPage() {
 
         {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
 
-        <div className="flex items-center gap-3 pb-8">
+        <div className="flex items-center gap-3 pb-4">
           <button onClick={handleSave} disabled={saving}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50 transition-all">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -595,6 +629,91 @@ export default function SettingsPage() {
             </span>
           )}
         </div>
+
+        {/* ── Danger zone ── */}
+        <div className="rounded-2xl border border-red-900/40 bg-red-950/10 p-6 space-y-4 pb-8">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-red-400">Danger zone</h2>
+            <p className="text-xs text-ink-3 mt-1">These actions are permanent and cannot be undone.</p>
+          </div>
+
+          {/* Manage subscription link */}
+          <div className="flex items-center justify-between py-3 border-b border-red-900/20">
+            <div>
+              <p className="text-sm text-ink-1">Manage subscription</p>
+              <p className="text-xs text-ink-3 mt-0.5">Upgrade, downgrade or cancel your plan.</p>
+            </div>
+            <a
+              href="/subscription"
+              className="px-3 py-1.5 rounded-lg border border-edge text-xs text-ink-2 hover:text-ink-1 hover:border-zinc-500 transition-colors"
+            >
+              Go to billing →
+            </a>
+          </div>
+
+          {/* Delete account */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-ink-1">Delete account</p>
+                <p className="text-xs text-ink-3 mt-0.5">
+                  Permanently deletes all your data — expenses, income, timesheets, documents and your profile.
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowDeleteZone(v => !v); setDeleteConfirm(''); setDeleteError(null) }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-800/50 text-xs text-red-400 hover:bg-red-900/20 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
+            </div>
+
+            {showDeleteZone && (
+              <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-4 space-y-3">
+                <p className="text-xs text-red-300/90 leading-relaxed">
+                  This will <strong>immediately and permanently</strong> delete your account, all uploaded documents,
+                  all financial records and your login. There is no recovery.
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-ink-2">
+                    Type <span className="font-mono font-bold text-red-400">DELETE</span> to confirm
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirm}
+                    onChange={e => setDeleteConfirm(e.target.value)}
+                    placeholder="DELETE"
+                    className="w-full bg-raised border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-red-500/60 transition-colors"
+                    autoComplete="off"
+                  />
+                </div>
+                {deleteError && (
+                  <p className="text-xs text-red-400">{deleteError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowDeleteZone(false); setDeleteConfirm('') }}
+                    className="flex-1 py-2 rounded-xl text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteConfirm !== 'DELETE' || deletingAccount}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white disabled:opacity-40 transition-colors"
+                  >
+                    {deletingAccount
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Deleting…</>
+                      : <><Trash2 className="w-3.5 h-3.5" /> Delete my account</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
     </div>
   )
 }
