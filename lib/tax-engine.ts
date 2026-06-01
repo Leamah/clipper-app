@@ -90,9 +90,10 @@ const RATES_2026: YearRates = {
 
 // ── 2026/2027 tax year ────────────────────────────────────
 // Brackets, rebates and thresholds: gazetted 25 February 2026 Budget.
+// Fixed-cost table: PAYE-GEN-01-G03-A01 Revision 19, effective 1 March 2026.
 // Medical aid credits and interest exemptions: carry over from 2025/2026
 // pending full gazette — verify at sars.gov.za/tax-rates.
-// Fixed-cost table: carry over — SARS publishes rates-per-km separately.
+// Simplified method (s8(1)(b)(iii)): 495 c/km flat rate.
 const BRACKETS_2027: TaxBracket[] = [
   { min:         0, max:    245_100, base:         0, rate: 0.18 },
   { min:   245_101, max:    383_100, base:    44_118, rate: 0.26 },
@@ -103,9 +104,26 @@ const BRACKETS_2027: TaxBracket[] = [
   { min: 1_878_601, max:       null, base:   666_339, rate: 0.45 },
 ]
 
+// PAYE-GEN-01-G03-A01 Rev 19 — effective 1 March 2026
+// Note: 2027 table uses R115 000 bands (vs R95 000 in prior years).
+// The R805 001–R920 000 and >R920 000 rows share the same fixed cost
+// and fuel rate but differ on maintenance (126.1c vs 126.9c).
+const FIXED_COST_2027: FixedCostRow[] = [
+  { maxValue:  115_000, fixedCost:  38_344, fuelRate: 132.9, mainRate:  49.1 },
+  { maxValue:  230_000, fixedCost:  68_487, fuelRate: 148.4, mainRate:  61.4 },
+  { maxValue:  345_000, fixedCost:  98_689, fuelRate: 161.2, mainRate:  67.8 },
+  { maxValue:  460_000, fixedCost: 125_393, fuelRate: 173.4, mainRate:  74.0 },
+  { maxValue:  575_000, fixedCost: 152_097, fuelRate: 185.5, mainRate:  86.9 },
+  { maxValue:  690_000, fixedCost: 180_078, fuelRate: 212.8, mainRate: 102.0 },
+  { maxValue:  805_000, fixedCost: 208_106, fuelRate: 216.5, mainRate: 114.5 },
+  { maxValue:  920_000, fixedCost: 237_679, fuelRate: 220.1, mainRate: 126.1 },
+  { maxValue: Infinity, fixedCost: 237_679, fuelRate: 220.1, mainRate: 126.9 },
+]
+
 const RATES_2027: YearRates = {
   ...RATES_2025,                    // medical credits / interest exemptions carry over
   brackets:               BRACKETS_2027,
+  fixedCostTable:         FIXED_COST_2027,
   // Rebates & thresholds: gazetted 25 February 2026
   primaryRebate:          17_820,
   secondaryRebate:         9_765,
@@ -113,7 +131,6 @@ const RATES_2027: YearRates = {
   threshold_under65:      99_000,
   threshold_65_74:       153_250,
   threshold_75plus:      171_300,
-  fixedCostTable:         FIXED_COST_2025, // update when SARS rates-per-km gazette is published
 }
 
 // ── Rate selector ─────────────────────────────────────────
