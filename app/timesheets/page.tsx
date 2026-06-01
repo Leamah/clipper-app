@@ -8,7 +8,7 @@ import AppNav from '@/components/AppNav'
 import {
   Plus, ChevronLeft, ChevronRight, Download, CheckCircle2,
   Clock, Briefcase, Pencil, X, Check, AlertCircle, Users,
-  PenLine, Lock, Save, Loader2,
+  PenLine, Lock, Save, Loader2, Zap, RotateCcw,
 } from 'lucide-react'
 import {
   format, startOfMonth, getDaysInMonth, getDay, getYear, getMonth,
@@ -18,6 +18,7 @@ import type {
   KlippaProfile, KlippaClient, KlippaTimesheet, KlippaTimesheetEntry, OrgBranding,
 } from '@/lib/types'
 import { getSAHolidayName } from '@/lib/sa-holidays'
+import { isFreeUser } from '@/lib/tier'
 import { useRouter } from 'next/navigation'
 
 // ── Helpers ───────────────────────────────────────────────
@@ -277,7 +278,7 @@ function DayCard({
         className="w-full text-left rounded-xl border border-emerald-500/30 bg-emerald-950/20 hover:border-emerald-500/50 p-2.5 min-h-[72px] transition-colors group disabled:cursor-default disabled:hover:border-emerald-500/30"
       >
         <div className="flex items-center justify-between mb-0.5">
-          <span className="text-[10px] text-ink-2 font-medium">{dayLabel}</span>
+          <span className="text-[10px] text-ink-2 font-medium">{dayLabel} {dayNum}</span>
           {locked
             ? <Lock className="w-2.5 h-2.5 text-ink-3" />
             : <Pencil className="w-2.5 h-2.5 text-ink-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -327,17 +328,22 @@ function DayCard({
 
 function SignaturePad({
   saving,
+  savedSignature,
   onSave,
   onClose,
 }: {
-  saving:   boolean
-  onSave:   (dataUrl: string) => void
-  onClose:  () => void
+  saving:          boolean
+  savedSignature:  string | null
+  onSave:          (dataUrl: string, saveToProfile: boolean) => void
+  onClose:         () => void
 }) {
-  const canvasRef   = useRef<HTMLCanvasElement>(null)
-  const drawing     = useRef(false)
-  const [hasDrawn,  setHasDrawn]  = useState(false)
-  const [isEmpty,   setIsEmpty]   = useState(true)
+  // 'use-saved' mode only available when a saved sig exists
+  const [mode,       setMode]       = useState<'use-saved' | 'draw'>(savedSignature ? 'use-saved' : 'draw')
+  const [remember,   setRemember]   = useState(!savedSignature)  // default checked when no saved sig
+  const [isEmpty,    setIsEmpty]    = useState(true)
+  const [hasDrawn,   setHasDrawn]   = useState(false)
+  const canvasRef  = useRef<HTMLCanvasElement>(null)
+  const drawing    = useRef(false)
 
   function getPos(e: React.MouseEvent | React.TouchEvent, rect: DOMRect) {
     if ('touches' in e) {
@@ -350,9 +356,9 @@ function SignaturePad({
     e.preventDefault()
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx  = canvas.getContext('2d')!
-    const rect = canvas.getBoundingClientRect()
-    const pos  = getPos(e, rect)
+    const ctx    = canvas.getContext('2d')!
+    const rect   = canvas.getBoundingClientRect()
+    const pos    = getPos(e, rect)
     const scaleX = canvas.width  / rect.width
     const scaleY = canvas.height / rect.height
     drawing.current = true
@@ -365,9 +371,9 @@ function SignaturePad({
     if (!drawing.current) return
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx  = canvas.getContext('2d')!
-    const rect = canvas.getBoundingClientRect()
-    const pos  = getPos(e, rect)
+    const ctx    = canvas.getContext('2d')!
+    const rect   = canvas.getBoundingClientRect()
+    const pos    = getPos(e, rect)
     const scaleX = canvas.width  / rect.width
     const scaleY = canvas.height / rect.height
     ctx.lineTo(pos.x * scaleX, pos.y * scaleY)
@@ -385,76 +391,151 @@ function SignaturePad({
     drawing.current = false
   }
 
-  function clear() {
+  function clearCanvas() {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height)
     setIsEmpty(true)
     setHasDrawn(false)
   }
 
-  function save() {
+  function handleConfirmDrawn() {
     const canvas = canvasRef.current
     if (!canvas || isEmpty) return
-    onSave(canvas.toDataURL('image/png'))
+    onSave(canvas.toDataURL('image/png'), remember)
+  }
+
+  function handleUseSaved() {
+    if (!savedSignature) return
+    // Using saved sig never re-saves (it's already saved)
+    onSave(savedSignature, false)
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-4">
+
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-ink-1">Draw your signature</h3>
-            <p className="text-xs text-ink-3 mt-0.5">Use your mouse or finger to sign below</p>
+            <h3 className="font-semibold text-ink-1">Sign timesheet</h3>
+            <p className="text-xs text-ink-3 mt-0.5">
+              {mode === 'use-saved' ? 'Use your saved signature or draw a new one' : 'Draw your signature below'}
+            </p>
           </div>
-          <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="text-ink-2 hover:text-ink-1">
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Canvas */}
-        <div className="rounded-xl overflow-hidden border border-edge bg-zinc-950">
-          <canvas
-            ref={canvasRef}
-            width={640}
-            height={200}
-            className="w-full cursor-crosshair touch-none select-none"
-            onMouseDown={startDraw}
-            onMouseMove={draw}
-            onMouseUp={stopDraw}
-            onMouseLeave={stopDraw}
-            onTouchStart={startDraw}
-            onTouchMove={draw}
-            onTouchEnd={stopDraw}
-          />
-        </div>
-
-        {!hasDrawn && (
-          <p className="text-xs text-center text-ink-3">← Draw your signature in the box above →</p>
+        {/* Mode toggle tabs (only when a saved sig exists) */}
+        {savedSignature && (
+          <div className="flex gap-1 p-1 bg-raised rounded-xl">
+            <button
+              onClick={() => setMode('use-saved')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                mode === 'use-saved' ? 'bg-surface text-ink-1 shadow-sm' : 'text-ink-2 hover:text-ink-1'
+              }`}
+            >
+              Saved signature
+            </button>
+            <button
+              onClick={() => setMode('draw')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                mode === 'draw' ? 'bg-surface text-ink-1 shadow-sm' : 'text-ink-2 hover:text-ink-1'
+              }`}
+            >
+              Draw new
+            </button>
+          </div>
         )}
 
+        {/* ── Use saved signature ── */}
+        {mode === 'use-saved' && savedSignature && (
+          <div className="rounded-xl border border-edge bg-zinc-950 p-4 flex items-center justify-center min-h-[100px]">
+            <img
+              src={savedSignature}
+              alt="Saved signature"
+              className="max-h-20 object-contain"
+              style={{ filter: 'invert(0) brightness(1)' }}
+            />
+          </div>
+        )}
+
+        {/* ── Draw new canvas ── */}
+        {mode === 'draw' && (
+          <>
+            <div className="rounded-xl overflow-hidden border border-edge bg-zinc-950">
+              <canvas
+                ref={canvasRef}
+                width={640}
+                height={200}
+                className="w-full cursor-crosshair touch-none select-none"
+                onMouseDown={startDraw}
+                onMouseMove={draw}
+                onMouseUp={stopDraw}
+                onMouseLeave={stopDraw}
+                onTouchStart={startDraw}
+                onTouchMove={draw}
+                onTouchEnd={stopDraw}
+              />
+            </div>
+            {!hasDrawn && (
+              <p className="text-xs text-center text-ink-3">← Draw your signature in the box above →</p>
+            )}
+            {/* Remember checkbox */}
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+                className="w-3.5 h-3.5 rounded accent-emerald-500 cursor-pointer"
+              />
+              <span className="text-xs text-ink-2">Save this signature for future timesheets</span>
+            </label>
+          </>
+        )}
+
+        {/* Action buttons */}
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={clear}
-            className="px-4 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors"
-          >
-            Clear
-          </button>
+          {mode === 'draw' && (
+            <button
+              onClick={clearCanvas}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Clear
+            </button>
+          )}
           <button
             onClick={onClose}
             className="px-4 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors"
           >
             Cancel
           </button>
-          <button
-            onClick={save}
-            disabled={isEmpty || saving}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
-          >
-            {saving
-              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Signing…</>
-              : <><PenLine className="w-3.5 h-3.5" /> Confirm & sign</>
-            }
-          </button>
+          {mode === 'use-saved' ? (
+            <button
+              onClick={handleUseSaved}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+            >
+              {saving
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Signing…</>
+                : <><CheckCircle2 className="w-3.5 h-3.5" /> Use this & sign</>
+              }
+            </button>
+          ) : (
+            <button
+              onClick={handleConfirmDrawn}
+              disabled={isEmpty || saving}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+            >
+              {saving
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Signing…</>
+                : <><PenLine className="w-3.5 h-3.5" /> Confirm & sign</>
+              }
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -738,7 +819,7 @@ export default function TimesheetsPage() {
   }
 
   // ── Signoff functions ─────────────────────────────────
-  async function signConsultant(signatureDataUrl: string) {
+  async function signConsultant(signatureDataUrl: string, saveToProfile = false) {
     if (!timesheet) return
     setSigningConsultant(true)
     const now = new Date().toISOString()
@@ -756,6 +837,16 @@ export default function TimesheetsPage() {
       .select()
       .single()
     if (data) setTimesheet(data as KlippaTimesheet)
+
+    // Persist signature to profile for reuse on future timesheets
+    if (saveToProfile && profile) {
+      await supabase
+        .from('klippa_profiles')
+        .update({ saved_signature: signatureDataUrl })
+        .eq('id', profile.id)
+      setProfile(prev => prev ? { ...prev, saved_signature: signatureDataUrl } : prev)
+    }
+
     setSigningConsultant(false)
     setShowSignPad(false)
   }
@@ -840,6 +931,9 @@ export default function TimesheetsPage() {
     setActiveClient(c)
     setShowNewClient(false)
   }
+
+  // ── Tier helpers ──────────────────────────────────────
+  const isFree = isFreeUser(profile ?? { subscription_tier: 'free', organisation_id: null })
 
   // ── Totals ────────────────────────────────────────────
   const totalHours = entries.reduce((s, e) => s + Number(e.hours), 0)
@@ -943,12 +1037,22 @@ export default function TimesheetsPage() {
                 {c.name}
               </button>
             ))}
-            <button
-              onClick={() => setShowNewClient(true)}
-              className="px-2.5 py-1.5 rounded-full bg-raised text-ink-2 hover:text-ink-1 text-xs transition-colors flex items-center gap-1"
-            >
-              <Plus className="w-3 h-3" /> New client
-            </button>
+            {isFree && clients.length >= 1 ? (
+              <a
+                href="/pricing"
+                className="px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-1 hover:bg-amber-500/20 transition-colors"
+                title="Free plan includes 1 client. Upgrade for unlimited clients."
+              >
+                <Zap className="w-3 h-3" /> Upgrade for more clients
+              </a>
+            ) : (
+              <button
+                onClick={() => setShowNewClient(true)}
+                className="px-2.5 py-1.5 rounded-full bg-raised text-ink-2 hover:text-ink-1 text-xs transition-colors flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> New client
+              </button>
+            )}
           </div>
 
           {/* Month navigator */}
@@ -1207,7 +1311,8 @@ export default function TimesheetsPage() {
       {showSignPad && (
         <SignaturePad
           saving={signingConsultant}
-          onSave={(dataUrl) => signConsultant(dataUrl)}
+          savedSignature={profile?.saved_signature ?? null}
+          onSave={(dataUrl, saveToProfile) => signConsultant(dataUrl, saveToProfile)}
           onClose={() => setShowSignPad(false)}
         />
       )}

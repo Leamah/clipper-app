@@ -112,6 +112,8 @@ export interface KlippaProfile {
   user_type:            UserType
   organisation_id:      string | null
   org_role:             OrgRole | null
+  // Persisted signature PNG (base64 data-URL) — reused across timesheets
+  saved_signature:      string | null
   created_at:           string
   updated_at:           string
 }
