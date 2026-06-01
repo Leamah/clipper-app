@@ -8,7 +8,7 @@ import AppNav from '@/components/AppNav'
 import {
   Plus, ChevronLeft, ChevronRight, Download, CheckCircle2,
   Clock, Briefcase, Pencil, X, Check, AlertCircle, Users,
-  PenLine, Lock, Save,
+  PenLine, Lock, Save, Loader2,
 } from 'lucide-react'
 import {
   format, startOfMonth, getDaysInMonth, getDay, getYear, getMonth,
@@ -323,6 +323,144 @@ function DayCard({
 
 // ── Main Page ─────────────────────────────────────────────
 
+// ── Signature drawing pad ─────────────────────────────────
+
+function SignaturePad({
+  saving,
+  onSave,
+  onClose,
+}: {
+  saving:   boolean
+  onSave:   (dataUrl: string) => void
+  onClose:  () => void
+}) {
+  const canvasRef   = useRef<HTMLCanvasElement>(null)
+  const drawing     = useRef(false)
+  const [hasDrawn,  setHasDrawn]  = useState(false)
+  const [isEmpty,   setIsEmpty]   = useState(true)
+
+  function getPos(e: React.MouseEvent | React.TouchEvent, rect: DOMRect) {
+    if ('touches' in e) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top }
+    }
+    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top }
+  }
+
+  function startDraw(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault()
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx  = canvas.getContext('2d')!
+    const rect = canvas.getBoundingClientRect()
+    const pos  = getPos(e, rect)
+    const scaleX = canvas.width  / rect.width
+    const scaleY = canvas.height / rect.height
+    drawing.current = true
+    ctx.beginPath()
+    ctx.moveTo(pos.x * scaleX, pos.y * scaleY)
+  }
+
+  function draw(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault()
+    if (!drawing.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx  = canvas.getContext('2d')!
+    const rect = canvas.getBoundingClientRect()
+    const pos  = getPos(e, rect)
+    const scaleX = canvas.width  / rect.width
+    const scaleY = canvas.height / rect.height
+    ctx.lineTo(pos.x * scaleX, pos.y * scaleY)
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth   = 2.5
+    ctx.lineCap     = 'round'
+    ctx.lineJoin    = 'round'
+    ctx.stroke()
+    setIsEmpty(false)
+    setHasDrawn(true)
+  }
+
+  function stopDraw(e: React.MouseEvent | React.TouchEvent) {
+    e.preventDefault()
+    drawing.current = false
+  }
+
+  function clear() {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')!
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    setIsEmpty(true)
+    setHasDrawn(false)
+  }
+
+  function save() {
+    const canvas = canvasRef.current
+    if (!canvas || isEmpty) return
+    onSave(canvas.toDataURL('image/png'))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-ink-1">Draw your signature</h3>
+            <p className="text-xs text-ink-3 mt-0.5">Use your mouse or finger to sign below</p>
+          </div>
+          <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
+        </div>
+
+        {/* Canvas */}
+        <div className="rounded-xl overflow-hidden border border-edge bg-zinc-950">
+          <canvas
+            ref={canvasRef}
+            width={640}
+            height={200}
+            className="w-full cursor-crosshair touch-none select-none"
+            onMouseDown={startDraw}
+            onMouseMove={draw}
+            onMouseUp={stopDraw}
+            onMouseLeave={stopDraw}
+            onTouchStart={startDraw}
+            onTouchMove={draw}
+            onTouchEnd={stopDraw}
+          />
+        </div>
+
+        {!hasDrawn && (
+          <p className="text-xs text-center text-ink-3">← Draw your signature in the box above →</p>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={clear}
+            className="px-4 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors"
+          >
+            Clear
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={isEmpty || saving}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
+          >
+            {saving
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Signing…</>
+              : <><PenLine className="w-3.5 h-3.5" /> Confirm & sign</>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function TimesheetsPage() {
   const router = useRouter()
 
@@ -336,6 +474,7 @@ export default function TimesheetsPage() {
   const [smartFillHrs,    setSmartFillHrs]     = useState('8')
   const [loading,         setLoading]          = useState(true)
   const [signingConsultant, setSigningConsultant] = useState(false)
+  const [showSignPad,     setShowSignPad]      = useState(false)
   const [signingClient,   setSigningClient]    = useState(false)
   const [savingPdf,       setSavingPdf]        = useState(false)
   const [saveMsg,         setSaveMsg]          = useState<string | null>(null)
@@ -509,13 +648,14 @@ export default function TimesheetsPage() {
       const { exportMergedTimesheetPDF } = await import('@/lib/pdf-export')
       await exportMergedTimesheetPDF(
         {
-          consultant_name:      latest.consultant_name ?? profile.full_name,
-          position:             latest.position ?? activeClient.position,
-          client_name:          activeClient.name,
-          client_contact:       activeClient.contact,
-          hourly_rate:          latest.hourly_rate,
-          consultant_signed_at: latest.consultant_signed_at,
-          client_signed_at:     latest.client_signed_at,
+          consultant_name:       latest.consultant_name ?? profile.full_name,
+          position:              latest.position ?? activeClient.position,
+          client_name:           activeClient.name,
+          client_contact:        activeClient.contact,
+          hourly_rate:           latest.hourly_rate,
+          consultant_signed_at:  latest.consultant_signed_at,
+          consultant_signature:  (latest as any).consultant_signature ?? null,
+          client_signed_at:      latest.client_signed_at,
         },
         months,
         { branding: orgBranding ?? undefined },
@@ -598,18 +738,26 @@ export default function TimesheetsPage() {
   }
 
   // ── Signoff functions ─────────────────────────────────
-  async function signConsultant() {
+  async function signConsultant(signatureDataUrl: string) {
     if (!timesheet) return
     setSigningConsultant(true)
     const now = new Date().toISOString()
     const { data } = await supabase
       .from('klippa_timesheets')
-      .update({ consultant_signed_at: now, status: 'submitted', updated_at: now })
+      .update({
+        consultant_signed_at: now,
+        consultant_signature:  signatureDataUrl,
+        client_name:           activeClient?.name ?? null,
+        client_contact:        activeClient?.contact ?? null,
+        status:                'submitted',
+        updated_at:            now,
+      })
       .eq('id', timesheet.id)
       .select()
       .single()
     if (data) setTimesheet(data as KlippaTimesheet)
     setSigningConsultant(false)
+    setShowSignPad(false)
   }
 
   async function unsignConsultant() {
@@ -651,7 +799,7 @@ export default function TimesheetsPage() {
 
       // Generate PDF as a Blob (no auto-download)
       const blob = await exportTimesheetPDF(
-        { ...timesheet, client_name: activeClient?.name, client_contact: activeClient?.contact ?? undefined },
+        { ...timesheet, client_name: activeClient?.name ?? null, client_contact: activeClient?.contact ?? null },
         entries,
         { blob: true, branding: orgBranding ?? undefined },
       ) as Blob
@@ -936,9 +1084,17 @@ export default function TimesheetsPage() {
                 </div>
                 {timesheet.consultant_signed_at ? (
                   <div className="space-y-2">
+                    {timesheet.consultant_signature && (
+                      <img
+                        src={timesheet.consultant_signature}
+                        alt="Consultant signature"
+                        className="h-12 object-contain"
+                        style={{ filter: 'invert(1) brightness(2)' }}
+                      />
+                    )}
                     <div className="flex items-center gap-1.5 text-emerald-400 text-xs">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      Digitally signed {format(new Date(timesheet.consultant_signed_at), 'd MMM yyyy')}
+                      Signed {format(new Date(timesheet.consultant_signed_at), 'd MMM yyyy HH:mm')}
                     </div>
                     <button
                       onClick={unsignConsultant}
@@ -949,7 +1105,7 @@ export default function TimesheetsPage() {
                   </div>
                 ) : (
                   <button
-                    onClick={signConsultant}
+                    onClick={() => setShowSignPad(true)}
                     disabled={signingConsultant}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
                   >
@@ -1046,6 +1202,15 @@ export default function TimesheetsPage() {
           </div>
         </div>
       </div>
+
+      {/* Signature drawing pad */}
+      {showSignPad && (
+        <SignaturePad
+          saving={signingConsultant}
+          onSave={(dataUrl) => signConsultant(dataUrl)}
+          onClose={() => setShowSignPad(false)}
+        />
+      )}
 
       {/* New client panel */}
       {showNewClient && (

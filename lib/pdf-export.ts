@@ -55,7 +55,7 @@ function fmtRand(n: number): string {
 // ── Timesheet PDF ─────────────────────────────────────────
 
 export async function exportTimesheetPDF(
-  timesheet: KlippaTimesheet & { client_name?: string; client_contact?: string },
+  timesheet: KlippaTimesheet & { client_name?: string | null; client_contact?: string | null },
   entries:   KlippaTimesheetEntry[],
   options?:  { blob?: boolean; branding?: OrgBranding },
 ): Promise<void | Blob> {
@@ -207,8 +207,15 @@ export async function exportTimesheetPDF(
   // ── Sign-off section (constant: name, signature + date fields) ──
   const sigY = cursorY + 10
 
-  /** Draw one signature box at x with a constant name / signature / date layout. */
-  const signBox = (x: number, title: string, line1: string, line2: string, signedAt?: string | null) => {
+  /** Draw one signature box at x. Shows drawn signature image when signed, blank lines when not. */
+  const signBox = (
+    x:         number,
+    title:     string,
+    line1:     string,
+    line2:     string,
+    signedAt?: string | null,
+    sigImg?:   string | null,
+  ) => {
     doc.setDrawColor(...ZINC700)
     doc.setLineWidth(0.3)
     doc.rect(x, sigY, 87, boxH)
@@ -221,36 +228,52 @@ export async function exportTimesheetPDF(
     doc.setFont('helvetica', 'bold')
     doc.text(title, x + 3.5, sigY + 5)
 
-    // Name / company
+    // Name / position / company
     doc.setTextColor(30, 30, 30)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.text(line1, x + 3, sigY + 13)
     doc.text(line2, x + 3, sigY + 18)
 
-    // Constant signature + date fields
-    doc.setDrawColor(120, 120, 120)
-    doc.text('Signature:', x + 3, sigY + 28)
-    doc.line(x + 22, sigY + 28, x + 84, sigY + 28)
-    doc.text('Date:', x + 3, sigY + 34)
-    doc.line(x + 16, sigY + 34, x + 50, sigY + 34)
-
-    // Overlay digital confirmation on top of the fields when signed
     if (signedAt) {
+      // Drawn signature image (if available), else "Digitally signed" text
+      if (sigImg) {
+        try {
+          doc.addImage(sigImg, 'PNG', x + 3, sigY + 20, 60, 12)
+        } catch {
+          doc.setTextColor(...ACCENT)
+          doc.setFont('helvetica', 'bolditalic')
+          doc.text('Digitally signed', x + 3, sigY + 28)
+          doc.setFont('helvetica', 'normal')
+        }
+      } else {
+        doc.setTextColor(...ACCENT)
+        doc.setFont('helvetica', 'bolditalic')
+        doc.text('Digitally signed', x + 3, sigY + 28)
+        doc.setFont('helvetica', 'normal')
+      }
+      // Date below signature
       const d = new Date(signedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
-      doc.setTextColor(...ACCENT)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Digitally signed', x + 24, sigY + 27)
-      doc.text(d, x + 18, sigY + 33)
+      doc.setTextColor(80, 80, 80)
+      doc.setFontSize(7)
+      doc.text(`Signed: ${d}`, x + 3, sigY + 34)
+      doc.setFontSize(8)
       doc.setTextColor(30, 30, 30)
-      doc.setFont('helvetica', 'normal')
+    } else {
+      // Blank signature + date lines for wet-ink signing
+      doc.setDrawColor(120, 120, 120)
+      doc.text('Signature:', x + 3, sigY + 28)
+      doc.line(x + 22, sigY + 28, x + 84, sigY + 28)
+      doc.text('Date:', x + 3, sigY + 34)
+      doc.line(x + 16, sigY + 34, x + 50, sigY + 34)
     }
   }
 
   signBox(14,  'CONSULTANT',
     `Name: ${timesheet.consultant_name ?? ''}`,
     `Position: ${timesheet.position ?? ''}`,
-    timesheet.consultant_signed_at)
+    timesheet.consultant_signed_at,
+    (timesheet as any).consultant_signature ?? null)
 
   signBox(109, 'CLIENT / AUTHORISED SIGNATORY',
     `Name: ${timesheet.client_contact ?? ''}`,
@@ -286,6 +309,7 @@ export async function exportMergedTimesheetPDF(
     client_contact?:       string | null
     hourly_rate?:          number | null
     consultant_signed_at?: string | null
+    consultant_signature?: string | null
     client_signed_at?:     string | null
   },
   months:   { monthISO: string; entries: KlippaTimesheetEntry[] }[],
@@ -429,41 +453,72 @@ export async function exportMergedTimesheetPDF(
   }
 
   const sigY = cursorY + 10
-  const signBox = (x: number, title: string, line1: string, line2: string, signedAt?: string | null) => {
+  const signBox = (
+    x:         number,
+    title:     string,
+    line1:     string,
+    line2:     string,
+    signedAt?: string | null,
+    sigImg?:   string | null,
+  ) => {
     doc.setDrawColor(...ZINC700)
     doc.setLineWidth(0.3)
     doc.rect(x, sigY, 87, boxH)
+
+    // Header bar
     doc.setFillColor(...ZINC900)
     doc.rect(x, sigY, 87, 7, 'F')
     doc.setTextColor(...WHITE)
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.text(title, x + 3.5, sigY + 5)
+
+    // Name / position / company
     doc.setTextColor(30, 30, 30)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.text(line1, x + 3, sigY + 13)
     doc.text(line2, x + 3, sigY + 18)
-    doc.setDrawColor(120, 120, 120)
-    doc.text('Signature:', x + 3, sigY + 28)
-    doc.line(x + 22, sigY + 28, x + 84, sigY + 28)
-    doc.text('Date:', x + 3, sigY + 34)
-    doc.line(x + 16, sigY + 34, x + 50, sigY + 34)
+
     if (signedAt) {
+      // Drawn signature image (if available), else "Digitally signed" text
+      if (sigImg) {
+        try {
+          doc.addImage(sigImg, 'PNG', x + 3, sigY + 20, 60, 12)
+        } catch {
+          doc.setTextColor(...ACCENT)
+          doc.setFont('helvetica', 'bolditalic')
+          doc.text('Digitally signed', x + 3, sigY + 28)
+          doc.setFont('helvetica', 'normal')
+        }
+      } else {
+        doc.setTextColor(...ACCENT)
+        doc.setFont('helvetica', 'bolditalic')
+        doc.text('Digitally signed', x + 3, sigY + 28)
+        doc.setFont('helvetica', 'normal')
+      }
+      // Date below signature
       const d = new Date(signedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
-      doc.setTextColor(...ACCENT)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Digitally signed', x + 24, sigY + 27)
-      doc.text(d, x + 18, sigY + 33)
+      doc.setTextColor(80, 80, 80)
+      doc.setFontSize(7)
+      doc.text(`Signed: ${d}`, x + 3, sigY + 34)
+      doc.setFontSize(8)
       doc.setTextColor(30, 30, 30)
-      doc.setFont('helvetica', 'normal')
+    } else {
+      // Blank signature + date lines for wet-ink signing
+      doc.setDrawColor(120, 120, 120)
+      doc.text('Signature:', x + 3, sigY + 28)
+      doc.line(x + 22, sigY + 28, x + 84, sigY + 28)
+      doc.text('Date:', x + 3, sigY + 34)
+      doc.line(x + 16, sigY + 34, x + 50, sigY + 34)
     }
   }
 
   signBox(14,  'CONSULTANT',
     `Name: ${meta.consultant_name ?? ''}`,
     `Position: ${meta.position ?? ''}`,
-    meta.consultant_signed_at)
+    meta.consultant_signed_at,
+    meta.consultant_signature ?? null)
   signBox(109, 'CLIENT / AUTHORISED SIGNATORY',
     `Name: ${meta.client_contact ?? ''}`,
     `Company: ${meta.client_name ?? ''}`,

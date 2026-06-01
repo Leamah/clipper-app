@@ -240,8 +240,11 @@ export interface KlippaTimesheet {
   position:              string | null
   hourly_rate:           number | null
   status:                'draft' | 'submitted' | 'approved'
-  consultant_signed_at:  string | null  // ISO timestamp — digital signature
+  consultant_signed_at:  string | null  // ISO timestamp
+  consultant_signature:  string | null  // base64 PNG of drawn signature
   client_signed_at:      string | null  // ISO timestamp — manually confirmed by consultant
+  client_name:           string | null  // denormalised at sign time
+  client_contact:        string | null  // denormalised at sign time
   created_at:            string
   updated_at:            string
 }
