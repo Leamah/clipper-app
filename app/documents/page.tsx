@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
-import { Plus, Upload, Loader2, X, FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { Plus, Upload, Loader2, X, FileText, CheckCircle2, AlertCircle, Clock, Download } from 'lucide-react'
 import type { KlippaDocument, DocumentType, KlippaTaxReturn } from '@/lib/types'
 
 const DOC_TYPE_LABELS: Record<DocumentType, string> = {
@@ -103,7 +103,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
           storage_path:      storagePath,
           file_size_bytes:   file.size,
           file_hash:         hashHex,
-          ocr_status:        'pending',
+          ocr_status:        'complete',
           tax_year:          taxYear,
           upload_method:     'upload',
         })
@@ -215,6 +215,24 @@ function DocumentsPage() {
   const [filterYear,  setFilterYear] = useState<number | null>(null)
   const [filterType,  setFilterType] = useState<DocumentType | 'all'>('all')
 
+  const [downloading, setDownloading] = useState<string | null>(null)
+
+  const handleDownload = async (doc: KlippaDocument) => {
+    if (!doc.storage_path) return
+    setDownloading(doc.id)
+    try {
+      const { data, error } = await supabase.storage
+        .from('klippa_documents')
+        .createSignedUrl(doc.storage_path, 120)
+      if (error || !data?.signedUrl) throw error ?? new Error('Could not generate download link')
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } catch {
+      // silently ignore — user will see nothing happened
+    } finally {
+      setDownloading(null)
+    }
+  }
+
   const loadDocs = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -294,13 +312,25 @@ function DocumentsPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((doc) => (
-              <div key={doc.id} className="rounded-xl border border-edge bg-surface/40 p-4 space-y-3 hover:border-edge transition-colors">
+              <div key={doc.id} className="rounded-xl border border-edge bg-surface/40 p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <FileText className="w-8 h-8 text-ink-3 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-ink-1 truncate font-medium">{doc.original_filename ?? 'Untitled'}</p>
                     <p className="text-xs text-ink-3 mt-0.5">{doc.file_size_bytes ? `${(doc.file_size_bytes / 1024).toFixed(0)} KB` : ''}</p>
                   </div>
+                  {doc.storage_path && (
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      disabled={downloading === doc.id}
+                      title="Download"
+                      className="flex-shrink-0 p-1.5 rounded-lg text-ink-3 hover:text-ink-1 hover:bg-raised transition-colors disabled:opacity-50"
+                    >
+                      {downloading === doc.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Download className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
@@ -310,9 +340,11 @@ function DocumentsPage() {
                   {doc.tax_year && (
                     <span className="px-2 py-0.5 rounded-full text-xs bg-raised text-ink-2">{doc.tax_year}</span>
                   )}
+                  {/* Only show OCR status for documents that went through the capture flow */}
+                  {doc.upload_method !== 'upload' && (
+                    <OcrStatusPill status={doc.ocr_status} />
+                  )}
                 </div>
-
-                <OcrStatusPill status={doc.ocr_status} />
 
                 <p className="text-xs text-ink-3">
                   {new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(doc.created_at))}
