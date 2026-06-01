@@ -8,9 +8,11 @@ import {
   Menu, X, PanelLeftClose, PanelLeftOpen, MessageCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import UserNav       from '@/components/UserNav'
-import ThemeToggle   from '@/components/ThemeToggle'
-import { supabase } from '@/lib/supabase'
+import UserNav        from '@/components/UserNav'
+import ThemeToggle    from '@/components/ThemeToggle'
+import FeedbackWidget from '@/components/FeedbackWidget'
+import TaxChatbot     from '@/components/TaxChatbot'
+import { supabase }  from '@/lib/supabase'
 
 export type ActivePage =
   | 'dashboard'
@@ -264,6 +266,10 @@ export default function AppNav({
           )}
         </div>
       </aside>
+
+      {/* Authenticated-only widgets — mounted here so they never appear on public pages */}
+      <FeedbackWidget />
+      <TaxChatbot />
     </>
   )
 }

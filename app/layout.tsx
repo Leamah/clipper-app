@@ -2,8 +2,6 @@ import type { Metadata } from 'next'
 import './globals.css'
 import PageTransition  from '@/components/PageTransition'
 import IdleGuard       from '@/components/IdleGuard'
-import FeedbackWidget  from '@/components/FeedbackWidget'
-import TaxChatbot      from '@/components/TaxChatbot'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
 
@@ -102,8 +100,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-base text-ink-1 antialiased">
         <IdleGuard />
         <PageTransition>{children}</PageTransition>
-        <FeedbackWidget />
-        <TaxChatbot />
       </body>
     </html>
   )
