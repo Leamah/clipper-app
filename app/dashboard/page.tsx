@@ -305,8 +305,8 @@ export default function Dashboard() {
           <AuditReadinessCard readiness={auditReadiness} />
         )}
 
-        {/* Upgrade nudge for free-tier users */}
-        {profile && !['starter', 'professional', 'admin'].includes(profile.subscription_tier ?? '') && (
+        {/* Upgrade nudge — only for standalone free users, not org/practice members */}
+        {profile && !['starter', 'professional', 'admin'].includes(profile.subscription_tier ?? '') && !profile.organisation_id && (
           <Link
             href="/pricing"
             className="flex items-center justify-between gap-4 rounded-2xl border border-emerald-600/30 bg-emerald-950/20 px-5 py-4 hover:bg-emerald-950/30 transition-colors group"

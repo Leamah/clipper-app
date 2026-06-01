@@ -84,16 +84,17 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await anon.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Premium gate — check subscription tier
+  // Premium gate — paid subscriber OR org/practice member (seat covered by org owner)
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const { data: profile } = await admin
     .from('klippa_profiles')
-    .select('subscription_tier')
+    .select('subscription_tier, organisation_id')
     .eq('id', user.id)
     .single()
 
-  const tier = profile?.subscription_tier ?? 'free'
-  if (tier === 'free') {
+  const tier   = profile?.subscription_tier ?? 'free'
+  const hasOrg = !!profile?.organisation_id
+  if (tier === 'free' && !hasOrg) {
     return NextResponse.json({ error: 'premium_required' }, { status: 402 })
   }
 

@@ -20,22 +20,27 @@ const STARTERS = [
 export default function TaxChatbot() {
   const [open,    setOpen]    = useState(false)
   const [tier,    setTier]    = useState<string | null>(null)
+  const [hasOrg,  setHasOrg]  = useState(false)
   const [msgs,    setMsgs]    = useState<Msg[]>([])
   const [input,   setInput]   = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
 
-  // Load user tier once on mount
+  // Load user tier + org membership once on mount
+  // Access = paid subscriber OR org/practice member (seat covered by org owner)
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase
         .from('klippa_profiles')
-        .select('subscription_tier')
+        .select('subscription_tier, organisation_id')
         .eq('id', user.id)
         .single()
-        .then(({ data }) => setTier(data?.subscription_tier ?? 'free'))
+        .then(({ data }) => {
+          setTier(data?.subscription_tier ?? 'free')
+          setHasOrg(!!data?.organisation_id)
+        })
     })
   }, [])
 
@@ -46,10 +51,10 @@ export default function TaxChatbot() {
 
   // Focus input when panel opens
   useEffect(() => {
-    if (open && tier !== 'free') {
+    if (open && isPremium) {
       setTimeout(() => inputRef.current?.focus(), 100)
     }
-  }, [open, tier])
+  }, [open, tier, hasOrg])
 
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim()
@@ -108,7 +113,8 @@ export default function TaxChatbot() {
     }
   }
 
-  const isPremium = tier !== null && tier !== 'free'
+  // Premium = paid plan OR org member (covered by org's seat billing)
+  const isPremium = tier !== null && (tier !== 'free' || hasOrg)
 
   return (
     <>
