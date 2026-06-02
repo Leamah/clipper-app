@@ -890,7 +890,12 @@ export default function TimesheetsPage() {
 
       // Generate PDF as a Blob (no auto-download)
       const blob = await exportTimesheetPDF(
-        { ...timesheet, client_name: activeClient?.name ?? null, client_contact: activeClient?.contact ?? null },
+        {
+          ...timesheet,
+          consultant_name: timesheet.consultant_name ?? profile?.full_name ?? null,
+          client_name:     activeClient?.name    ?? null,
+          client_contact:  activeClient?.contact ?? null,
+        },
         entries,
         { blob: true, branding: orgBranding ?? undefined },
       ) as Blob
