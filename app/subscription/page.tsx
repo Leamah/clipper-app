@@ -127,10 +127,6 @@ function SubscriptionContent() {
     }
   }
 
-  // True when the user is renewing the same plan they're already on
-  const isRenewal = hasActiveSub && !cancelDone &&
-    activeSub?.plan === plan && activeSub?.billing_cycle === cycle
-
   const startPayment = async () => {
     setPaying(true)
     setError(null)
@@ -174,6 +170,10 @@ function SubscriptionContent() {
   const selectedPlan = PLANS[plan]
   const isOnTrial    = profile?.trial_ends_at && new Date(profile.trial_ends_at) > new Date()
   const hasActiveSub = activeSub?.status === 'active'
+
+  // True when the user is renewing the same plan they're already on
+  const isRenewal = hasActiveSub && !cancelDone &&
+    activeSub?.plan === plan && activeSub?.billing_cycle === cycle
 
   // Days until renewal — used for expiry warning
   const daysUntilRenewal = activeSub?.current_period_end
