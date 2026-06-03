@@ -615,7 +615,7 @@ export default function LandingPage() {
                   transition={{ duration: 3.8, repeat: Infinity, ease: 'easeInOut', delay: 0 }}
                   className="flex flex-col items-center gap-1.5"
                 >
-                  <span className="text-5xl">👩🏾‍💼</span>
+                  <img src="/consultant.png" alt="Consultant" className="w-14 h-16 rounded-2xl object-cover object-top shadow-lg" />
                   <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[10px] font-semibold text-amber-300">Consultant</span>
                 </motion.div>
 
@@ -624,7 +624,7 @@ export default function LandingPage() {
                   transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
                   className="flex flex-col items-center gap-1.5 -mb-2"
                 >
-                  <span className="text-6xl">🧑🏼‍💻</span>
+                  <img src="/Freelancer.png" alt="Freelancer" className="w-16 h-20 rounded-2xl object-cover object-top shadow-lg" />
                   <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-semibold text-emerald-300">Freelancer</span>
                 </motion.div>
 
@@ -633,7 +633,7 @@ export default function LandingPage() {
                   transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
                   className="flex flex-col items-center gap-1.5"
                 >
-                  <span className="text-5xl">👨🏽‍🎨</span>
+                  <img src="/Creative.png" alt="Creative" className="w-14 h-16 rounded-2xl object-cover object-top shadow-lg" />
                   <span className="px-2.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-[10px] font-semibold text-violet-300">Creator</span>
                 </motion.div>
               </div>
