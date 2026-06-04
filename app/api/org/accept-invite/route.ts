@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   // Look up the invite
   const { data: invite, error: invErr } = await admin
     .from('klippa_org_invites')
-    .select('*')
+    .select('id, organisation_id, invited_email, role, expires_at, status, seat_access_until')
     .eq('token', token.trim())
     .eq('status', 'pending')
     .single()
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
         user_type:           'freelancer',   // consultant keeps freelancer tax features
         onboarding_complete: true,           // bypass the type-selection onboarding step
         // Carry the custom seat end date from the invite (null = covered by org subscription_ends_at)
-        seat_access_until:   (invite as Record<string, unknown>).seat_access_until ?? null,
+        seat_access_until:   invite.seat_access_until ?? null,
       }, { onConflict: 'id' }),
   ])
 

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { escapeHtml } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,12 @@ export async function POST(request: Request, { params }: { params: { token: stri
   const mime = file.type || 'application/octet-stream'
   if (!ALLOWED_MIMES.includes(mime))
     return NextResponse.json({ error: 'Only images and PDF files are allowed' }, { status: 415 })
+  if (checklistItemId) {
+    const checklist = Array.isArray(client.doc_checklist) ? client.doc_checklist : []
+    if (!checklist.some((it: { id: string }) => it.id === checklistItemId)) {
+      return NextResponse.json({ error: 'Invalid checklist item' }, { status: 400 })
+    }
+  }
 
   // Store under a practice-scoped path in the private documents bucket.
   const safeName   = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
@@ -118,18 +125,21 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
     const brand   = org.brand_color ?? '#10b981'
+    const safeClientName = escapeHtml(client.full_name)
+    const safeOrgName = escapeHtml(org.name ?? 'Klippa')
+    const safeFileName = escapeHtml(safeName)
     await sendBrevoEmail({
       to:      ownerEmail,
       subject: `📎 ${client.full_name} uploaded a document`,
       html: `<!DOCTYPE html><html><body style="margin:0;background:#0f0f0f;font-family:-apple-system,Segoe UI,sans-serif;">
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f0f0f;padding:40px 16px;"><tr><td align="center">
           <table width="100%" style="max-width:520px;background:#1a1a1a;border-radius:16px;border:1px solid #2a2a2a;overflow:hidden;">
-            <tr><td style="background:${brand};padding:20px 32px;color:#fff;font-size:16px;font-weight:700;">${org.name ?? 'Klippa'}</td></tr>
+            <tr><td style="background:${brand};padding:20px 32px;color:#fff;font-size:16px;font-weight:700;">${safeOrgName}</td></tr>
             <tr><td style="padding:32px;">
               <p style="margin:0 0 12px;color:#f5f5f5;font-size:18px;font-weight:700;">New client upload</p>
               <p style="margin:0 0 8px;color:#a0a0a0;font-size:14px;line-height:1.7;">
-                <strong style="color:#f5f5f5;">${client.full_name}</strong> uploaded
-                <strong style="color:#f5f5f5;">${safeName}</strong> via their document portal.
+                <strong style="color:#f5f5f5;">${safeClientName}</strong> uploaded
+                <strong style="color:#f5f5f5;">${safeFileName}</strong> via their document portal.
               </p>
               <table cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td style="background:${brand};border-radius:10px;">
                 <a href="${siteUrl}/practice/clients/${client.id}" style="display:inline-block;padding:13px 26px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">Review in Klippa →</a>

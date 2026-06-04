@@ -12,8 +12,8 @@ export const metadata: Metadata = {
     template: '%s | Klippa',
   },
   icons: {
-    icon:  [{ url: '/icon', type: 'image/png', sizes: '32x32' }],
-    apple: [{ url: '/apple-icon', type: 'image/png', sizes: '180x180' }],
+    icon:  [{ url: '/icon.svg', type: 'image/svg+xml', sizes: '32x32' }],
+    apple: [{ url: '/apple-icon.svg', type: 'image/svg+xml', sizes: '180x180' }],
   },
   description:
     'Klippa is the South African tax app for freelancers, consultants and accountants. Auto-categorise expenses, calculate mixed-use deductions, generate a SARS-compliant mileage logbook, and file your ITR12 in minutes — audit-ready all year.',

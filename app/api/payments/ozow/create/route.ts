@@ -7,6 +7,7 @@ import {
   buildOzowRequest, getPlanAmount, getSeatTotal, SEAT_PRICE_ANNUAL,
   type PlanKey, type BillingCycle,
 } from '@/lib/ozow'
+import { getSiteUrl } from '@/lib/security'
 
 export async function POST(request: Request) {
   const cookieStore = cookies()
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
 
   const siteCode   = process.env.OZOW_SITE_CODE   ?? ''
   const privateKey = process.env.OZOW_PRIVATE_KEY ?? ''
-  const origin     = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
+  const siteUrl    = getSiteUrl()
 
   if (!siteCode || !privateKey) {
     return NextResponse.json({ error: 'Ozow credentials not configured' }, { status: 500 })
@@ -87,10 +88,10 @@ export async function POST(request: Request) {
         transactionRef: ref,
         amount,
         bankReference:  'Klippa seats',
-        successUrl:     `${origin}/payments/success?ref=${ref}`,
-        cancelUrl:      `${origin}/payments/cancel?ref=${ref}`,
-        errorUrl:       `${origin}/payments/cancel?ref=${ref}&error=1`,
-        notifyUrl:      `${origin}/api/payments/ozow/notify`,
+        successUrl:     `${siteUrl}/payments/success?ref=${ref}`,
+        cancelUrl:      `${siteUrl}/payments/cancel?ref=${ref}`,
+        errorUrl:       `${siteUrl}/payments/cancel?ref=${ref}&error=1`,
+        notifyUrl:      `${siteUrl}/api/payments/ozow/notify`,
         userId:         user.id,
         plan:           'team',
         billingCycle:   'annual',
@@ -151,10 +152,10 @@ export async function POST(request: Request) {
       transactionRef,
       amount,
       bankReference: `Klippa ${plan}`,   // max 20 chars, alphanumeric + spaces only
-      successUrl:    `${origin}/payments/success?ref=${transactionRef}`,
-      cancelUrl:     `${origin}/payments/cancel?ref=${transactionRef}`,
-      errorUrl:      `${origin}/payments/cancel?ref=${transactionRef}&error=1`,
-      notifyUrl:     `${origin}/api/payments/ozow/notify`,
+      successUrl:    `${siteUrl}/payments/success?ref=${transactionRef}`,
+      cancelUrl:     `${siteUrl}/payments/cancel?ref=${transactionRef}`,
+      errorUrl:      `${siteUrl}/payments/cancel?ref=${transactionRef}&error=1`,
+      notifyUrl:     `${siteUrl}/api/payments/ozow/notify`,
       userId:        user.id,
       plan,
       billingCycle,

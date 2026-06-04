@@ -19,7 +19,11 @@ export async function POST(request: Request) {
 
   // Verify hash — reject if tampered
   if (!verifyOzowWebhook(body, privateKey)) {
-    console.error('[ozow/notify] Hash verification failed', body)
+    console.error('[ozow/notify] Hash verification failed', {
+      transactionReference: body.TransactionReference,
+      transactionId: body.TransactionId,
+      status: body.Status,
+    })
     return NextResponse.json({ error: 'Invalid hash' }, { status: 400 })
   }
 

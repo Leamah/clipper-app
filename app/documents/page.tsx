@@ -2,13 +2,28 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
-import { Plus, Upload, Loader2, X, FileText, CheckCircle2, AlertCircle, Clock, Download } from 'lucide-react'
+import { Plus, Upload, Loader2, X, FileText, CheckCircle2, AlertCircle, Clock, Download, Search } from 'lucide-react'
 import type { KlippaDocument, DocumentType, KlippaTaxReturn } from '@/lib/types'
+
+const DOCUMENT_SELECT = 'id, user_id, tax_return_id, document_type, expense_category, original_filename, storage_path, file_size_bytes, file_hash, ocr_status, ocr_confidence, extracted_data, tax_year, upload_method, created_at'
+const TAX_RETURN_SELECT = 'id, user_id, tax_year, return_type, status, gross_income, total_deductions, taxable_income, tax_payable, rebates, net_tax_payable, sars_reference, submitted_at, assessed_at, refund_amount, employees_tax_paid, payment1_status, payment2_status, payment1_paid_at, payment2_paid_at, created_at, updated_at'
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+const ALLOWED_FILE_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg'])
+
+type UploadStep = 'idle' | 'validating' | 'hashing' | 'checking' | 'uploading' | 'saving'
+
+const UPLOAD_STEP_LABELS: Record<Exclude<UploadStep, 'idle'>, string> = {
+  validating: 'Validating file',
+  hashing:    'Checking file fingerprint',
+  checking:   'Checking for duplicates',
+  uploading:  'Uploading to secure storage',
+  saving:     'Saving document record',
+}
 
 const DOC_TYPE_LABELS: Record<DocumentType, string> = {
   receipt:         'Receipt',
@@ -57,22 +72,50 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
   const [file,       setFile]       = useState<File | null>(null)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)
+  const [step,       setStep]       = useState<UploadStep>('idle')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const validateFile = (selectedFile: File) => {
+    if (!ALLOWED_FILE_TYPES.has(selectedFile.type)) {
+      throw new Error('Please upload a PDF, PNG, JPG, or JPEG file.')
+    }
+    if (selectedFile.size > MAX_UPLOAD_BYTES) {
+      throw new Error('File is too large. Maximum upload size is 20 MB.')
+    }
+  }
+
+  const handleFileSelect = (selectedFile: File | null) => {
+    setError(null)
+    if (!selectedFile) {
+      setFile(null)
+      return
+    }
+    try {
+      validateFile(selectedFile)
+      setFile(selectedFile)
+    } catch (e: unknown) {
+      setFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+      setError(e instanceof Error ? e.message : 'File could not be selected')
+    }
+  }
 
   const handleUpload = async () => {
     if (!file) return
     setUploading(true)
     setError(null)
+    setStep('validating')
     try {
+      validateFile(file)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      // Compute file hash for duplicate detection
+      setStep('hashing')
       const arrayBuffer = await file.arrayBuffer()
       const hashBuffer  = await crypto.subtle.digest('SHA-256', arrayBuffer)
       const hashHex     = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('')
 
-      // Check duplicate
+      setStep('checking')
       const { data: existing } = await supabase
         .from('klippa_documents')
         .select('id, original_filename')
@@ -82,7 +125,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
 
       if (existing) throw new Error(`You've already uploaded this document (${existing.original_filename})`)
 
-      // Upload to Supabase Storage
+      setStep('uploading')
       const ext = file.name.split('.').pop() ?? 'bin'
       const storagePath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
@@ -92,7 +135,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
 
       if (uploadErr) throw uploadErr
 
-      // Create document record
+      setStep('saving')
       const { data: doc, error: dbErr } = await supabase
         .from('klippa_documents')
         .insert({
@@ -107,7 +150,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
           tax_year:          taxYear,
           upload_method:     'upload',
         })
-        .select()
+        .select(DOCUMENT_SELECT)
         .single()
 
       if (dbErr) throw dbErr
@@ -117,6 +160,7 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
       setError(e instanceof Error ? e.message : 'Upload failed')
     } finally {
       setUploading(false)
+      setStep('idle')
     }
   }
 
@@ -182,11 +226,20 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
               ref={fileRef}
               type="file"
               accept=".pdf,.png,.jpg,.jpeg"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
               className="hidden"
             />
           </div>
         </div>
+
+        {uploading && step !== 'idle' && (
+          <div className="rounded-lg border border-edge bg-raised/40 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs text-ink-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+              <span>{UPLOAD_STEP_LABELS[step]}</span>
+            </div>
+          </div>
+        )}
 
         {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
 
@@ -214,44 +267,79 @@ function DocumentsPage() {
   const [showUpload,  setShowUpload] = useState(searchParams.get('add') === '1')
   const [filterYear,  setFilterYear] = useState<number | null>(null)
   const [filterType,  setFilterType] = useState<DocumentType | 'all'>('all')
-
+  const [query,       setQuery]      = useState('')
+  const [loadError,   setLoadError]  = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
 
   const handleDownload = async (doc: KlippaDocument) => {
     if (!doc.storage_path) return
     setDownloading(doc.id)
+    setDownloadError(null)
     try {
       const { data, error } = await supabase.storage
         .from('klippa_documents')
         .createSignedUrl(doc.storage_path, 120)
       if (error || !data?.signedUrl) throw error ?? new Error('Could not generate download link')
       window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
-    } catch {
-      // silently ignore — user will see nothing happened
+    } catch (e: unknown) {
+      setDownloadError(e instanceof Error ? e.message : 'Download failed. Please try again.')
     } finally {
       setDownloading(null)
     }
   }
 
   const loadDocs = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setDocs([])
+        setTaxReturn(null)
+        return
+      }
 
-    const { data: ret } = await supabase.from('klippa_tax_returns').select('*').eq('user_id', user.id).order('tax_year', { ascending: false }).limit(1).single()
-    setTaxReturn(ret as KlippaTaxReturn | null)
+      const { data: ret, error: retError } = await supabase
+        .from('klippa_tax_returns')
+        .select(TAX_RETURN_SELECT)
+        .eq('user_id', user.id)
+        .order('tax_year', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (retError) throw retError
+      setTaxReturn(ret as KlippaTaxReturn | null)
 
-    const { data } = await supabase.from('klippa_documents').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-    setDocs((data ?? []) as KlippaDocument[])
-    setLoading(false)
+      const { data, error: docsError } = await supabase
+        .from('klippa_documents')
+        .select(DOCUMENT_SELECT)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+      if (docsError) throw docsError
+      setDocs((data ?? []) as KlippaDocument[])
+    } catch (e: unknown) {
+      setLoadError(e instanceof Error ? e.message : 'Could not load documents')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { loadDocs() }, [loadDocs])
 
-  const filtered = docs.filter((d) => {
-    if (filterYear && d.tax_year !== filterYear) return false
-    if (filterType !== 'all' && d.document_type !== filterType) return false
-    return true
-  })
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    return docs.filter((d) => {
+      if (filterYear && d.tax_year !== filterYear) return false
+      if (filterType !== 'all' && d.document_type !== filterType) return false
+      if (!normalizedQuery) return true
+      const label = DOC_TYPE_LABELS[d.document_type as DocumentType] ?? d.document_type
+      return [
+        d.original_filename,
+        label,
+        d.tax_year?.toString(),
+      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(normalizedQuery))
+    })
+  }, [docs, filterType, filterYear, query])
 
   const years = [...new Set(docs.map((d) => d.tax_year).filter(Boolean))] as number[]
 
@@ -272,6 +360,15 @@ function DocumentsPage() {
 
         {/* Filters */}
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative min-w-[220px] flex-1 sm:flex-none">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search documents"
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-raised border border-edge text-ink-1 outline-none placeholder:text-ink-3"
+            />
+          </div>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as DocumentType | 'all')}
@@ -294,6 +391,12 @@ function DocumentsPage() {
           )}
         </div>
 
+        {(loadError || downloadError) && (
+          <div className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">
+            {loadError ?? downloadError}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
@@ -302,8 +405,8 @@ function DocumentsPage() {
           <div className="rounded-2xl border border-dashed border-edge p-16 text-center space-y-4">
             <Upload className="w-8 h-8 text-ink-3 mx-auto" />
             <div>
-              <p className="text-sm font-medium text-ink-2">No documents yet</p>
-              <p className="text-xs text-ink-3 mt-1">Upload IRP5 certificates, receipts, and bank statements.</p>
+              <p className="text-sm font-medium text-ink-2">{docs.length === 0 ? 'No documents yet' : 'No documents match your filters'}</p>
+              <p className="text-xs text-ink-3 mt-1">{docs.length === 0 ? 'Upload IRP5 certificates, receipts, and bank statements.' : 'Adjust search, type, or year to widen the results.'}</p>
             </div>
             <button onClick={() => setShowUpload(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
               <Plus className="w-3.5 h-3.5" /> Upload document

@@ -756,7 +756,7 @@ function MetricCard({ label, value, sub, color, icon, highlight }: {
         {label}
       </div>
       <p className="text-2xl font-bold text-ink-1 tabular-nums">{value}</p>
-      <p className="text-xs text-ink-2" dangerouslySetInnerHTML={{ __html: sub }} />
+      <p className="text-xs text-ink-2">{sub}</p>
     </motion.div>
   )
 }
