@@ -214,7 +214,7 @@ export async function GET() {
 
   const placementReadiness = placements.map(p => {
     const member = memberMap[p.user_id]
-    const ts = timesheetByPlacement[p.id] ?? timesheetMap[p.user_id] ?? null
+    const ts = timesheetByPlacement[p.id] ?? null
     const comp = complianceMap[p.user_id] ?? null
     const complianceScore = comp ? [
       comp.tax_profile_complete,
