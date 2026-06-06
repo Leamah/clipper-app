@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
@@ -189,6 +191,10 @@ export default function FilingPage() {
   })
 
   const deadline = getITR12Deadline(taxReturn.tax_year)
+  const returnSections = buildReturnSections({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm })
+  const missingItems = buildMissingItems(returnSections, profile, incomeRecords, payeInput)
+  const filingChecklist = buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents })
+  const investmentWorksheets = buildInvestmentWorksheets(incomeRecords, documents)
 
   return (
     <div className="app-shell bg-base text-ink-1">
@@ -290,6 +296,12 @@ export default function FilingPage() {
 
             <div className="flex justify-end">
               <button
+                onClick={() => exportFilingPackPDF({ profile, taxReturn, returnSections, missingItems, checklist: filingChecklist, investmentWorksheets, taxResult })}
+                className="mr-2 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-raised hover:bg-edge text-ink-1 text-sm font-medium transition-all"
+              >
+                <Download className="w-4 h-4" /> Filing pack
+              </button>
+              <button
                 onClick={() => setStep(1)}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
               >
@@ -303,13 +315,10 @@ export default function FilingPage() {
         {step === 1 && (
           <SarsPreview
             profile={profile}
-            incomeRecords={incomeRecords}
-            expenseRecords={expenseRecords}
-            taxResult={taxResult}
-            payeInput={payeInput}
-            businessKm={businessKm}
             taxYear={taxReturn.tax_year}
-            documents={documents}
+            returnSections={returnSections}
+            missingItems={missingItems}
+            investmentWorksheets={investmentWorksheets}
             onPrev={() => setStep(0)}
             onNext={() => setStep(2)}
           />
@@ -384,6 +393,10 @@ export default function FilingPage() {
 
             <p className="text-xs text-ink-3">These values are based on the {taxReturn.tax_year} SARS tax tables and the information you&apos;ve entered. Always verify against your actual documents before submitting.</p>
 
+            {investmentWorksheets.length > 0 && (
+              <InvestmentWorksheetPanel worksheets={investmentWorksheets} />
+            )}
+
             {incomeRecords.some(r => needsHumanReview(r.income_type)) && (
               <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3">
                 <p className="text-sm text-amber-200 font-medium">Some items need extra checking</p>
@@ -404,17 +417,10 @@ export default function FilingPage() {
             </div>
 
             <div className="space-y-4">
-              {[
-                { n: '01', title: 'Log in to SARS eFiling', body: 'Go to secure.sarsefiling.co.za and log in with your username and password. If you haven\'t registered, click "Register" and complete the process.', link: 'https://secure.sarsefiling.co.za/app/login', linkLabel: 'Open eFiling portal' },
-                { n: '02', title: 'Select "Returns" → "Returns Issued" → "Personal Income Tax (ITR12)"', body: 'From your dashboard, navigate to the Returns menu. Find the ITR12 for the current tax year and click "Open."' },
-                { n: '03', title: 'Enter your money received', body: `In the income sections, use the values from your field map. Klippa groups each amount by what happened in real life, then shows the SARS code next to it.` },
-                { n: '04', title: 'Enter your deductions', body: `In the "Deductions" section, enter your business expense deductions:\n${taxResult.section11fRa > 0 ? `• Code 4001 (RA / Section 11F): ${formatRand(taxResult.section11fRa)}\n` : ''}${taxResult.homeOffice > 0 ? `• Code 4011 (Home office): ${formatRand(taxResult.homeOffice)}\n` : ''}${taxResult.travel > 0 ? `• Code 4016 (Travel, fixed cost): ${formatRand(taxResult.travel)}\n` : ''}${taxResult.otherDeductions > 0 ? `• Code 4018 (Other business expenses): ${formatRand(taxResult.otherDeductions)}` : ''}` },
-                { n: '05', title: 'Review the calculated tax', body: 'SARS eFiling will automatically calculate your tax. Compare it against your cheat sheet. If the figures differ significantly, review your entries.' },
-                { n: '06', title: 'Submit your return', body: 'Once satisfied, click "File Return" and confirm. Save your SARS reference number. You\'ll need it in the next step.' },
-              ].map((s) => (
+              {buildSarsCompanionSteps(returnSections, missingItems, taxResult).map((s, idx) => (
                 <div key={s.n} className="rounded-xl border border-edge p-4 space-y-3">
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl font-black text-edge leading-none flex-shrink-0">{s.n}</span>
+                    <span className="text-2xl font-black text-edge leading-none flex-shrink-0">{String(idx + 1).padStart(2, '0')}</span>
                     <div className="space-y-1 flex-1">
                       <h3 className="text-sm font-semibold text-ink-1">{s.title}</h3>
                       <p className="text-sm text-ink-2 leading-relaxed whitespace-pre-line">{s.body}</p>
@@ -446,8 +452,15 @@ export default function FilingPage() {
               <p className="text-sm text-ink-2 mt-1">Keep these documents for 5 years in case SARS audits your return. Do not submit them unless SARS specifically asks.</p>
             </div>
 
+            <button
+              onClick={() => exportFilingPackPDF({ profile, taxReturn, returnSections, missingItems, checklist: filingChecklist, investmentWorksheets, taxResult })}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-raised hover:bg-edge text-ink-1 text-sm font-medium transition-all"
+            >
+              <Download className="w-4 h-4" /> Export filing pack PDF
+            </button>
+
             <div className="rounded-2xl border border-edge divide-y divide-edge overflow-hidden">
-              {buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents }).map((item, i) => (
+              {filingChecklist.map((item, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
                   <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${item.ready ? 'border-emerald-500 bg-emerald-500' : 'border-amber-500/70'}`}>
                     {item.ready && <Check className="w-3 h-3 text-white" />}
@@ -592,6 +605,19 @@ interface MissingItem {
   detail: string
   href?: string
 }
+
+interface InvestmentWorksheet {
+  id: string
+  title: string
+  section: string
+  amount: number
+  treatment: string
+  known: string[]
+  needed: string[]
+  evidence: string[]
+}
+
+type FilingChecklistItem = ReturnType<typeof buildFilingPackChecklist>[number]
 
 function hasDoc(documents: KlippaDocument[], types: DocumentType[]) {
   return documents.some((d) => types.includes(d.document_type))
@@ -861,20 +887,265 @@ function buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, docu
   ].filter((item) => item.required)
 }
 
-function SarsPreview({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm, taxYear, onPrev, onNext }: {
+function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], documents: KlippaDocument[]): InvestmentWorksheet[] {
+  const investmentTypes: KlippaIncomeRecord['income_type'][] = ['interest', 'dividends', 'capital_gains', 'crypto', 'foreign_income']
+  return investmentTypes.flatMap((type) => {
+    const records = incomeRecords.filter((r) => r.income_type === type)
+    if (records.length === 0) return []
+    const amount = records.reduce((s, r) => s + r.amount, 0)
+    const evidence = docNames(documents, type === 'foreign_income'
+      ? ['invoice', 'bank_statement', 'other']
+      : ['investment_certificate', 'bank_statement', 'other'])
+
+    const base = {
+      id: `worksheet-${type}`,
+      amount,
+      known: [
+        `${records.length} record${records.length === 1 ? '' : 's'} captured in Klippa`,
+        `Total amount captured: ${formatRand(amount)}`,
+      ],
+      evidence,
+    }
+
+    if (type === 'interest') {
+      return [{
+        ...base,
+        title: 'Bank interest worksheet',
+        section: 'Investment income',
+        treatment: 'Klippa includes this in the estimate and applies the annual interest exemption.',
+        needed: ['Bank or investment tax certificate', 'Confirm the amount is interest, not transfers between your own accounts'],
+      }]
+    }
+    if (type === 'dividends') {
+      return [{
+        ...base,
+        title: 'Share or ETF payout worksheet',
+        section: 'Investment income',
+        treatment: 'Shown separately because dividends and ETF distributions can have special tax treatment.',
+        needed: ['Investment tax certificate', 'Breakdown between dividends, interest, REIT income, and foreign amounts if the platform provides it'],
+      }]
+    }
+    if (type === 'capital_gains' || type === 'crypto') {
+      return [{
+        ...base,
+        title: type === 'crypto' ? 'Crypto gain worksheet' : 'Sold investment or asset worksheet',
+        section: 'Capital gains',
+        treatment: 'Shown separately. Klippa needs purchase cost and sale details before it can calculate a reliable taxable gain.',
+        needed: ['Date bought', 'Amount paid', 'Date sold', 'Amount received', 'Platform fees or agent fees', 'Statement proving the transaction'],
+      }]
+    }
+    return [{
+      ...base,
+      title: 'Money from outside South Africa worksheet',
+      section: 'Foreign income',
+      treatment: 'Shown separately because exchange rates and possible foreign tax credits can affect SARS treatment.',
+      needed: ['Foreign payer name', 'Payment date', 'Original currency amount', 'Rand amount received', 'Exchange rate used', 'Any foreign tax certificate'],
+    }]
+  })
+}
+
+function buildSarsCompanionSteps(sections: ReturnSection[], missingItems: MissingItem[], taxResult: ReturnType<typeof calculateTax>) {
+  const yesSections = sections.filter((s) => s.applies)
+  const codeLines = yesSections
+    .filter((s) => s.code !== 'N/A')
+    .map((s) => `${s.section}: ${s.value} (SARS ${s.code})`)
+    .join('\n')
+  const missingLines = missingItems.length > 0
+    ? missingItems.map((m) => `- ${m.title}`).join('\n')
+    : 'No blocking missing items found in Klippa.'
+
+  return [
+    {
+      n: '01',
+      title: 'Open your ITR12 on SARS eFiling',
+      body: 'Log in, open Returns, then open the Personal Income Tax return for this tax year. Keep Klippa open next to SARS.',
+      link: 'https://secure.sarsefiling.co.za/app/login',
+      linkLabel: 'Open eFiling portal',
+    },
+    {
+      n: '02',
+      title: 'Answer the setup questions using the preview',
+      body: `When SARS asks which sections apply, answer Yes for the sections Klippa marked as applying:\n${yesSections.map((s) => `- ${s.section}`).join('\n') || '- No sections ready yet'}`,
+    },
+    {
+      n: '03',
+      title: 'Copy the field map values',
+      body: `Enter these values where SARS shows the matching field or code:\n${codeLines || 'No field values ready yet. Add income and profile details first.'}`,
+    },
+    {
+      n: '04',
+      title: 'Pause on items Klippa marked for checking',
+      body: `Resolve these before submitting if possible:\n${missingLines}`,
+    },
+    {
+      n: '05',
+      title: 'Compare the SARS result to Klippa',
+      body: `SARS will calculate the final result. Compare it to Klippa's current estimate:\nTax payable: ${formatRand(taxResult.taxPayable)}\nNet result after PAYE: ${taxResult.netTaxPayable > 0 ? formatRand(taxResult.netTaxPayable) : `Refund ${formatRand(Math.abs(taxResult.netTaxPayable))}`}\nIf SARS differs by a large amount, re-check income, PAYE, retirement, medical aid, travel, and investment sections.`,
+    },
+    {
+      n: '06',
+      title: 'Submit and save your reference',
+      body: 'After submitting on SARS, save or download the confirmation page. Enter the SARS reference number in Klippa on the final step.',
+    },
+  ]
+}
+
+function InvestmentWorksheetPanel({ worksheets }: { worksheets: InvestmentWorksheet[] }) {
+  return (
+    <div className="rounded-2xl border border-edge overflow-hidden">
+      <div className="px-4 py-3 bg-surface/60 border-b border-edge">
+        <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Investment worksheets</p>
+      </div>
+      {worksheets.map((w) => (
+        <div key={w.id} className="px-4 py-4 border-b border-edge/60 last:border-b-0 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-ink-1">{w.title}</p>
+              <p className="text-xs text-ink-2 mt-0.5">{w.treatment}</p>
+            </div>
+            <span className="font-bold text-ink-1 tabular-nums">{formatRand(w.amount)}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-lg bg-raised/40 px-3 py-2">
+              <p className="text-xs font-semibold text-ink-1">Known in Klippa</p>
+              {w.known.map((item) => <p key={item} className="text-xs text-ink-2 mt-1">{item}</p>)}
+              <p className="text-xs text-ink-2 mt-1">Evidence: {w.evidence.length ? w.evidence.join(', ') : 'No matching document uploaded yet'}</p>
+            </div>
+            <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+              <p className="text-xs font-semibold text-amber-200">Still needed</p>
+              {w.needed.map((item) => <p key={item} className="text-xs text-amber-300/80 mt-1">{item}</p>)}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function exportFilingPackPDF(input: {
   profile: KlippaProfile
-  incomeRecords: KlippaIncomeRecord[]
-  expenseRecords: KlippaExpenseRecord[]
-  documents: KlippaDocument[]
+  taxReturn: KlippaTaxReturn
+  returnSections: ReturnSection[]
+  missingItems: MissingItem[]
+  checklist: FilingChecklistItem[]
+  investmentWorksheets: InvestmentWorksheet[]
   taxResult: ReturnType<typeof calculateTax>
-  payeInput: number
-  businessKm: number
+}) {
+  const { profile, taxReturn, returnSections, missingItems, checklist, investmentWorksheets, taxResult } = input
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const margin = 14
+  let y = 16
+
+  const addHeading = (title: string, sub?: string) => {
+    if (y > 250) { doc.addPage(); y = 16 }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(14)
+    doc.setTextColor(24, 24, 27)
+    doc.text(title, margin, y)
+    y += 6
+    if (sub) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(82, 82, 91)
+      doc.text(doc.splitTextToSize(sub, 180), margin, y)
+      y += 8
+    }
+  }
+
+  doc.setFillColor(24, 24, 27)
+  doc.rect(0, 0, 210, 34, 'F')
+  doc.setTextColor(16, 185, 129)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(18)
+  doc.text('KLIPPA FILING PACK', margin, 14)
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`Tax year ${taxReturn.tax_year} | ${profile.full_name || 'Taxpayer'}`, margin, 23)
+  doc.text(`Generated ${new Date().toLocaleDateString('en-ZA')}`, margin, 29)
+  y = 44
+
+  addHeading('Calculation summary')
+  autoTable(doc, {
+    startY: y,
+    head: [['Item', 'Amount']],
+    body: [
+      ['Gross income in Klippa estimate', formatRand(taxResult.grossIncome)],
+      ['Total deductions', formatRand(taxResult.totalDeductions)],
+      ['Taxable income', formatRand(taxResult.taxableIncome)],
+      ['Tax payable', formatRand(taxResult.taxPayable)],
+      ['PAYE already taken off', formatRand(taxResult.employeesTaxPaid)],
+      ['Net result', taxResult.netTaxPayable > 0 ? formatRand(taxResult.netTaxPayable) : `Refund ${formatRand(Math.abs(taxResult.netTaxPayable))}`],
+    ],
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
+  })
+  y = (doc as any).lastAutoTable.finalY + 10
+
+  addHeading('SARS return mirror', 'Plain-English sections Klippa expects on the ITR12.')
+  autoTable(doc, {
+    startY: y,
+    head: [['Section', 'Answer', 'SARS', 'Value', 'Status']],
+    body: returnSections.map((s) => [s.section, s.answer, s.code === 'N/A' ? s.sars : `${s.code} ${s.sars}`, s.value, s.status]),
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.6 },
+    headStyles: { fillColor: [24, 24, 27], textColor: [255, 255, 255] },
+    columnStyles: { 0: { cellWidth: 34 }, 1: { cellWidth: 48 }, 2: { cellWidth: 42 }, 3: { cellWidth: 28 }, 4: { cellWidth: 28 } },
+  })
+  y = (doc as any).lastAutoTable.finalY + 10
+
+  if (investmentWorksheets.length > 0) {
+    addHeading('Investment worksheets', 'Items that need investment certificates, purchase/sale details, exchange-rate support, or extra checking.')
+    autoTable(doc, {
+      startY: y,
+      head: [['Worksheet', 'Known amount', 'Still needed']],
+      body: investmentWorksheets.map((w) => [w.title, formatRand(w.amount), w.needed.join('; ')]),
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1.6 },
+      headStyles: { fillColor: [24, 24, 27], textColor: [255, 255, 255] },
+      columnStyles: { 0: { cellWidth: 42 }, 1: { cellWidth: 28 }, 2: { cellWidth: 110 } },
+    })
+    y = (doc as any).lastAutoTable.finalY + 10
+  }
+
+  addHeading('Missing or check-before-filing items')
+  autoTable(doc, {
+    startY: y,
+    head: [['Item', 'Detail']],
+    body: missingItems.length > 0 ? missingItems.map((m) => [m.title, m.detail]) : [['None found', 'No blocking missing items found in Klippa.']],
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.6 },
+    headStyles: { fillColor: [245, 158, 11], textColor: [0, 0, 0] },
+    columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 125 } },
+  })
+  y = (doc as any).lastAutoTable.finalY + 10
+
+  addHeading('Document checklist')
+  autoTable(doc, {
+    startY: y,
+    head: [['Document', 'Status', 'Hint']],
+    body: checklist.map((item) => [item.label, item.ready ? 'Found / generated' : 'Missing', item.ready ? '' : item.hint]),
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 1.6 },
+    headStyles: { fillColor: [24, 24, 27], textColor: [255, 255, 255] },
+    columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 34 }, 2: { cellWidth: 88 } },
+  })
+
+  doc.save(`klippa-filing-pack-${taxReturn.tax_year}.pdf`)
+}
+
+function SarsPreview({ profile, returnSections, missingItems, investmentWorksheets, taxYear, onPrev, onNext }: {
+  profile: KlippaProfile
+  returnSections: ReturnSection[]
+  missingItems: MissingItem[]
+  investmentWorksheets: InvestmentWorksheet[]
   taxYear: number
   onPrev: () => void
   onNext: () => void
 }) {
-  const previewRows = buildReturnSections({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm })
-  const missingRows = buildMissingItems(previewRows, profile, incomeRecords, payeInput)
+  const previewRows = returnSections
+  const missingRows = missingItems
   const lifeEvents = buildLifeEvents(previewRows, profile)
 
   return (
@@ -937,6 +1208,10 @@ function SarsPreview({ profile, incomeRecords, expenseRecords, documents, taxRes
           </div>
         ))}
       </div>
+
+      {investmentWorksheets.length > 0 && (
+        <InvestmentWorksheetPanel worksheets={investmentWorksheets} />
+      )}
 
       {missingRows.length > 0 && (
         <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 space-y-2">
