@@ -11,7 +11,7 @@ import AppNav from '@/components/AppNav'
 import { Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase, Zap } from 'lucide-react'
 import type { KlippaProfile, KlippaIncomeRecord, KlippaTaxReturn, IncomeType } from '@/lib/types'
 import { INCOME_TYPE_LABELS } from '@/lib/types'
-import { INCOME_TYPE_META, PLAIN_INCOME_OPTIONS, needsHumanReview } from '@/lib/sars-return-map'
+import { PLAIN_INCOME_OPTIONS, getIncomeTypeCopy, needsHumanReview } from '@/lib/sars-return-map'
 import { isStarterOrAbove, FREE_INCOME_LIMIT } from '@/lib/tier'
 import Papa from 'papaparse'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
@@ -41,6 +41,7 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
+  const copy = getIncomeTypeCopy(form.income_type, { source: form.source_name, description: form.description })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,7 +103,7 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
               ))}
             </select>
             <p className="text-xs text-ink-3 leading-relaxed">
-              {INCOME_TYPE_META[form.income_type].examples}
+              {copy.examples}
             </p>
           </Field>
 

@@ -16,7 +16,7 @@ import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseR
 import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { isProfessionalOrAbove } from '@/lib/tier'
-import { INCOME_TYPE_META, isIncludedInTaxEstimate, needsHumanReview } from '@/lib/sars-return-map'
+import { getIncomeTypeCopy, isIncludedInTaxEstimate, needsHumanReview } from '@/lib/sars-return-map'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -653,10 +653,20 @@ function buildReturnSections(input: {
   const { profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm } = input
   const groupedIncome = incomeRecords.reduce((groups, r) => {
     const existing = groups.find((g) => g.type === r.income_type)
-    if (existing) existing.amount += r.amount
-    else groups.push({ type: r.income_type, amount: r.amount })
+    if (existing) {
+      existing.amount += r.amount
+      existing.sources.push(r.source_name)
+      if (r.description) existing.descriptions.push(r.description)
+    } else {
+      groups.push({
+        type: r.income_type,
+        amount: r.amount,
+        sources: [r.source_name],
+        descriptions: r.description ? [r.description] : [],
+      })
+    }
     return groups
-  }, [] as { type: KlippaIncomeRecord['income_type']; amount: number }[])
+  }, [] as { type: KlippaIncomeRecord['income_type']; amount: number; sources: string[]; descriptions: string[] }[])
 
   const confirmedExpenseTotal = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
   const incomeDocTypes: Partial<Record<KlippaIncomeRecord['income_type'], DocumentType[]>> = {
@@ -672,8 +682,8 @@ function buildReturnSections(input: {
     other:          ['bank_statement', 'other'],
   }
 
-  const sections: ReturnSection[] = groupedIncome.map(({ type, amount }) => {
-    const meta = INCOME_TYPE_META[type]
+  const sections: ReturnSection[] = groupedIncome.map(({ type, amount, sources, descriptions }) => {
+    const meta = getIncomeTypeCopy(type, { source: sources.join(' '), description: descriptions.join(' ') })
     const docs = incomeDocTypes[type] ?? ['other']
     const hasEvidence = hasDoc(documents, docs)
     return {

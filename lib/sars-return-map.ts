@@ -13,6 +13,19 @@ export interface IncomeTypeMeta {
   treatment:    TaxTreatment
 }
 
+type IncomeCopyContext = {
+  source?:      string | null
+  description?: string | null
+}
+
+function contextText(context?: IncomeCopyContext) {
+  return `${context?.source ?? ''} ${context?.description ?? ''}`.toLowerCase()
+}
+
+function hasAny(text: string, words: string[]) {
+  return words.some((w) => text.includes(w))
+}
+
 export const INCOME_TYPE_META: Record<IncomeType, IncomeTypeMeta> = {
   salary: {
     label:        'Job or payslip income',
@@ -120,6 +133,80 @@ export const PLAIN_INCOME_OPTIONS = Object.entries(INCOME_TYPE_META).map(([value
   value: value as IncomeType,
   ...meta,
 }))
+
+export function getIncomeTypeCopy(type: IncomeType, context?: IncomeCopyContext): IncomeTypeMeta {
+  const base = INCOME_TYPE_META[type]
+  const text = contextText(context)
+
+  if (type === 'freelance') {
+    if (hasAny(text, ['campaign', 'brand', 'sponsored', 'sponsorship', 'influencer', 'instagram', 'tiktok', 'youtube', 'ugc', 'content'])) {
+      return {
+        ...base,
+        label: 'Campaign or content payment',
+        question: 'Did a brand or agency pay you for a campaign, post, video, or content work?',
+        examples: 'Examples: Instagram campaign, TikTok video, YouTube sponsorship, UGC content, brand ambassador fee.',
+        documentHint: 'Keep the campaign brief, invoice, bank proof, and any agency or brand payment statement.',
+      }
+    }
+    if (hasAny(text, ['uber', 'bolt', 'mr d', 'mrd', 'takealot', 'checkers sixty60', 'sixty60', 'delivery', 'driver', 'rideshare'])) {
+      return {
+        ...base,
+        label: 'Driving or delivery platform payment',
+        question: 'Did a platform pay you for trips, deliveries, or driving work?',
+        examples: 'Examples: Uber, Bolt, Mr D, Takealot, Checkers Sixty60, delivery or driving payouts.',
+        documentHint: 'Keep platform statements, weekly payout reports, bank proof, fuel/vehicle records, and logbook support.',
+      }
+    }
+    if (hasAny(text, ['upwork', 'fiverr', 'freelancer.com', 'peopleperhour', 'platform'])) {
+      return {
+        ...base,
+        label: 'Online platform freelance payment',
+        question: 'Did an online platform pay you for freelance work?',
+        examples: 'Examples: Upwork, Fiverr, Freelancer.com, online client platform payouts.',
+        documentHint: 'Keep platform statements, invoices, payout reports, and bank proof.',
+      }
+    }
+    return {
+      ...base,
+      label: 'Client or contract payment',
+      question: 'Did a client pay you for work, a project, or a contract?',
+      examples: 'Examples: consulting, design, development, bookkeeping, tutoring, project work, retainer work.',
+      documentHint: 'Keep invoices, contracts, bank statements, and proof of payment from each client.',
+    }
+  }
+
+  if (type === 'commission' && hasAny(text, ['affiliate', 'referral', 'creator', 'link'])) {
+    return {
+      ...base,
+      label: 'Affiliate or referral payment',
+      question: 'Were you paid for referrals, affiliate links, or sales you helped generate?',
+      examples: 'Examples: affiliate links, referral fees, promo-code commission, creator store commission.',
+      documentHint: 'Keep the payout statement showing sales, commission rate, and money received.',
+    }
+  }
+
+  if (type === 'rental' && hasAny(text, ['airbnb', 'booking.com', 'lekke slaap', 'short stay', 'guest'])) {
+    return {
+      ...base,
+      label: 'Short-stay or Airbnb rental',
+      question: 'Did guests pay you for a room, cottage, Airbnb, or short-stay property?',
+      examples: 'Examples: Airbnb, Booking.com, guest room, holiday rental, garden cottage.',
+      documentHint: 'Keep platform statements, cleaning/repairs proof, rates, levies, bond interest, and bank proof.',
+    }
+  }
+
+  if (type === 'foreign_income' && hasAny(text, ['paypal', 'wise', 'payoneer', 'stripe', 'deel', 'remote', 'usd', 'eur', 'gbp'])) {
+    return {
+      ...base,
+      label: 'Overseas client or platform payment',
+      question: 'Did an overseas client, remote-work platform, or foreign app pay you?',
+      examples: 'Examples: PayPal, Wise, Payoneer, Stripe, Deel, overseas client, USD/EUR/GBP payout.',
+      documentHint: 'Keep invoices, payout statements, bank conversion proof, exchange rates, and any foreign tax certificates.',
+    }
+  }
+
+  return base
+}
 
 export function isIncludedInTaxEstimate(type: IncomeType): boolean {
   return INCOME_TYPE_META[type]?.treatment !== 'informational'
