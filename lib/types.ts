@@ -13,6 +13,10 @@ export type IncomeType =
   | 'freelance'
   | 'salary'
   | 'interest'
+  | 'dividends'
+  | 'capital_gains'
+  | 'foreign_income'
+  | 'crypto'
   | 'rental'
   | 'commission'
   | 'other'
@@ -41,6 +45,7 @@ export type DocumentType =
   | 'invoice'
   | 'medical'
   | 'ra_certificate'
+  | 'investment_certificate'
   | 'timesheet'
   | 'other'
 
@@ -545,12 +550,16 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 }
 
 export const INCOME_TYPE_LABELS: Record<IncomeType, string> = {
-  freelance:  'Freelance / Consulting',
-  salary:     'Salary / Employment',
-  interest:   'Interest Earned',
-  rental:     'Property Rental',
-  commission: 'Commission',
-  other:      'Other Income',
+  freelance:      'Client or freelance work',
+  salary:         'Job or payslip income',
+  interest:       'Bank interest',
+  dividends:      'Share or ETF payouts',
+  capital_gains:  'Sold an investment or asset',
+  foreign_income: 'Money from outside SA',
+  crypto:         'Crypto sale or trading profit',
+  rental:         'Rent from property',
+  commission:     'Commission earned',
+  other:          'Other money received',
 }
 
 export const WORK_LOCATION_LABELS: Record<WorkLocation, string> = {

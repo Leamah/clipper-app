@@ -16,6 +16,7 @@ import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseR
 import { useRouter } from 'next/navigation'
 import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline, nextProvisionalPayment, currentRunningTaxYear, VAT_THRESHOLD, VAT_WARNING_THRESHOLD } from '@/lib/tax-engine'
 import { startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear } from 'date-fns'
+import { isIncludedInTaxEstimate } from '@/lib/sars-return-map'
 
 function countPendingLogbookWeeks(taxYear: number, reviewedWeekKeys: string[]): number {
   const taxStart = new Date(taxYear - 1, 2, 1)
@@ -116,6 +117,7 @@ export default function Dashboard() {
   // ── Calculations ──────────────────────────────────────────
 
   const totalIncome        = incomeRecords.reduce((s, r) => s + r.amount, 0)
+  const taxEstimateIncome  = incomeRecords.filter(r => isIncludedInTaxEstimate(r.income_type)).reduce((s, r) => s + r.amount, 0)
   const totalExpDeductible = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
 
   const dashBusinessKm  = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
@@ -124,8 +126,8 @@ export default function Dashboard() {
 
   const taxResult = profile
     ? calculateTax({
-        grossIncome:          totalIncome,
-        raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, totalIncome * 0.275, 350_000) : 0,
+        grossIncome:          taxEstimateIncome,
+        raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, taxEstimateIncome * 0.275, 350_000) : 0,
         pensionContributions: profile.has_pension ? (profile.pension_contributions ?? 0) : 0,
         homeofficePct:        profile.works_from_home ? profile.home_office_pct : 0,
         homeExpenses:         profile.works_from_home ? (profile.home_expenses_annual ?? 0) : 0,

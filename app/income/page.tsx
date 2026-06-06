@@ -11,6 +11,7 @@ import AppNav from '@/components/AppNav'
 import { Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase, Zap } from 'lucide-react'
 import type { KlippaProfile, KlippaIncomeRecord, KlippaTaxReturn, IncomeType } from '@/lib/types'
 import { INCOME_TYPE_LABELS } from '@/lib/types'
+import { INCOME_TYPE_META, PLAIN_INCOME_OPTIONS, needsHumanReview } from '@/lib/sars-return-map'
 import { isStarterOrAbove, FREE_INCOME_LIMIT } from '@/lib/tier'
 import Papa from 'papaparse'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
@@ -90,16 +91,19 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
             />
           </Field>
 
-          <Field label="Income type">
+          <Field label="What kind of money was this?">
             <select
               value={form.income_type}
               onChange={(e) => setForm((f) => ({ ...f, income_type: e.target.value as IncomeType }))}
               className="input"
             >
-              {(Object.entries(INCOME_TYPE_LABELS) as [IncomeType, string][]).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
+              {PLAIN_INCOME_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+            <p className="text-xs text-ink-3 leading-relaxed">
+              {INCOME_TYPE_META[form.income_type].examples}
+            </p>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -304,8 +308,8 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
                     onChange={(e) => setRowType(i, e.target.value as IncomeType)}
                     className="w-32 flex-shrink-0 bg-raised border border-edge text-ink-1 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer"
                   >
-                    {(Object.entries(INCOME_TYPE_LABELS) as [IncomeType, string][]).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
+                    {PLAIN_INCOME_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                   <span className="w-24 text-right text-emerald-400 font-medium tabular-nums flex-shrink-0">{formatRand(t.amount)}</span>
@@ -540,6 +544,9 @@ function IncomePage() {
                       <span className="px-2 py-0.5 rounded-full text-xs bg-raised text-ink-2">
                         {INCOME_TYPE_LABELS[r.income_type as IncomeType]}
                       </span>
+                      {needsHumanReview(r.income_type as IncomeType) && (
+                        <p className="text-[11px] text-amber-500 mt-1">Klippa will show this separately in your filing preview.</p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-2">{formatDate(r.received_date)}</td>
                     <td className="px-4 py-3 text-right font-medium text-ink-1 tabular-nums">{formatRand(r.amount)}</td>

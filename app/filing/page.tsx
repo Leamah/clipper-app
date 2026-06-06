@@ -14,12 +14,13 @@ import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseR
 import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { isProfessionalOrAbove } from '@/lib/tier'
+import { INCOME_TYPE_META, isIncludedInTaxEstimate, needsHumanReview } from '@/lib/sars-return-map'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
 }
 
-const STEPS = ['Review', 'Cheat Sheet', 'eFiling Guide', 'Checklist', 'Submit']
+const STEPS = ['Review', 'SARS Preview', 'Field Map', 'eFiling Guide', 'Checklist', 'Submit']
 
 interface FilingData {
   profile:       KlippaProfile
@@ -101,7 +102,7 @@ export default function FilingPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base">
-        <FilingNav step={-1} totalSteps={5} onPrev={() => {}} onNext={() => {}} canNext={false} />
+        <FilingNav step={-1} totalSteps={6} onPrev={() => {}} onNext={() => {}} canNext={false} />
         <div className="flex items-center justify-center py-32">
           <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
         </div>
@@ -161,14 +162,15 @@ export default function FilingPage() {
 
   const { profile, taxReturn, incomeRecords, expenseRecords, mileageTrips } = data
   const totalIncome       = incomeRecords.reduce((s, r) => s + r.amount, 0)
+  const taxEstimateIncome = incomeRecords.filter(r => isIncludedInTaxEstimate(r.income_type)).reduce((s, r) => s + r.amount, 0)
   const totalDeductible   = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
   const businessKm        = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
   const totalKm           = mileageTrips.reduce((s, t) => s + t.distance_km, 0)
   const interestIncome    = incomeRecords.filter(r => r.income_type === 'interest').reduce((s, r) => s + r.amount, 0)
 
   const taxResult = calculateTax({
-    grossIncome:          totalIncome,
-    raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, totalIncome * 0.275, 350_000) : 0,
+    grossIncome:          taxEstimateIncome,
+    raContributions:      profile.has_ra ? Math.min(profile.ra_contributions ?? 0, taxEstimateIncome * 0.275, 350_000) : 0,
     pensionContributions: profile.has_pension ? (profile.pension_contributions ?? 0) : 0,
     homeofficePct:        profile.works_from_home ? profile.home_office_pct : 0,
     homeExpenses:         profile.works_from_home ? (profile.home_expenses_annual ?? 0) : 0,
@@ -288,18 +290,33 @@ export default function FilingPage() {
                 onClick={() => setStep(1)}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
               >
-                Continue to cheat sheet <ChevronRight className="w-4 h-4" />
+                Continue <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
 
-        {/* ── Step 1: Cheat Sheet ─────────────────────────────── */}
+        {/* ── Step 1: SARS Preview ─────────────────────────────── */}
         {step === 1 && (
+          <SarsPreview
+            profile={profile}
+            incomeRecords={incomeRecords}
+            expenseRecords={expenseRecords}
+            taxResult={taxResult}
+            payeInput={payeInput}
+            businessKm={businessKm}
+            taxYear={taxReturn.tax_year}
+            onPrev={() => setStep(0)}
+            onNext={() => setStep(2)}
+          />
+        )}
+
+        {/* ── Step 2: Field Map ─────────────────────────────── */}
+        {step === 2 && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-xl font-bold text-ink-1">Your eFiling cheat sheet</h1>
-              <p className="text-sm text-ink-2 mt-1">Enter these exact values on SARS eFiling. Copy each line into the corresponding field on your ITR12.</p>
+              <h1 className="text-xl font-bold text-ink-1">Your SARS field map</h1>
+              <p className="text-sm text-ink-2 mt-1">Use these values when SARS asks for each matching section. The plain wording is what happened in your year; the code is the SARS field behind it.</p>
             </div>
 
             <div className="rounded-2xl border border-edge overflow-hidden">
@@ -363,12 +380,19 @@ export default function FilingPage() {
 
             <p className="text-xs text-ink-3">These values are based on the {taxReturn.tax_year} SARS tax tables and the information you&apos;ve entered. Always verify against your actual documents before submitting.</p>
 
-            <StepNav onPrev={() => setStep(0)} onNext={() => setStep(2)} />
+            {incomeRecords.some(r => needsHumanReview(r.income_type)) && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3">
+                <p className="text-sm text-amber-200 font-medium">Some items need extra checking</p>
+                <p className="text-xs text-amber-300/75 mt-0.5">Investments, crypto, foreign money, and unusual once-off amounts can need special SARS treatment. Klippa shows them separately so you do not miss them.</p>
+              </div>
+            )}
+
+            <StepNav onPrev={() => setStep(1)} onNext={() => setStep(3)} />
           </div>
         )}
 
         {/* ── Step 2: eFiling guide ───────────────────────────── */}
-        {step === 2 && (
+        {step === 3 && (
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold text-ink-1">eFiling walkthrough</h1>
@@ -379,7 +403,7 @@ export default function FilingPage() {
               {[
                 { n: '01', title: 'Log in to SARS eFiling', body: 'Go to secure.sarsefiling.co.za and log in with your username and password. If you haven\'t registered, click "Register" and complete the process.', link: 'https://secure.sarsefiling.co.za/app/login', linkLabel: 'Open eFiling portal' },
                 { n: '02', title: 'Select "Returns" → "Returns Issued" → "Personal Income Tax (ITR12)"', body: 'From your dashboard, navigate to the Returns menu. Find the ITR12 for the current tax year and click "Open."' },
-                { n: '03', title: 'Enter your income', body: `In the "Income" section, find "Local income" and enter your freelance/consulting income. Use the values from your cheat sheet:\n• Code 3699 (Freelance): ${formatRand(totalIncome)}` },
+                { n: '03', title: 'Enter your money received', body: `In the income sections, use the values from your field map. Klippa groups each amount by what happened in real life, then shows the SARS code next to it.` },
                 { n: '04', title: 'Enter your deductions', body: `In the "Deductions" section, enter your business expense deductions:\n${taxResult.section11fRa > 0 ? `• Code 4001 (RA / Section 11F): ${formatRand(taxResult.section11fRa)}\n` : ''}${taxResult.homeOffice > 0 ? `• Code 4011 (Home office): ${formatRand(taxResult.homeOffice)}\n` : ''}${taxResult.travel > 0 ? `• Code 4016 (Travel, fixed cost): ${formatRand(taxResult.travel)}\n` : ''}${taxResult.otherDeductions > 0 ? `• Code 4018 (Other business expenses): ${formatRand(taxResult.otherDeductions)}` : ''}` },
                 { n: '05', title: 'Review the calculated tax', body: 'SARS eFiling will automatically calculate your tax. Compare it against your cheat sheet. If the figures differ significantly, review your entries.' },
                 { n: '06', title: 'Submit your return', body: 'Once satisfied, click "File Return" and confirm. Save your SARS reference number. You\'ll need it in the next step.' },
@@ -406,12 +430,12 @@ export default function FilingPage() {
               ))}
             </div>
 
-            <StepNav onPrev={() => setStep(1)} onNext={() => setStep(3)} />
+            <StepNav onPrev={() => setStep(2)} onNext={() => setStep(4)} />
           </div>
         )}
 
         {/* ── Step 3: Document checklist ──────────────────────── */}
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-6">
             <div>
               <h1 className="text-xl font-bold text-ink-1">Document checklist</h1>
@@ -426,7 +450,8 @@ export default function FilingPage() {
                 { label: 'RA certificate from your fund provider',  required: profile.has_ra },
                 { label: 'Home office floor plan or photos',        required: profile.works_from_home },
                 { label: 'Vehicle logbook (business km)',           required: profile.has_vehicle },
-                { label: 'IRP5 from any employer (if applicable)',  required: profile.employment_type !== 'freelance' },
+                { label: 'Employer tax certificate if you had a job', required: profile.employment_type !== 'freelance' },
+                { label: 'Bank or investment tax certificate if savings/investments paid you', required: profile.has_interest_savings || profile.has_tfsa || incomeRecords.some(r => ['interest', 'dividends', 'capital_gains', 'crypto'].includes(r.income_type)) },
               ].filter((i) => i.required).map((item, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-4 h-4 rounded-full border-2 border-emerald-500/50 flex-shrink-0" />
@@ -440,12 +465,12 @@ export default function FilingPage() {
               <p className="text-xs text-amber-300/70 mt-0.5">Keep all supporting documents for at least 5 years after your assessment date.</p>
             </div>
 
-            <StepNav onPrev={() => setStep(2)} onNext={() => setStep(4)} />
+            <StepNav onPrev={() => setStep(3)} onNext={() => setStep(5)} />
           </div>
         )}
 
         {/* ── Step 4: Submission record ───────────────────────── */}
-        {step === 4 && (
+        {step === 5 && (
           <div className="space-y-6">
             {submitted ? (
               <div className="space-y-6 text-center py-8">
@@ -487,7 +512,7 @@ export default function FilingPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setStep(3)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
+                  <button onClick={() => setStep(4)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
                     <ChevronLeft className="w-3.5 h-3.5" /> Back
                   </button>
                   <button
@@ -544,6 +569,185 @@ function StepNav({ onPrev, onNext }: { onPrev: () => void; onNext: () => void })
   )
 }
 
+function SarsPreview({ profile, incomeRecords, expenseRecords, taxResult, payeInput, businessKm, taxYear, onPrev, onNext }: {
+  profile: KlippaProfile
+  incomeRecords: KlippaIncomeRecord[]
+  expenseRecords: KlippaExpenseRecord[]
+  taxResult: ReturnType<typeof calculateTax>
+  payeInput: number
+  businessKm: number
+  taxYear: number
+  onPrev: () => void
+  onNext: () => void
+}) {
+  const groupedIncome = incomeRecords.reduce((groups, r) => {
+    const existing = groups.find((g) => g.type === r.income_type)
+    if (existing) existing.amount += r.amount
+    else groups.push({ type: r.income_type, amount: r.amount })
+    return groups
+  }, [] as { type: KlippaIncomeRecord['income_type']; amount: number }[])
+
+  const confirmedExpenseTotal = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
+  const previewRows = [
+    ...groupedIncome.map(({ type, amount }) => {
+      const meta = INCOME_TYPE_META[type]
+      return {
+        section: meta.section,
+        plain:   meta.question,
+        examples: meta.examples,
+        code:    meta.sarsCode,
+        sars:    meta.sarsLabel,
+        value:   formatRand(amount),
+        status:  needsHumanReview(type) ? 'Check carefully' : 'Ready',
+        hint:    meta.documentHint,
+      }
+    }),
+    profile.has_ra && taxResult.section11fRa > 0 ? {
+      section: 'Retirement savings',
+      plain:   'You paid into your own retirement plan.',
+      examples: 'Examples: Allan Gray RA, Sygnia RA, 10X RA, Old Mutual RA.',
+      code:    SARS_DEDUCTION_CODES.section11f.code,
+      sars:    SARS_DEDUCTION_CODES.section11f.label,
+      value:   formatRand(taxResult.section11fRa),
+      status:  'Ready',
+      hint:    'Keep the retirement tax certificate from your provider.',
+    } : null,
+    profile.has_pension && taxResult.section11fRa > 0 ? {
+      section: 'Employer retirement',
+      plain:   'Your employer took retirement money off your payslip.',
+      examples: 'Examples: pension fund, provident fund, company retirement fund.',
+      code:    SARS_DEDUCTION_CODES.pension.code,
+      sars:    SARS_DEDUCTION_CODES.pension.label,
+      value:   formatRand(profile.pension_contributions ?? 0),
+      status:  'Ready',
+      hint:    'This is usually shown on your employer tax certificate.',
+    } : null,
+    profile.has_medical ? {
+      section: 'Medical aid',
+      plain:   'You paid for medical aid.',
+      examples: 'Examples: Discovery, Bonitas, Momentum, Medihelp, Bestmed.',
+      code:    SARS_DEDUCTION_CODES.medical.code,
+      sars:    SARS_DEDUCTION_CODES.medical.label,
+      value:   formatRand(taxResult.medicalAidCredits),
+      status:  'Ready',
+      hint:    'Keep the medical aid tax certificate for the tax year.',
+    } : null,
+    taxResult.homeOffice > 0 ? {
+      section: 'Working from home',
+      plain:   'You work from a dedicated space at home.',
+      examples: 'Examples: separate study, office room, work-only room.',
+      code:    SARS_DEDUCTION_CODES.home_office.code,
+      sars:    SARS_DEDUCTION_CODES.home_office.label,
+      value:   formatRand(taxResult.homeOffice),
+      status:  'Check carefully',
+      hint:    'Keep proof of home costs and how you calculated the work area percentage.',
+    } : null,
+    taxResult.travel > 0 ? {
+      section: 'Driving for work',
+      plain:   'You drove for work and kept a logbook.',
+      examples: 'Examples: client visits, site trips, business travel.',
+      code:    SARS_DEDUCTION_CODES.travel.code,
+      sars:    SARS_DEDUCTION_CODES.travel.label,
+      value:   `${formatRand(taxResult.travel)} (${businessKm.toLocaleString('en-ZA')} business km)`,
+      status:  'Ready',
+      hint:    'Keep the vehicle logbook and opening/closing odometer readings.',
+    } : null,
+    confirmedExpenseTotal > 0 ? {
+      section: 'Business expenses',
+      plain:   'You spent money to earn your income.',
+      examples: 'Examples: software, data, equipment, training, bank fees, professional fees.',
+      code:    SARS_DEDUCTION_CODES.other_biz.code,
+      sars:    SARS_DEDUCTION_CODES.other_biz.label,
+      value:   formatRand(confirmedExpenseTotal),
+      status:  'Ready',
+      hint:    'Keep receipts and proof that each expense was for work.',
+    } : null,
+    payeInput > 0 ? {
+      section: 'Tax already taken off',
+      plain:   'Your employer already paid some tax for you.',
+      examples: 'This is the tax deducted from your payslip during the year.',
+      code:    SARS_DEDUCTION_CODES.employees_tax.code,
+      sars:    SARS_DEDUCTION_CODES.employees_tax.label,
+      value:   formatRand(payeInput),
+      status:  'Ready',
+      hint:    'Check this against the employer tax certificate.',
+    } : null,
+  ].filter(Boolean) as {
+    section: string
+    plain: string
+    examples: string
+    code: string
+    sars: string
+    value: string
+    status: string
+    hint: string
+  }[]
+
+  const missingRows = [
+    profile.has_interest_savings && !incomeRecords.some(r => r.income_type === 'interest')
+      ? 'You said a bank or savings account pays you interest, but no bank interest amount has been added yet.'
+      : null,
+    profile.has_tfsa
+      ? 'You said you have a tax-free savings account. Keep the certificate or statement, even if no tax is due on growth.'
+      : null,
+    profile.employment_type !== 'freelance' && payeInput === 0
+      ? 'You said you had employment income, but no tax already taken off has been entered yet.'
+      : null,
+  ].filter(Boolean) as string[]
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-ink-1">Your SARS return preview</h1>
+        <p className="text-sm text-ink-2 mt-1">This is a plain-English mirror of the sections Klippa expects on your ITR12 for tax year {taxYear}.</p>
+      </div>
+
+      <div className="rounded-2xl border border-edge overflow-hidden">
+        <div className="px-4 py-3 bg-surface/60 border-b border-edge">
+          <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">What Klippa will help you fill in</p>
+        </div>
+        {previewRows.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm text-ink-2">No SARS sections are ready yet. Add income, documents, or profile details first.</p>
+          </div>
+        ) : previewRows.map((row, i) => (
+          <div key={`${row.section}-${i}`} className="px-4 py-4 border-b border-edge/60 last:border-b-0 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-ink-1">{row.section}</p>
+                <p className="text-sm text-ink-2 mt-0.5">{row.plain}</p>
+              </div>
+              <div className="flex items-center gap-2 sm:justify-end">
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${row.status === 'Ready' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                  {row.status}
+                </span>
+                <span className="font-bold text-ink-1 tabular-nums">{row.value}</span>
+              </div>
+            </div>
+            <p className="text-xs text-ink-3">{row.examples}</p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 text-xs">
+              <span className="font-mono text-ink-2">SARS {row.code}</span>
+              <span className="text-ink-3">{row.sars}</span>
+            </div>
+            <p className="text-xs text-ink-2">{row.hint}</p>
+          </div>
+        ))}
+      </div>
+
+      {missingRows.length > 0 && (
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 space-y-2">
+          <p className="text-sm text-amber-200 font-medium">Things to check before filing</p>
+          {missingRows.map((row, i) => (
+            <p key={i} className="text-xs text-amber-300/80 leading-relaxed">{row}</p>
+          ))}
+        </div>
+      )}
+
+      <StepNav onPrev={onPrev} onNext={onNext} />
+    </div>
+  )
+}
+
 function CheatRow({ code, label, value }: { code: string; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-edge/60 last:border-0">
@@ -576,4 +780,3 @@ function SectionRow({ label, value, sub, href, highlight }: {
   if (href) return <Link href={href} className="block hover:bg-surface/30 transition-colors">{content}</Link>
   return content
 }
-

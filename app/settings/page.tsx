@@ -408,22 +408,22 @@ export default function SettingsPage() {
         {/* ── Retirement savings ── */}
         <Section title="Retirement savings" hint="Section 11F: often the biggest single deduction for self-employed people.">
           <ToggleRow
-            label="I contribute to a Retirement Annuity (RA)"
-            sub="Up to 27.5% of income or R350,000 per year, whichever is lower"
+            label="I pay into my own retirement plan"
+            sub="Examples: Allan Gray RA, Sygnia RA, 10X RA, Old Mutual RA"
             impact="Switch on to unlock. Could save you R10,000+ in tax depending on income."
             value={profile.has_ra} onChange={(v) => update('has_ra', v)}
           />
           {profile.has_ra && (
             <div className="pl-2 space-y-1.5">
-              <Field label="Annual RA contributions (R)" hint="Check your latest statement from your RA provider.">
+              <Field label="Total paid this tax year (R)" hint="Check your latest certificate or statement from the retirement provider.">
                 <NumInput value={profile.ra_contributions ?? 0} onChange={(v) => update('ra_contributions', v)} step={500} placeholder="e.g. 36000" />
               </Field>
             </div>
           )}
 
           <ToggleRow
-            label="I contribute to an employer pension or provident fund"
-            sub="Combined with RA under Section 11F"
+            label="My employer takes retirement money off my payslip"
+            sub="Examples: pension fund, provident fund, company retirement fund"
             value={profile.has_pension} onChange={(v) => update('has_pension', v)}
           />
           {profile.has_pension && (
@@ -569,13 +569,13 @@ export default function SettingsPage() {
         {/* ── Savings & investments ── */}
         <Section title="Savings & investments">
           <ToggleRow
-            label="Tax-Free Savings Account (TFSA)"
-            sub="Returns are tax-free. Annual limit R36,000, lifetime R500,000."
+            label="I have a tax-free savings account"
+            sub="Examples: EasyEquities TFSA, bank TFSA, Satrix TFSA. Growth is usually tax-free."
             value={profile.has_tfsa} onChange={(v) => update('has_tfsa', v)}
           />
           <ToggleRow
-            label="Interest-bearing savings / fixed deposit"
-            sub="Exemption: R23,800/yr under 65, or R34,500/yr if 65 or older"
+            label="A bank or savings account pays me interest"
+            sub="Examples: savings account, fixed deposit, money market, notice account"
             value={profile.has_interest_savings} onChange={(v) => update('has_interest_savings', v)}
           />
         </Section>

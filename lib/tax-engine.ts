@@ -445,12 +445,16 @@ export const PROVISIONAL_TAX_THRESHOLD = 30_000
 // ── SARS Line number mapping ──────────────────────────────
 
 export const SARS_INCOME_CODES: Record<string, { code: string; label: string }> = {
-  freelance:  { code: '3699', label: 'Other income / Freelance income' },
-  salary:     { code: '3601', label: 'Income / Salary' },
-  commission: { code: '3606', label: 'Commission' },
-  rental:     { code: '4210', label: 'Rental income' },
-  interest:   { code: '4201', label: 'Local interest' },
-  other:      { code: '3699', label: 'Other income' },
+  freelance:      { code: '3699', label: 'Client / freelance work' },
+  salary:         { code: '3601', label: 'Job or payslip income' },
+  commission:     { code: '3606', label: 'Commission' },
+  rental:         { code: '4210', label: 'Rent from property' },
+  interest:       { code: '4201', label: 'Bank interest' },
+  dividends:      { code: '4238', label: 'Share or ETF payouts' },
+  capital_gains:  { code: '4250', label: 'Sold an investment or asset' },
+  crypto:         { code: '4250', label: 'Crypto sale or trading profit' },
+  foreign_income: { code: '4218', label: 'Money from outside SA' },
+  other:          { code: '3699', label: 'Other money received' },
 }
 
 export const SARS_DEDUCTION_CODES: Record<string, { code: string; label: string }> = {

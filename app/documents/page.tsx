@@ -27,11 +27,12 @@ const UPLOAD_STEP_LABELS: Record<Exclude<UploadStep, 'idle'>, string> = {
 
 const DOC_TYPE_LABELS: Record<DocumentType, string> = {
   receipt:         'Receipt',
-  irp5:            'IRP5 / IT3',
-  bank_statement:  'Bank Statement',
+  irp5:            'Employer tax certificate',
+  bank_statement:  'Bank statement',
   invoice:         'Invoice',
-  medical:         'Medical Aid Certificate',
-  ra_certificate:  'RA Certificate',
+  medical:         'Medical aid certificate',
+  ra_certificate:  'Retirement certificate',
+  investment_certificate: 'Bank or investment tax certificate',
   timesheet:       'Timesheet',
   other:           'Other',
 }
@@ -43,6 +44,7 @@ const DOC_TYPE_COLORS: Record<DocumentType, string> = {
   invoice:         'bg-emerald-500/15 text-emerald-300',
   medical:         'bg-pink-500/15 text-pink-300',
   ra_certificate:  'bg-orange-500/15 text-orange-300',
+  investment_certificate: 'bg-cyan-500/15 text-cyan-300',
   timesheet:       'bg-teal-500/15 text-teal-300',
   other:           'bg-edge text-ink-2',
 }

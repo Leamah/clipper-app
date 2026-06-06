@@ -529,16 +529,16 @@ export default function OnboardingPage() {
               {step === 3 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-xl font-bold">Which financial products do you have?</h2>
-                    <p className="text-sm text-ink-2 mt-1">Select all that apply. Each one unlocks relevant deductions or exemptions.</p>
+                    <h2 className="text-xl font-bold">What money products do you have?</h2>
+                    <p className="text-sm text-ink-2 mt-1">Select anything that sounds familiar. Klippa handles the SARS wording later.</p>
                   </div>
                   <div className="space-y-2.5">
                     {([
-                      { key: 'ra'               as FinancialProduct, label: 'Retirement Annuity (RA)',         sub: 'Deductible up to 27.5% of income or R350,000 (Section 11F)', badge: 'Deduction' },
-                      { key: 'pension'          as FinancialProduct, label: 'Pension Fund',                    sub: 'Combined with RA under Section 11F: employer + employee contributions', badge: 'Deduction' },
-                      { key: 'medical'          as FinancialProduct, label: 'Medical Aid',                     sub: 'Monthly tax credit: R364 per member (first 2), R246 each additional', badge: 'Tax Credit' },
-                      { key: 'tfsa'             as FinancialProduct, label: 'Tax-Free Savings Account (TFSA)', sub: 'Returns are tax-free (not a deduction but no tax on growth/interest)', badge: 'Tax-free' },
-                      { key: 'interest_savings' as FinancialProduct, label: 'Interest-Bearing Savings Account',sub: 'First R23,800/year (under 65) or R34,500 (65+) of interest is exempt', badge: 'Exemption' },
+                      { key: 'ra'               as FinancialProduct, label: 'I pay into my own retirement plan', sub: 'Examples: Allan Gray RA, Sygnia RA, 10X RA, Old Mutual RA.', badge: 'Can reduce tax' },
+                      { key: 'pension'          as FinancialProduct, label: 'My employer takes retirement money off my payslip', sub: 'Examples: pension fund, provident fund, company retirement fund.', badge: 'Can reduce tax' },
+                      { key: 'medical'          as FinancialProduct, label: 'I pay for medical aid', sub: 'Examples: Discovery, Bonitas, Momentum, Medihelp, Bestmed.', badge: 'Tax credit' },
+                      { key: 'tfsa'             as FinancialProduct, label: 'I have a tax-free savings account', sub: 'Examples: EasyEquities TFSA, bank TFSA, Satrix TFSA.', badge: 'Tax-free' },
+                      { key: 'interest_savings' as FinancialProduct, label: 'A bank or savings account pays me interest', sub: 'Examples: savings account, fixed deposit, money market, notice account.', badge: 'May be partly tax-free' },
                     ]).map(({ key, label, sub, badge }) => {
                       const selected = state.financial_products.has(key)
                       return (
