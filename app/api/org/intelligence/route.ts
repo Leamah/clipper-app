@@ -26,7 +26,7 @@ export async function GET() {
   const orgId = callerProfile.organisation_id
 
   // ── Parallel fetches ────────────────────────────────────────
-  const [membersRes, periodsRes, contractsRes, complianceRes, authRes] = await Promise.all([
+  const [membersRes, periodsRes, contractsRes, complianceRes, clientsRes, placementsRes, authRes] = await Promise.all([
     admin.from('klippa_profiles')
       .select('id, full_name, org_role, created_at')
       .eq('organisation_id', orgId)
@@ -48,22 +48,36 @@ export async function GET() {
       .select('*')
       .eq('organisation_id', orgId),
 
+    admin.from('klippa_org_clients')
+      .select('*')
+      .eq('organisation_id', orgId)
+      .eq('status', 'active')
+      .order('name', { ascending: true }),
+
+    admin.from('klippa_org_placements')
+      .select('*')
+      .eq('organisation_id', orgId)
+      .eq('status', 'active'),
+
     admin.auth.admin.listUsers({ perPage: 1000 }),
   ])
 
   const members    = membersRes.data    ?? []
   const contracts  = contractsRes.data  ?? []
   const compliance = complianceRes.data ?? []
+  const clients     = clientsRes.data    ?? []
+  const placements  = placementsRes.data ?? []
   const emailMap   = Object.fromEntries((authRes.data?.users ?? []).map(u => [u.id, u.email ?? '']))
   const currentPeriod = periodsRes.data?.[0] ?? null
 
   // ── Timesheets for current period month ─────────────────────
-  let timesheetMap: Record<string, { status: string; month: string }> = {}
+  let timesheetMap: Record<string, { id: string; status: string; month: string; client_signed_at: string | null; org_approved_at: string | null }> = {}
+  let timesheetHours: Record<string, number> = {}
   if (members.length > 0) {
     const memberIds = members.map(m => m.id)
 
     let tsQuery = admin.from('klippa_timesheets')
-      .select('user_id, status, month')
+      .select('id, user_id, status, month, client_signed_at, org_approved_at')
       .in('user_id', memberIds)
       .order('month', { ascending: false })
 
@@ -76,7 +90,26 @@ export async function GET() {
 
     const { data: timesheets } = await tsQuery
     for (const ts of timesheets ?? []) {
-      if (!timesheetMap[ts.user_id]) timesheetMap[ts.user_id] = { status: ts.status, month: ts.month }
+      if (!timesheetMap[ts.user_id]) {
+        timesheetMap[ts.user_id] = {
+          id: ts.id,
+          status: ts.status,
+          month: ts.month,
+          client_signed_at: ts.client_signed_at,
+          org_approved_at: ts.org_approved_at,
+        }
+      }
+    }
+
+    const tsIds = (timesheets ?? []).map(t => t.id)
+    if (tsIds.length > 0) {
+      const { data: entries } = await admin
+        .from('klippa_timesheet_entries')
+        .select('timesheet_id, hours')
+        .in('timesheet_id', tsIds)
+      for (const e of entries ?? []) {
+        timesheetHours[e.timesheet_id] = (timesheetHours[e.timesheet_id] ?? 0) + Number(e.hours ?? 0)
+      }
     }
   }
 
@@ -147,6 +180,73 @@ export async function GET() {
     }
   })
 
+  const clientMap = Object.fromEntries(clients.map(c => [c.id, c]))
+  const memberMap = Object.fromEntries(members.map(m => [m.id, m]))
+
+  const placementReadiness = placements.map(p => {
+    const member = memberMap[p.user_id]
+    const ts = timesheetMap[p.user_id] ?? null
+    const comp = complianceMap[p.user_id] ?? null
+    const complianceScore = comp ? [
+      comp.tax_profile_complete,
+      comp.banking_verified,
+      comp.id_verified,
+      comp.popia_consent,
+      !!comp.signed_agreement_at,
+    ].filter(Boolean).length : 0
+    const hours = ts ? (timesheetHours[ts.id] ?? 0) : 0
+    const billRate = Number(p.bill_rate ?? 0)
+    const payRate = Number(p.pay_rate ?? 0)
+    const expectedBill = hours * billRate
+    const expectedPay = hours * payRate
+    const expectedMargin = expectedBill - expectedPay
+    const marginPct = expectedBill > 0 ? Math.round((expectedMargin / expectedBill) * 100) : null
+    const todayDate = new Date()
+    const blockers: string[] = []
+
+    if (!ts || ts.status === 'draft') blockers.push('Contractor has not submitted time')
+    if (ts && !ts.client_signed_at) blockers.push('Client manager has not signed the timesheet')
+    if (ts && ts.status !== 'approved' && !ts.org_approved_at) blockers.push('Placement house has not approved the timesheet')
+    if (complianceScore < 5) blockers.push('Contractor compliance is incomplete')
+    if (!p.bill_rate || !p.pay_rate) blockers.push('Bill rate or pay rate is missing')
+    if (p.end_date && new Date(p.end_date) < todayDate) blockers.push('Placement has ended')
+    if (billRate > 0 && payRate > billRate) blockers.push('Pay rate is higher than bill rate')
+
+    return {
+      placement: p,
+      client: clientMap[p.client_id] ?? null,
+      consultant: {
+        id: p.user_id,
+        full_name: member?.full_name ?? null,
+        email: emailMap[p.user_id] ?? '',
+      },
+      timesheet: ts ? { ...ts, hours } : null,
+      compliance_score: complianceScore,
+      expected_bill: expectedBill,
+      expected_pay: expectedPay,
+      expected_margin: expectedMargin,
+      margin_pct: marginPct,
+      ready_to_bill: blockers.length === 0 && expectedBill > 0,
+      ready_to_pay: !!ts && (ts.status === 'approved' || !!ts.org_approved_at) && complianceScore === 5 && !!p.pay_rate,
+      blockers,
+    }
+  })
+
+  const projectedBill = placementReadiness.reduce((sum, p) => sum + p.expected_bill, 0)
+  const projectedPay = placementReadiness.reduce((sum, p) => sum + p.expected_pay, 0)
+  const projectedMargin = projectedBill - projectedPay
+  const placementSummary = {
+    active: placements.length,
+    ready_to_bill: placementReadiness.filter(p => p.ready_to_bill).length,
+    ready_to_pay: placementReadiness.filter(p => p.ready_to_pay).length,
+    blocked: placementReadiness.filter(p => p.blockers.length > 0).length,
+    client_approval_due: placementReadiness.filter(p => p.blockers.includes('Client manager has not signed the timesheet')).length,
+    projected_bill: projectedBill,
+    projected_pay: projectedPay,
+    projected_margin: projectedMargin,
+    margin_pct: projectedBill > 0 ? Math.round((projectedMargin / projectedBill) * 100) : null,
+  }
+
   return NextResponse.json({
     active_consultants:  members.length,
     submission_rate:     submissionRate,
@@ -155,5 +255,8 @@ export async function GET() {
     current_period:      currentPeriod,
     days_until_deadline: daysUntilDeadline,
     consultants,
+    clients,
+    placements:         placementReadiness,
+    placement_summary:  placementSummary,
   })
 }

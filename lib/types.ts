@@ -297,6 +297,8 @@ export type PayrollStatus   = 'open' | 'closed' | 'processing'
 export type ContractType    = 'fixed_term' | 'permanent' | 'freelance' | 'retainer'
 export type ContractStatus  = 'active' | 'expired' | 'terminated'
 export type RateType        = 'hourly' | 'daily' | 'monthly' | 'project'
+export type OrgClientStatus = 'active' | 'paused' | 'archived'
+export type PlacementStatus = 'active' | 'ending' | 'ended' | 'paused'
 
 export interface KlippaPayrollPeriod {
   id:              string
@@ -339,6 +341,55 @@ export interface KlippaConsultantCompliance {
   updated_at:           string
 }
 
+export interface KlippaOrgClient {
+  id:              string
+  organisation_id: string
+  name:            string
+  contact_person:  string | null
+  contact_email:   string | null
+  default_site:    string | null
+  status:          OrgClientStatus
+  notes:           string | null
+  created_at:      string
+  updated_at:      string
+}
+
+export interface KlippaOrgPlacement {
+  id:                      string
+  organisation_id:         string
+  client_id:               string
+  user_id:                 string
+  role_title:              string
+  site:                    string | null
+  client_manager_name:     string | null
+  client_manager_email:    string | null
+  start_date:              string | null
+  end_date:                string | null
+  bill_rate:               number | null
+  pay_rate:                number | null
+  rate_type:               RateType
+  status:                  PlacementStatus
+  compliance_requirements: string[]
+  notes:                   string | null
+  created_at:              string
+  updated_at:              string
+}
+
+export interface OrgPlacementReadiness {
+  placement:       KlippaOrgPlacement
+  client:          KlippaOrgClient | null
+  consultant:      { id: string; full_name: string | null; email: string }
+  timesheet:       { id: string; status: string; month: string; hours: number; client_signed_at: string | null; org_approved_at: string | null } | null
+  compliance_score: number
+  expected_bill:    number
+  expected_pay:     number
+  expected_margin:  number
+  margin_pct:       number | null
+  ready_to_bill:    boolean
+  ready_to_pay:     boolean
+  blockers:         string[]
+}
+
 // Aggregated per-consultant view for the org dashboard
 export interface OrgConsultantRow {
   id:               string
@@ -360,6 +411,19 @@ export interface OrgIntelligence {
   current_period:      KlippaPayrollPeriod | null
   days_until_deadline: number | null
   consultants:         OrgConsultantRow[]
+  clients?:            KlippaOrgClient[]
+  placements?:         OrgPlacementReadiness[]
+  placement_summary?:  {
+    active:             number
+    ready_to_bill:      number
+    ready_to_pay:       number
+    blocked:            number
+    client_approval_due: number
+    projected_bill:     number
+    projected_pay:      number
+    projected_margin:   number
+    margin_pct:         number | null
+  }
 }
 
 // ── Practice (Accounting) Types ────────────────────────────

@@ -11,6 +11,7 @@ import {
   CalendarDays, AlertTriangle, CheckCircle2,
   Clock, TrendingUp, Bell, Plus, Loader2,
   FileX, ChevronRight, Check, X,
+  BriefcaseBusiness, CircleDollarSign,
 } from 'lucide-react'
 import type { KlippaOrganisation, OrgIntelligence, OrgConsultantRow } from '@/lib/types'
 
@@ -18,6 +19,14 @@ import type { KlippaOrganisation, OrgIntelligence, OrgConsultantRow } from '@/li
 
 function formatDate(s: string) {
   return new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s))
+}
+
+function formatMoney(n: number | null | undefined) {
+  return new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
+    maximumFractionDigits: 0,
+  }).format(Number(n ?? 0))
 }
 
 function ComplianceDots({ score }: { score: number }) {
@@ -178,6 +187,9 @@ export default function OrgDashboardPage() {
             <Link href="/org/payroll" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
               <CalendarDays className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Payroll</span>
             </Link>
+            <Link href="/org/placements" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
+              <BriefcaseBusiness className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Placements</span>
+            </Link>
             <Link href="/org/consultants" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
               <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Team</span>
             </Link>
@@ -201,15 +213,23 @@ export default function OrgDashboardPage() {
 
         {/* ── Stat cards ──────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <StatCard icon={Users}      label="Consultants"       value={intel?.active_consultants ?? 0}   color="blue" />
+          <StatCard icon={BriefcaseBusiness} label="Placements" value={intel?.placement_summary?.active ?? 0}
+            color="blue"
+            sub={`${intel?.placement_summary?.ready_to_bill ?? 0} ready to bill`}
+          />
+          <StatCard icon={CircleDollarSign} label="Projected margin" value={formatMoney(intel?.placement_summary?.projected_margin ?? 0)}
+            color={(intel?.placement_summary?.projected_margin ?? 0) < 0 ? 'red' : 'emerald'}
+            alert={(intel?.placement_summary?.projected_margin ?? 0) < 0}
+            sub={intel?.placement_summary?.margin_pct == null ? 'no billable hours yet' : `${intel.placement_summary.margin_pct}% margin`}
+          />
           <StatCard icon={TrendingUp} label="Submission rate"   value={`${intel?.submission_rate ?? 0}%`}
             color={(intel?.submission_rate ?? 100) < 80 ? 'amber' : 'emerald'}
             sub={period ? `for ${period.name}` : 'all time'}
           />
-          <StatCard icon={FileX}      label="Missing"           value={missing.length}
-            color={missing.length > 0 ? 'amber' : 'emerald'}
-            alert={missing.length > 0}
-            sub={missing.length > 0 ? `timesheet${missing.length !== 1 ? 's' : ''} not submitted` : 'all submitted ✓'}
+          <StatCard icon={FileX}      label="Blocked"           value={intel?.placement_summary?.blocked ?? missing.length}
+            color={(intel?.placement_summary?.blocked ?? missing.length) > 0 ? 'amber' : 'emerald'}
+            alert={(intel?.placement_summary?.blocked ?? missing.length) > 0}
+            sub={`${intel?.placement_summary?.client_approval_due ?? 0} need client sign-off`}
           />
           <StatCard icon={AlertTriangle} label="Contracts expiring" value={expiring.length}
             color={expiring.length > 0 ? 'amber' : 'emerald'}
@@ -227,6 +247,21 @@ export default function OrgDashboardPage() {
             sub={period ? period.name : 'No open period'}
           />
         </div>
+
+        {intel?.placement_summary && intel.placement_summary.active > 0 && (
+          <div className="rounded-2xl border border-edge bg-surface/50 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-ink-1">Placement billing control</p>
+              <p className="text-xs text-ink-2 mt-0.5">
+                {intel.placement_summary.ready_to_bill}/{intel.placement_summary.active} placements can be invoiced.
+                {' '}{intel.placement_summary.ready_to_pay}/{intel.placement_summary.active} contractors are ready for payment.
+              </p>
+            </div>
+            <Link href="/org/placements" className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+              Review placements <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
 
         {/* ── Payroll period alert banner ─────────────────────── */}
         {period && missing.length > 0 && (
