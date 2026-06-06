@@ -203,6 +203,7 @@ export async function GET() {
     const marginPct = expectedBill > 0 ? Math.round((expectedMargin / expectedBill) * 100) : null
     const todayDate = new Date()
     const blockers: string[] = []
+    const riskFlags: string[] = []
 
     if (!ts || ts.status === 'draft') blockers.push('Contractor has not submitted time')
     if (ts && !ts.client_signed_at) blockers.push('Client manager has not signed the timesheet')
@@ -211,6 +212,18 @@ export async function GET() {
     if (!p.bill_rate || !p.pay_rate) blockers.push('Bill rate or pay rate is missing')
     if (p.end_date && new Date(p.end_date) < todayDate) blockers.push('Placement has ended')
     if (billRate > 0 && payRate > billRate) blockers.push('Pay rate is higher than bill rate')
+
+    if (!p.end_date) riskFlags.push('Open-ended placement')
+    if (p.end_date) {
+      const daysLeft = Math.ceil((new Date(p.end_date).getTime() - todayDate.getTime()) / 86_400_000)
+      if (daysLeft >= 0 && daysLeft <= 30) riskFlags.push('Placement ends within 30 days')
+    }
+    if (p.rate_type === 'monthly') riskFlags.push('Monthly pay pattern')
+    if (marginPct != null && marginPct < 15) riskFlags.push('Low margin')
+    if (!p.client_manager_email) riskFlags.push('No client approver recorded')
+    if ((p.compliance_requirements ?? []).length > 0 && complianceScore < 5) {
+      riskFlags.push('Client/site documents still need evidence')
+    }
 
     return {
       placement: p,
@@ -229,6 +242,8 @@ export async function GET() {
       ready_to_bill: blockers.length === 0 && expectedBill > 0,
       ready_to_pay: !!ts && (ts.status === 'approved' || !!ts.org_approved_at) && complianceScore === 5 && !!p.pay_rate,
       blockers,
+      risk_flags: riskFlags,
+      risk_score: Math.min(100, riskFlags.length * 20 + blockers.length * 10),
     }
   })
 

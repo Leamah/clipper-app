@@ -136,6 +136,12 @@ export async function PATCH(request: Request) {
     'rate_type', 'status', 'compliance_requirements', 'notes',
   ]
   const safe = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)))
+  for (const field of ['start_date', 'end_date']) {
+    if (field in safe && !safe[field]) safe[field] = null
+  }
+  for (const field of ['bill_rate', 'pay_rate']) {
+    if (field in safe) safe[field] = safe[field] === '' || safe[field] == null ? null : Number(safe[field])
+  }
 
   const { data, error } = await ctx.admin
     .from('klippa_org_placements')

@@ -388,6 +388,8 @@ export interface OrgPlacementReadiness {
   ready_to_bill:    boolean
   ready_to_pay:     boolean
   blockers:         string[]
+  risk_flags:       string[]
+  risk_score:       number
 }
 
 // Aggregated per-consultant view for the org dashboard

@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import {
   AlertCircle, ArrowLeft, BriefcaseBusiness, Building2, Check,
   CircleDollarSign, Loader2, Plus, ShieldCheck, TriangleAlert, Users,
+  Archive, Download, Pencil,
 } from 'lucide-react'
 import type {
   KlippaOrgClient,
@@ -35,6 +36,24 @@ function statusClass(ready: boolean, blocked: boolean) {
   if (ready) return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
   if (blocked) return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
   return 'bg-edge text-ink-2'
+}
+
+function csvCell(value: string | number | null | undefined) {
+  const text = String(value ?? '')
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+function downloadCsv(filename: string, rows: (string | number | null | undefined)[][]) {
+  const csv = rows.map(row => row.map(csvCell).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 function SummaryCard({ label, value, sub, icon: Icon, alert = false }: {
@@ -73,6 +92,8 @@ export default function PlacementsPage() {
   const [summary, setSummary] = useState<OrgIntelligence['placement_summary'] | null>(null)
   const [showClientForm, setShowClientForm] = useState(false)
   const [showPlacementForm, setShowPlacementForm] = useState(false)
+  const [editingPlacementId, setEditingPlacementId] = useState<string | null>(null)
+  const [archivingId, setArchivingId] = useState<string | null>(null)
 
   const [clientForm, setClientForm] = useState({
     name: '',
@@ -97,6 +118,15 @@ export default function PlacementsPage() {
     compliance_requirements: '',
     notes: '',
   })
+
+  const resetPlacementForm = () => {
+    setPlacementForm({
+      client_id: '', user_id: '', role_title: '', site: '', client_manager_name: '',
+      client_manager_email: '', start_date: '', end_date: '', bill_rate: '',
+      pay_rate: '', rate_type: 'hourly', compliance_requirements: '', notes: '',
+    })
+    setEditingPlacementId(null)
+  }
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -164,17 +194,17 @@ export default function PlacementsPage() {
         .filter(Boolean)
 
       const res = await fetch('/api/org/placements', {
-        method: 'POST',
+        method: editingPlacementId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...placementForm, compliance_requirements: requirements }),
+        body: JSON.stringify({
+          ...(editingPlacementId ? { id: editingPlacementId } : {}),
+          ...placementForm,
+          compliance_requirements: requirements,
+        }),
       })
       const json = await res.json()
       if (!res.ok || json.error) throw new Error(json.error ?? 'Could not save placement')
-      setPlacementForm({
-        client_id: '', user_id: '', role_title: '', site: '', client_manager_name: '',
-        client_manager_email: '', start_date: '', end_date: '', bill_rate: '',
-        pay_rate: '', rate_type: 'hourly', compliance_requirements: '', notes: '',
-      })
+      resetPlacementForm()
       setShowPlacementForm(false)
       await load()
     } catch (e: unknown) {
@@ -182,6 +212,82 @@ export default function PlacementsPage() {
     } finally {
       setSavingPlacement(false)
     }
+  }
+
+  const editPlacement = (row: OrgPlacementReadiness) => {
+    setPlacementForm({
+      client_id: row.placement.client_id,
+      user_id: row.placement.user_id,
+      role_title: row.placement.role_title,
+      site: row.placement.site ?? '',
+      client_manager_name: row.placement.client_manager_name ?? '',
+      client_manager_email: row.placement.client_manager_email ?? '',
+      start_date: row.placement.start_date ?? '',
+      end_date: row.placement.end_date ?? '',
+      bill_rate: row.placement.bill_rate?.toString() ?? '',
+      pay_rate: row.placement.pay_rate?.toString() ?? '',
+      rate_type: row.placement.rate_type,
+      compliance_requirements: (row.placement.compliance_requirements ?? []).join(', '),
+      notes: row.placement.notes ?? '',
+    })
+    setEditingPlacementId(row.placement.id)
+    setShowPlacementForm(true)
+  }
+
+  const archivePlacement = async (id: string) => {
+    if (!confirm('Archive this placement? It will no longer appear in readiness totals.')) return
+    setArchivingId(id); setError(null)
+    try {
+      const res = await fetch('/api/org/placements', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'ended' }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) throw new Error(json.error ?? 'Could not archive placement')
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not archive placement')
+    } finally {
+      setArchivingId(null)
+    }
+  }
+
+  const exportBillingPack = () => {
+    downloadCsv('klippa-client-billing-pack.csv', [
+      ['Client', 'Contractor', 'Role', 'Site', 'Hours', 'Bill rate', 'Expected bill', 'Client signed', 'Ready to bill', 'Blockers'],
+      ...placements.map(row => [
+        row.client?.name ?? '',
+        row.consultant.full_name ?? row.consultant.email,
+        row.placement.role_title,
+        row.placement.site ?? '',
+        row.timesheet?.hours ?? 0,
+        row.placement.bill_rate ?? 0,
+        row.expected_bill,
+        row.timesheet?.client_signed_at ? 'Yes' : 'No',
+        row.ready_to_bill ? 'Yes' : 'No',
+        row.blockers.join('; '),
+      ]),
+    ])
+  }
+
+  const exportPaymentPack = () => {
+    downloadCsv('klippa-contractor-payment-pack.csv', [
+      ['Contractor', 'Client', 'Role', 'Hours', 'Pay rate', 'Expected pay', 'Approved', 'Compliance score', 'Ready to pay', 'Blockers', 'Risk flags'],
+      ...placements.map(row => [
+        row.consultant.full_name ?? row.consultant.email,
+        row.client?.name ?? '',
+        row.placement.role_title,
+        row.timesheet?.hours ?? 0,
+        row.placement.pay_rate ?? 0,
+        row.expected_pay,
+        row.timesheet?.org_approved_at || row.timesheet?.status === 'approved' ? 'Yes' : 'No',
+        `${row.compliance_score}/5`,
+        row.ready_to_pay ? 'Yes' : 'No',
+        row.blockers.join('; '),
+        row.risk_flags.join('; '),
+      ]),
+    ])
   }
 
   if (loading) {
@@ -214,12 +320,20 @@ export default function PlacementsPage() {
             </div>
           </div>
           {isOwner && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button onClick={exportBillingPack}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-edge hover:bg-raised transition-colors">
+                <Download className="w-3.5 h-3.5" /> Billing pack
+              </button>
+              <button onClick={exportPaymentPack}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-edge hover:bg-raised transition-colors">
+                <Download className="w-3.5 h-3.5" /> Payment pack
+              </button>
               <button onClick={() => setShowClientForm(v => !v)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-edge hover:bg-raised transition-colors">
                 <Building2 className="w-3.5 h-3.5" /> Client
               </button>
-              <button onClick={() => setShowPlacementForm(v => !v)}
+              <button onClick={() => { resetPlacementForm(); setShowPlacementForm(v => !v) }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
                 <Plus className="w-3.5 h-3.5" /> Placement
               </button>
@@ -261,7 +375,7 @@ export default function PlacementsPage() {
 
         {showPlacementForm && isOwner && (
           <form onSubmit={createPlacement} className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 space-y-4">
-            <p className="text-sm font-semibold">Add contractor placement</p>
+            <p className="text-sm font-semibold">{editingPlacementId ? 'Edit contractor placement' : 'Add contractor placement'}</p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <select required value={placementForm.client_id} onChange={e => setPlacementForm(f => ({ ...f, client_id: e.target.value }))} className="input">
                 <option value="">Select client</option>
@@ -288,9 +402,9 @@ export default function PlacementsPage() {
               <input value={placementForm.compliance_requirements} onChange={e => setPlacementForm(f => ({ ...f, compliance_requirements: e.target.value }))} placeholder="Docs needed, comma separated" className="input" />
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setShowPlacementForm(false)} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">Cancel</button>
+              <button type="button" onClick={() => { resetPlacementForm(); setShowPlacementForm(false) }} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">Cancel</button>
               <button disabled={savingPlacement || clients.length === 0 || consultants.length === 0} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors">
-                {savingPlacement ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Save placement
+                {savingPlacement ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} {editingPlacementId ? 'Update placement' : 'Save placement'}
               </button>
             </div>
           </form>
@@ -309,10 +423,10 @@ export default function PlacementsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[920px]">
+              <table className="w-full text-sm min-w-[1080px]">
                 <thead>
                   <tr className="border-b border-edge/50 bg-surface/40">
-                    {['Client / contractor', 'Placement', 'Readiness', 'Bill', 'Pay', 'Margin', 'Blockers'].map(h => (
+                    {['Client / contractor', 'Placement', 'Readiness', 'Bill', 'Pay', 'Margin', 'Blockers', 'Risk', ''].map(h => (
                       <th key={h} className="text-left px-5 py-3 text-xs font-medium text-ink-2">{h}</th>
                     ))}
                   </tr>
@@ -353,6 +467,40 @@ export default function PlacementsPage() {
                               <span key={b} className="px-2 py-0.5 rounded-full text-[11px] bg-amber-500/15 text-amber-700 dark:text-amber-300">{b}</span>
                             ))}
                             {row.blockers.length > 3 && <span className="text-[11px] text-ink-3">+{row.blockers.length - 3}</span>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {row.risk_flags.length === 0 ? (
+                          <span className="text-xs text-ink-3">Low</span>
+                        ) : (
+                          <div className="space-y-1">
+                            <span className={`w-fit px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                              row.risk_score >= 60
+                                ? 'bg-red-500/15 text-red-500'
+                                : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                            }`}>
+                              Risk {row.risk_score}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 max-w-xs">
+                              {row.risk_flags.slice(0, 2).map(flag => (
+                                <span key={flag} className="px-2 py-0.5 rounded-full text-[11px] bg-edge text-ink-2">{flag}</span>
+                              ))}
+                              {row.risk_flags.length > 2 && <span className="text-[11px] text-ink-3">+{row.risk_flags.length - 2}</span>}
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {isOwner && (
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => editPlacement(row)} className="p-1.5 rounded-lg text-ink-3 hover:text-ink-1 hover:bg-raised transition-colors" title="Edit placement">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => archivePlacement(row.placement.id)} disabled={archivingId === row.placement.id}
+                              className="p-1.5 rounded-lg text-ink-3 hover:text-red-400 hover:bg-raised disabled:opacity-50 transition-colors" title="Archive placement">
+                              {archivingId === row.placement.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Archive className="w-3.5 h-3.5" />}
+                            </button>
                           </div>
                         )}
                       </td>
