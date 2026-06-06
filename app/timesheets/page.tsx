@@ -641,6 +641,13 @@ export default function TimesheetsPage() {
       .single()
 
     if (existing) {
+      if (!existing.org_placement_id && activeClient.org_placement_id) {
+        await supabase
+          .from('klippa_timesheets')
+          .update({ org_placement_id: activeClient.org_placement_id })
+          .eq('id', existing.id)
+        existing.org_placement_id = activeClient.org_placement_id
+      }
       setTimesheet(existing as KlippaTimesheet)
       const { data: ents } = await supabase
         .from('klippa_timesheet_entries')
@@ -655,6 +662,7 @@ export default function TimesheetsPage() {
         .insert({
           user_id:         profile.id,
           client_id:       activeClient.id,
+          org_placement_id: activeClient.org_placement_id ?? null,
           month:           monthStr,
           consultant_name: profile.full_name,
           position:        activeClient.position,

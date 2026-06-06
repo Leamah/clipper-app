@@ -177,12 +177,66 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // Confirm the timesheet belongs to this consultant
   const { data: ts } = await admin
     .from('klippa_timesheets')
-    .select('id, user_id, status')
+    .select('id, user_id, status, client_id, org_placement_id, hourly_rate')
     .eq('id', timesheet_id)
     .single()
 
   if (!ts || ts.user_id !== consultantId)
     return NextResponse.json({ error: 'Timesheet not found for this consultant' }, { status: 404 })
+
+  if (action === 'approve') {
+    let placementId = ts.org_placement_id
+    if (!placementId && ts.client_id) {
+      const { data: clientRow } = await admin
+        .from('klippa_clients')
+        .select('org_placement_id')
+        .eq('id', ts.client_id)
+        .maybeSingle()
+      placementId = clientRow?.org_placement_id ?? null
+    }
+
+    if (placementId) {
+      const [placementRes, complianceRes] = await Promise.all([
+        admin.from('klippa_org_placements')
+          .select('*')
+          .eq('id', placementId)
+          .eq('organisation_id', orgId)
+          .maybeSingle(),
+        admin.from('klippa_consultant_compliance')
+          .select('*')
+          .eq('organisation_id', orgId)
+          .eq('user_id', consultantId)
+          .maybeSingle(),
+      ])
+
+      const placement = placementRes.data
+      if (!placement || placement.status !== 'active')
+        return NextResponse.json({ error: 'This timesheet is not linked to an active placement' }, { status: 400 })
+
+      const comp = complianceRes.data
+      const complianceScore = comp ? [
+        comp.tax_profile_complete,
+        comp.banking_verified,
+        comp.id_verified,
+        comp.popia_consent,
+        !!comp.signed_agreement_at,
+      ].filter(Boolean).length : 0
+
+      const blockers: string[] = []
+      const billRate = Number(placement.bill_rate ?? 0)
+      const payRate = Number(placement.pay_rate ?? 0)
+      if (!billRate || !payRate) blockers.push('Placement bill rate or pay rate is missing')
+      if (payRate > billRate) blockers.push('Pay rate is higher than bill rate')
+      if (placement.end_date && new Date(placement.end_date) < new Date()) blockers.push('Placement has ended')
+      if (complianceScore < 5) blockers.push('Contractor compliance is incomplete')
+      if (ts.hourly_rate != null && payRate > 0 && Number(ts.hourly_rate) !== payRate) {
+        blockers.push('Timesheet rate does not match the placement pay rate')
+      }
+
+      if (blockers.length > 0)
+        return NextResponse.json({ error: blockers.join('. ') }, { status: 400 })
+    }
+  }
 
   const now = new Date().toISOString()
   const updates = action === 'approve'

@@ -51,7 +51,7 @@ export async function PATCH(request: Request) {
   const { user_id, ...updates } = await request.json()
   if (!user_id) return NextResponse.json({ error: 'user_id required' }, { status: 400 })
 
-  const allowed = ['tax_profile_complete','banking_verified','id_verified','popia_consent','signed_agreement_at','notes']
+  const allowed = ['tax_profile_complete','banking_verified','id_verified','popia_consent','signed_agreement_at','notes','evidence']
   const safe    = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)))
 
   // Handle signed_agreement_at toggle — if setting to true, use now(); if false, set null
@@ -68,6 +68,8 @@ export async function PATCH(request: Request) {
       organisation_id: profile.organisation_id,
       user_id,
       ...safe,
+      verified_by: user.id,
+      verified_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'organisation_id,user_id' })
     .select().single()

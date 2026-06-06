@@ -235,6 +235,8 @@ export interface KlippaClient {
   hourly_rate: number | null
   position:    string | null   // user's role at this client
   is_active:   boolean
+  organisation_id?: string | null
+  org_placement_id?: string | null
   created_at:  string
 }
 
@@ -242,6 +244,7 @@ export interface KlippaTimesheet {
   id:                    string
   user_id:               string
   client_id:             string | null
+  org_placement_id?:     string | null
   month:                 string       // ISO date: first day of month 'YYYY-MM-01'
   consultant_name:       string | null
   position:              string | null
@@ -337,6 +340,9 @@ export interface KlippaConsultantCompliance {
   popia_consent:        boolean
   signed_agreement_at:  string | null
   notes:                string | null
+  evidence?:             Record<string, unknown>
+  verified_by?:          string | null
+  verified_at?:          string | null
   created_at:           string
   updated_at:           string
 }

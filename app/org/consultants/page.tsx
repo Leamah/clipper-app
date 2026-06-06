@@ -81,6 +81,9 @@ function CompliancePanel({ consultant, onUpdate }: {
       {c?.signed_agreement_at && (
         <p className="text-xs text-ink-3">Agreement signed {formatDate(c.signed_agreement_at)}</p>
       )}
+      {c?.verified_at && (
+        <p className="text-xs text-ink-3">Last verified {formatDate(c.verified_at)}</p>
+      )}
     </div>
   )
 }

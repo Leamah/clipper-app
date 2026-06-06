@@ -71,13 +71,14 @@ export async function GET() {
   const currentPeriod = periodsRes.data?.[0] ?? null
 
   // ── Timesheets for current period month ─────────────────────
-  let timesheetMap: Record<string, { id: string; status: string; month: string; client_signed_at: string | null; org_approved_at: string | null }> = {}
+  let timesheetMap: Record<string, { id: string; status: string; month: string; client_id: string | null; org_placement_id: string | null; client_signed_at: string | null; org_approved_at: string | null }> = {}
+  let timesheetByPlacement: Record<string, { id: string; status: string; month: string; client_id: string | null; org_placement_id: string | null; client_signed_at: string | null; org_approved_at: string | null }> = {}
   let timesheetHours: Record<string, number> = {}
   if (members.length > 0) {
     const memberIds = members.map(m => m.id)
 
     let tsQuery = admin.from('klippa_timesheets')
-      .select('id, user_id, status, month, client_signed_at, org_approved_at')
+      .select('id, user_id, client_id, org_placement_id, status, month, client_signed_at, org_approved_at')
       .in('user_id', memberIds)
       .order('month', { ascending: false })
 
@@ -89,12 +90,40 @@ export async function GET() {
     }
 
     const { data: timesheets } = await tsQuery
+    const clientIds = Array.from(new Set((timesheets ?? []).map(ts => ts.client_id).filter(Boolean)))
+    let placementByClient: Record<string, string> = {}
+    if (clientIds.length > 0) {
+      const { data: clientLinks } = await admin
+        .from('klippa_clients')
+        .select('id, org_placement_id')
+        .in('id', clientIds)
+      placementByClient = Object.fromEntries(
+        (clientLinks ?? [])
+          .filter(c => c.org_placement_id)
+          .map(c => [c.id, c.org_placement_id]),
+      )
+    }
+
     for (const ts of timesheets ?? []) {
+      const placementId = ts.org_placement_id ?? (ts.client_id ? placementByClient[ts.client_id] : null)
       if (!timesheetMap[ts.user_id]) {
         timesheetMap[ts.user_id] = {
           id: ts.id,
           status: ts.status,
           month: ts.month,
+          client_id: ts.client_id,
+          org_placement_id: placementId,
+          client_signed_at: ts.client_signed_at,
+          org_approved_at: ts.org_approved_at,
+        }
+      }
+      if (placementId && !timesheetByPlacement[placementId]) {
+        timesheetByPlacement[placementId] = {
+          id: ts.id,
+          status: ts.status,
+          month: ts.month,
+          client_id: ts.client_id,
+          org_placement_id: placementId,
           client_signed_at: ts.client_signed_at,
           org_approved_at: ts.org_approved_at,
         }
@@ -185,7 +214,7 @@ export async function GET() {
 
   const placementReadiness = placements.map(p => {
     const member = memberMap[p.user_id]
-    const ts = timesheetMap[p.user_id] ?? null
+    const ts = timesheetByPlacement[p.id] ?? timesheetMap[p.user_id] ?? null
     const comp = complianceMap[p.user_id] ?? null
     const complianceScore = comp ? [
       comp.tax_profile_complete,

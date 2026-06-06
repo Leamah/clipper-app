@@ -51,6 +51,42 @@ async function verifyPlacementInputs(
   return null
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function syncContractorClient(admin: any, orgId: string, placement: any) {
+  const { data: client } = await admin
+    .from('klippa_org_clients')
+    .select('name, contact_person, default_site')
+    .eq('id', placement.client_id)
+    .eq('organisation_id', orgId)
+    .maybeSingle()
+
+  if (!client) return
+
+  const payload = {
+    user_id: placement.user_id,
+    name: client.name,
+    contact: placement.client_manager_name ?? client.contact_person ?? null,
+    hourly_rate: placement.pay_rate ?? null,
+    position: placement.role_title ?? null,
+    is_active: placement.status === 'active',
+    organisation_id: orgId,
+    org_placement_id: placement.id,
+  }
+
+  const { data: existing } = await admin
+    .from('klippa_clients')
+    .select('id')
+    .eq('user_id', placement.user_id)
+    .eq('org_placement_id', placement.id)
+    .maybeSingle()
+
+  if (existing?.id) {
+    await admin.from('klippa_clients').update(payload).eq('id', existing.id)
+  } else {
+    await admin.from('klippa_clients').insert(payload)
+  }
+}
+
 export async function GET() {
   const ctx = await getContext()
   if (ctx.error) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
@@ -104,6 +140,7 @@ export async function POST(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await syncContractorClient(ctx.admin, ctx.orgId, data)
   return NextResponse.json({ placement: data })
 }
 
@@ -152,5 +189,6 @@ export async function PATCH(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await syncContractorClient(ctx.admin, ctx.orgId, data)
   return NextResponse.json({ placement: data })
 }
