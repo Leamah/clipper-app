@@ -109,7 +109,7 @@ export async function POST(request: Request) {
   const {
     client_id, user_id, role_title, site, client_manager_name, client_manager_email,
     start_date, end_date, bill_rate, pay_rate, rate_type = 'hourly',
-    compliance_requirements = [], notes,
+    compliance_requirements = [], requirement_status = {}, risk_answers = {}, notes,
   } = body
 
   if (!client_id || !user_id || !role_title?.trim())
@@ -134,6 +134,8 @@ export async function POST(request: Request) {
       pay_rate: pay_rate === '' || pay_rate == null ? null : Number(pay_rate),
       rate_type,
       compliance_requirements: Array.isArray(compliance_requirements) ? compliance_requirements : [],
+      requirement_status: typeof requirement_status === 'object' && requirement_status !== null ? requirement_status : {},
+      risk_answers: typeof risk_answers === 'object' && risk_answers !== null ? risk_answers : {},
       notes: notes?.trim() || null,
     })
     .select()
@@ -170,7 +172,7 @@ export async function PATCH(request: Request) {
   const allowed = [
     'client_id', 'user_id', 'role_title', 'site', 'client_manager_name',
     'client_manager_email', 'start_date', 'end_date', 'bill_rate', 'pay_rate',
-    'rate_type', 'status', 'compliance_requirements', 'notes',
+    'rate_type', 'status', 'compliance_requirements', 'requirement_status', 'risk_answers', 'notes',
   ]
   const safe = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)))
   for (const field of ['start_date', 'end_date']) {

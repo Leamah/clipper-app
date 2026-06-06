@@ -376,6 +376,8 @@ export interface KlippaOrgPlacement {
   rate_type:               RateType
   status:                  PlacementStatus
   compliance_requirements: string[]
+  requirement_status?:     Record<string, boolean>
+  risk_answers?:           Record<string, boolean>
   notes:                   string | null
   created_at:              string
   updated_at:              string

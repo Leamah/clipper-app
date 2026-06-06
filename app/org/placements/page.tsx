@@ -19,6 +19,14 @@ import type {
   RateType,
 } from '@/lib/types'
 
+const RISK_QUESTIONS = [
+  { key: 'fixed_hours', label: 'Works fixed hours' },
+  { key: 'client_equipment', label: 'Uses client/company equipment' },
+  { key: 'daily_supervision', label: 'Daily client supervision' },
+  { key: 'only_client', label: 'This is their only known client' },
+  { key: 'cannot_subcontract', label: 'Cannot subcontract the work' },
+] as const
+
 function money(n: number | null | undefined) {
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
@@ -94,6 +102,7 @@ export default function PlacementsPage() {
   const [showPlacementForm, setShowPlacementForm] = useState(false)
   const [editingPlacementId, setEditingPlacementId] = useState<string | null>(null)
   const [archivingId, setArchivingId] = useState<string | null>(null)
+  const [requirementBusy, setRequirementBusy] = useState<string | null>(null)
 
   const [clientForm, setClientForm] = useState({
     name: '',
@@ -116,6 +125,7 @@ export default function PlacementsPage() {
     pay_rate: '',
     rate_type: 'hourly' as RateType,
     compliance_requirements: '',
+    risk_answers: {} as Record<string, boolean>,
     notes: '',
   })
 
@@ -123,7 +133,7 @@ export default function PlacementsPage() {
     setPlacementForm({
       client_id: '', user_id: '', role_title: '', site: '', client_manager_name: '',
       client_manager_email: '', start_date: '', end_date: '', bill_rate: '',
-      pay_rate: '', rate_type: 'hourly', compliance_requirements: '', notes: '',
+      pay_rate: '', rate_type: 'hourly', compliance_requirements: '', risk_answers: {}, notes: '',
     })
     setEditingPlacementId(null)
   }
@@ -200,6 +210,7 @@ export default function PlacementsPage() {
           ...(editingPlacementId ? { id: editingPlacementId } : {}),
           ...placementForm,
           compliance_requirements: requirements,
+          risk_answers: placementForm.risk_answers,
         }),
       })
       const json = await res.json()
@@ -228,6 +239,7 @@ export default function PlacementsPage() {
       pay_rate: row.placement.pay_rate?.toString() ?? '',
       rate_type: row.placement.rate_type,
       compliance_requirements: (row.placement.compliance_requirements ?? []).join(', '),
+      risk_answers: row.placement.risk_answers ?? {},
       notes: row.placement.notes ?? '',
     })
     setEditingPlacementId(row.placement.id)
@@ -253,14 +265,36 @@ export default function PlacementsPage() {
     }
   }
 
+  const toggleRequirement = async (row: OrgPlacementReadiness, requirement: string) => {
+    const key = `${row.placement.id}:${requirement}`
+    setRequirementBusy(key); setError(null)
+    try {
+      const current = row.placement.requirement_status ?? {}
+      const next = { ...current, [requirement]: !current[requirement] }
+      const res = await fetch('/api/org/placements', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.placement.id, requirement_status: next }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) throw new Error(json.error ?? 'Could not update requirement')
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not update requirement')
+    } finally {
+      setRequirementBusy(null)
+    }
+  }
+
   const exportBillingPack = () => {
     downloadCsv('klippa-placement-billing-readiness-pack.csv', [
-      ['Client', 'Contractor', 'Role', 'Site', 'Hours', 'Bill rate', 'Expected bill', 'Client signed', 'Ready to invoice', 'Blockers'],
+      ['Client', 'Contractor', 'Role', 'Site', 'Requirements complete', 'Hours', 'Bill rate', 'Expected bill', 'Client signed', 'Ready to invoice', 'Blockers'],
       ...placements.map(row => [
         row.client?.name ?? '',
         row.consultant.full_name ?? row.consultant.email,
         row.placement.role_title,
         row.placement.site ?? '',
+        `${(row.placement.compliance_requirements ?? []).filter(req => row.placement.requirement_status?.[req]).length}/${row.placement.compliance_requirements?.length ?? 0}`,
         row.timesheet?.hours ?? 0,
         row.placement.bill_rate ?? 0,
         row.expected_bill,
@@ -273,11 +307,12 @@ export default function PlacementsPage() {
 
   const exportPaymentPack = () => {
     downloadCsv('klippa-contractor-payment-readiness-pack.csv', [
-      ['Contractor', 'Client', 'Role', 'Hours', 'Pay rate', 'Expected pay', 'Placement house approved', 'Compliance score', 'Ready to pay', 'Blockers', 'Risk flags'],
+      ['Contractor', 'Client', 'Role', 'Requirements complete', 'Hours', 'Pay rate', 'Expected pay', 'Placement house approved', 'Compliance score', 'Ready to pay', 'Blockers', 'Risk flags'],
       ...placements.map(row => [
         row.consultant.full_name ?? row.consultant.email,
         row.client?.name ?? '',
         row.placement.role_title,
+        `${(row.placement.compliance_requirements ?? []).filter(req => row.placement.requirement_status?.[req]).length}/${row.placement.compliance_requirements?.length ?? 0}`,
         row.timesheet?.hours ?? 0,
         row.placement.pay_rate ?? 0,
         row.expected_pay,
@@ -401,6 +436,24 @@ export default function PlacementsPage() {
               </select>
               <input value={placementForm.compliance_requirements} onChange={e => setPlacementForm(f => ({ ...f, compliance_requirements: e.target.value }))} placeholder="Docs needed, comma separated" className="input" />
             </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-ink-2 uppercase tracking-wider">Contractor risk flags</p>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {RISK_QUESTIONS.map(q => (
+                  <label key={q.key} className="flex items-center gap-2 rounded-xl border border-edge bg-surface/70 px-3 py-2 text-xs text-ink-2">
+                    <input
+                      type="checkbox"
+                      checked={!!placementForm.risk_answers[q.key]}
+                      onChange={e => setPlacementForm(f => ({
+                        ...f,
+                        risk_answers: { ...f.risk_answers, [q.key]: e.target.checked },
+                      }))}
+                    />
+                    {q.label}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => { resetPlacementForm(); setShowPlacementForm(false) }} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">Cancel</button>
               <button disabled={savingPlacement || clients.length === 0 || consultants.length === 0} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors">
@@ -426,7 +479,7 @@ export default function PlacementsPage() {
               <table className="w-full text-sm min-w-[1080px]">
                 <thead>
                   <tr className="border-b border-edge/50 bg-surface/40">
-                    {['Client / contractor', 'Placement', 'Readiness', 'Bill', 'Pay', 'Margin', 'Blockers', 'Risk', ''].map(h => (
+                    {['Client / contractor', 'Placement', 'Requirements', 'Readiness', 'Bill', 'Pay', 'Margin', 'Blockers', 'Risk', ''].map(h => (
                       <th key={h} className="text-left px-5 py-3 text-xs font-medium text-ink-2">{h}</th>
                     ))}
                   </tr>
@@ -441,6 +494,32 @@ export default function PlacementsPage() {
                       <td className="px-5 py-3.5">
                         <p className="text-xs font-medium text-ink-1">{row.placement.role_title}</p>
                         <p className="text-xs text-ink-3">{formatDate(row.placement.start_date)} - {formatDate(row.placement.end_date)}</p>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {row.placement.compliance_requirements?.length ? (
+                          <div className="flex flex-wrap gap-1.5 max-w-xs">
+                            {row.placement.compliance_requirements.map(req => {
+                              const done = !!row.placement.requirement_status?.[req]
+                              const busy = requirementBusy === `${row.placement.id}:${req}`
+                              return (
+                                <button
+                                  key={req}
+                                  onClick={() => toggleRequirement(row, req)}
+                                  disabled={!isOwner || busy}
+                                  className={`px-2 py-0.5 rounded-full text-[11px] border transition-colors ${
+                                    done
+                                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25'
+                                  }`}
+                                >
+                                  {busy ? 'Saving...' : `${done ? 'Done' : 'Need'}: ${req}`}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-3">None set</span>
+                        )}
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex flex-col gap-1">

@@ -47,9 +47,10 @@ function formatRand(n: number | null) {
 
 function CompliancePanel({ consultant, onUpdate }: {
   consultant: OrgConsultantRow
-  onUpdate:   (userId: string, field: string, value: boolean) => Promise<void>
+  onUpdate:   (userId: string, field: string, value: boolean, evidence?: string) => Promise<void>
 }) {
   const c = consultant.compliance
+  const evidence = (c?.evidence ?? {}) as Record<string, string>
   const items: { key: string; label: string; icon: React.ElementType; value: boolean }[] = [
     { key: 'tax_profile_complete', label: 'Tax profile complete', icon: FileText,    value: c?.tax_profile_complete ?? false },
     { key: 'id_verified',          label: 'ID verified',          icon: IdCard,      value: c?.id_verified          ?? false },
@@ -61,21 +62,35 @@ function CompliancePanel({ consultant, onUpdate }: {
   return (
     <div className="px-5 py-4 bg-raised/30 border-t border-edge/40 space-y-3">
       <p className="text-xs font-semibold text-ink-2 uppercase tracking-wider">Compliance checklist</p>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
         {items.map(item => (
-          <button
+          <div
             key={item.key}
-            onClick={() => onUpdate(consultant.id, item.key, !item.value)}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${
+            className={`p-3 rounded-xl border text-xs transition-all ${
               item.value
                 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                : 'border-edge bg-surface text-ink-2 hover:border-ink-2'
+                : 'border-edge bg-surface text-ink-2'
             }`}
           >
-            <item.icon className="w-4 h-4" />
-            <span className="text-center leading-tight">{item.label}</span>
-            {item.value ? <Check className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full border border-current opacity-40" />}
-          </button>
+            <button
+              onClick={() => onUpdate(consultant.id, item.key, !item.value, evidence[item.key])}
+              className="w-full flex flex-col items-center gap-1.5 font-medium"
+            >
+              <item.icon className="w-4 h-4" />
+              <span className="text-center leading-tight">{item.label}</span>
+              {item.value ? <Check className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full border border-current opacity-40" />}
+            </button>
+            <input
+              type="text"
+              defaultValue={evidence[item.key] ?? ''}
+              onBlur={e => {
+                const value = e.target.value.trim()
+                if (value !== (evidence[item.key] ?? '')) onUpdate(consultant.id, item.key, item.value, value)
+              }}
+              placeholder="Proof ref"
+              className="input mt-2 text-[11px] py-1.5"
+            />
+          </div>
         ))}
       </div>
       {c?.signed_agreement_at && (
@@ -322,10 +337,15 @@ export default function ConsultantsPage() {
     router.refresh()
   }
 
-  const updateCompliance = async (userId: string, field: string, value: boolean) => {
+  const updateCompliance = async (userId: string, field: string, value: boolean, evidenceRef?: string) => {
+    const current = consultants.find(c => c.id === userId)?.compliance?.evidence ?? {}
     const res  = await fetch('/api/org/compliance', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, [field]: value }),
+      body: JSON.stringify({
+        user_id: userId,
+        [field]: value,
+        evidence: evidenceRef !== undefined ? { ...current, [field]: evidenceRef } : current,
+      }),
     })
     const json = await res.json()
     if (!json.error) {

@@ -233,6 +233,10 @@ export async function GET() {
     const todayDate = new Date()
     const blockers: string[] = []
     const riskFlags: string[] = []
+    const requirementStatus = (p.requirement_status ?? {}) as Record<string, boolean>
+    const incompleteRequirements = (p.compliance_requirements ?? [])
+      .filter((req: string) => !requirementStatus[req])
+    const riskAnswers = (p.risk_answers ?? {}) as Record<string, boolean>
 
     if (!ts || ts.status === 'draft') blockers.push('Contractor has not submitted time')
     if (ts && !ts.client_signed_at) blockers.push('Client manager has not signed the timesheet')
@@ -241,6 +245,7 @@ export async function GET() {
     if (!p.bill_rate || !p.pay_rate) blockers.push('Bill rate or pay rate is missing')
     if (p.end_date && new Date(p.end_date) < todayDate) blockers.push('Placement has ended')
     if (billRate > 0 && payRate > billRate) blockers.push('Pay rate is higher than bill rate')
+    if (incompleteRequirements.length > 0) blockers.push('Client/site requirements are incomplete')
 
     if (!p.end_date) riskFlags.push('Open-ended placement')
     if (p.end_date) {
@@ -250,9 +255,14 @@ export async function GET() {
     if (p.rate_type === 'monthly') riskFlags.push('Monthly pay pattern')
     if (marginPct != null && marginPct < 15) riskFlags.push('Low margin')
     if (!p.client_manager_email) riskFlags.push('No client approver recorded')
-    if ((p.compliance_requirements ?? []).length > 0 && complianceScore < 5) {
+    if (incompleteRequirements.length > 0) {
       riskFlags.push('Client/site documents still need evidence')
     }
+    if (riskAnswers.fixed_hours) riskFlags.push('Works fixed hours')
+    if (riskAnswers.client_equipment) riskFlags.push('Uses client/company equipment')
+    if (riskAnswers.daily_supervision) riskFlags.push('Daily client supervision')
+    if (riskAnswers.only_client) riskFlags.push('Only known client')
+    if (riskAnswers.cannot_subcontract) riskFlags.push('Cannot subcontract work')
 
     return {
       placement: p,
