@@ -194,7 +194,7 @@ export default function FilingPage() {
   const returnSections = buildReturnSections({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm })
   const missingItems = buildMissingItems(returnSections, profile, incomeRecords, payeInput)
   const filingChecklist = buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents })
-  const investmentWorksheets = buildInvestmentWorksheets(incomeRecords, documents)
+  const investmentWorksheets = buildInvestmentWorksheets(incomeRecords, documents, taxReturn.tax_year, ageFromDob(profile.date_of_birth ?? null))
 
   return (
     <div className="app-shell bg-base text-ink-1">
@@ -608,6 +608,7 @@ interface MissingItem {
 
 interface InvestmentWorksheet {
   id: string
+  kind: 'interest' | 'dividends' | 'capital_gain' | 'foreign_income'
   title: string
   section: string
   amount: number
@@ -615,6 +616,9 @@ interface InvestmentWorksheet {
   known: string[]
   needed: string[]
   evidence: string[]
+  annualExclusion?: number
+  inclusionRate?: number
+  interestExemption?: number
 }
 
 type FilingChecklistItem = ReturnType<typeof buildFilingPackChecklist>[number]
@@ -887,11 +891,21 @@ function buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, docu
   ].filter((item) => item.required)
 }
 
-function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], documents: KlippaDocument[]): InvestmentWorksheet[] {
+function cgtAnnualExclusion(taxYear: number) {
+  return taxYear >= 2027 ? 50_000 : 40_000
+}
+
+function interestExemptionForAge(age: number) {
+  return age >= 65 ? 34_500 : 23_800
+}
+
+function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], documents: KlippaDocument[], taxYear: number, age: number): InvestmentWorksheet[] {
   const investmentTypes: KlippaIncomeRecord['income_type'][] = ['interest', 'dividends', 'capital_gains', 'crypto', 'foreign_income']
-  return investmentTypes.flatMap((type) => {
+  const worksheets: InvestmentWorksheet[] = []
+
+  investmentTypes.forEach((type) => {
     const records = incomeRecords.filter((r) => r.income_type === type)
-    if (records.length === 0) return []
+    if (records.length === 0) return
     const amount = records.reduce((s, r) => s + r.amount, 0)
     const evidence = docNames(documents, type === 'foreign_income'
       ? ['invoice', 'bank_statement', 'other']
@@ -908,40 +922,52 @@ function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], document
     }
 
     if (type === 'interest') {
-      return [{
+      worksheets.push({
         ...base,
+        kind: 'interest' as const,
         title: 'Bank interest worksheet',
         section: 'Investment income',
         treatment: 'Klippa includes this in the estimate and applies the annual interest exemption.',
         needed: ['Bank or investment tax certificate', 'Confirm the amount is interest, not transfers between your own accounts'],
-      }]
+        interestExemption: interestExemptionForAge(age),
+      })
+      return
     }
     if (type === 'dividends') {
-      return [{
+      worksheets.push({
         ...base,
+        kind: 'dividends' as const,
         title: 'Share or ETF payout worksheet',
         section: 'Investment income',
         treatment: 'Shown separately because dividends and ETF distributions can have special tax treatment.',
         needed: ['Investment tax certificate', 'Breakdown between dividends, interest, REIT income, and foreign amounts if the platform provides it'],
-      }]
+      })
+      return
     }
     if (type === 'capital_gains' || type === 'crypto') {
-      return [{
+      worksheets.push({
         ...base,
+        kind: 'capital_gain' as const,
         title: type === 'crypto' ? 'Crypto gain worksheet' : 'Sold investment or asset worksheet',
         section: 'Capital gains',
         treatment: 'Shown separately. Klippa needs purchase cost and sale details before it can calculate a reliable taxable gain.',
         needed: ['Date bought', 'Amount paid', 'Date sold', 'Amount received', 'Platform fees or agent fees', 'Statement proving the transaction'],
-      }]
+        annualExclusion: cgtAnnualExclusion(taxYear),
+        inclusionRate: 0.4,
+      })
+      return
     }
-    return [{
+    worksheets.push({
       ...base,
+      kind: 'foreign_income' as const,
       title: 'Money from outside South Africa worksheet',
       section: 'Foreign income',
       treatment: 'Shown separately because exchange rates and possible foreign tax credits can affect SARS treatment.',
       needed: ['Foreign payer name', 'Payment date', 'Original currency amount', 'Rand amount received', 'Exchange rate used', 'Any foreign tax certificate'],
-    }]
+    })
   })
+
+  return worksheets
 }
 
 function buildSarsCompanionSteps(sections: ReturnSection[], missingItems: MissingItem[], taxResult: ReturnType<typeof calculateTax>) {
@@ -991,6 +1017,12 @@ function buildSarsCompanionSteps(sections: ReturnSection[], missingItems: Missin
 }
 
 function InvestmentWorksheetPanel({ worksheets }: { worksheets: InvestmentWorksheet[] }) {
+  const [inputs, setInputs] = useState<Record<string, Record<string, number | string>>>({})
+  const getValue = (id: string, key: string, fallback: number | string = '') => inputs[id]?.[key] ?? fallback
+  const setValue = (id: string, key: string, value: number | string) => {
+    setInputs((prev) => ({ ...prev, [id]: { ...(prev[id] ?? {}), [key]: value } }))
+  }
+
   return (
     <div className="rounded-2xl border border-edge overflow-hidden">
       <div className="px-4 py-3 bg-surface/60 border-b border-edge">
@@ -1016,8 +1048,124 @@ function InvestmentWorksheetPanel({ worksheets }: { worksheets: InvestmentWorksh
               {w.needed.map((item) => <p key={item} className="text-xs text-amber-300/80 mt-1">{item}</p>)}
             </div>
           </div>
+          {w.kind === 'interest' && (
+            <InvestmentResult
+              title="Interest estimate"
+              lines={[
+                ['Interest captured', formatRand(w.amount)],
+                ['Likely annual exemption', formatRand(w.interestExemption ?? 0)],
+                ['Likely taxable interest', formatRand(Math.max(0, w.amount - (w.interestExemption ?? 0)))],
+              ]}
+              note="Use the bank certificate as the final source. Transfers between your own accounts are not interest."
+            />
+          )}
+          {w.kind === 'dividends' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <MiniNumber label="Local dividends (R)" value={getValue(w.id, 'local', w.amount)} onChange={(v) => setValue(w.id, 'local', v)} />
+              <MiniNumber label="Foreign payouts (R)" value={getValue(w.id, 'foreign', 0)} onChange={(v) => setValue(w.id, 'foreign', v)} />
+              <MiniNumber label="Tax withheld (R)" value={getValue(w.id, 'withheld', 0)} onChange={(v) => setValue(w.id, 'withheld', v)} />
+              <div className="sm:col-span-3">
+                <InvestmentResult
+                  title="Dividend handling"
+                  lines={[
+                    ['Local dividends captured', formatRand(Number(getValue(w.id, 'local', w.amount)) || 0)],
+                    ['Foreign payouts captured', formatRand(Number(getValue(w.id, 'foreign', 0)) || 0)],
+                    ['Tax withheld shown on certificate', formatRand(Number(getValue(w.id, 'withheld', 0)) || 0)],
+                  ]}
+                  note="Local dividends are usually not normal taxable income, but ETF distributions can include interest, REIT, or foreign amounts. Use the certificate breakdown."
+                />
+              </div>
+            </div>
+          )}
+          {w.kind === 'capital_gain' && (() => {
+            const proceeds = Number(getValue(w.id, 'proceeds', w.amount)) || 0
+            const baseCost = Number(getValue(w.id, 'baseCost', 0)) || 0
+            const fees = Number(getValue(w.id, 'fees', 0)) || 0
+            const gain = proceeds - baseCost - fees
+            const afterExclusion = Math.max(0, gain - (w.annualExclusion ?? 0))
+            const taxable = afterExclusion * (w.inclusionRate ?? 0.4)
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <MiniNumber label="Sale amount (R)" value={getValue(w.id, 'proceeds', w.amount)} onChange={(v) => setValue(w.id, 'proceeds', v)} />
+                  <MiniNumber label="Amount paid (R)" value={getValue(w.id, 'baseCost', 0)} onChange={(v) => setValue(w.id, 'baseCost', v)} />
+                  <MiniNumber label="Fees (R)" value={getValue(w.id, 'fees', 0)} onChange={(v) => setValue(w.id, 'fees', v)} />
+                </div>
+                <InvestmentResult
+                  title="Capital gain estimate"
+                  lines={[
+                    ['Gain before annual exclusion', formatRand(gain)],
+                    ['Annual exclusion used by Klippa', formatRand(w.annualExclusion ?? 0)],
+                    ['Amount included in taxable income at 40%', formatRand(taxable)],
+                  ]}
+                  note="This is an estimate for ordinary individual CGT. Property, primary residence, trading stock, losses, and prior assessed losses can change the result."
+                />
+              </div>
+            )
+          })()}
+          {w.kind === 'foreign_income' && (() => {
+            const foreignAmount = Number(getValue(w.id, 'foreignAmount', 0)) || 0
+            const rate = Number(getValue(w.id, 'rate', 0)) || 0
+            const randValue = foreignAmount > 0 && rate > 0 ? foreignAmount * rate : w.amount
+            const foreignTax = Number(getValue(w.id, 'foreignTax', 0)) || 0
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <MiniNumber label="Foreign amount" value={getValue(w.id, 'foreignAmount', 0)} onChange={(v) => setValue(w.id, 'foreignAmount', v)} />
+                  <MiniNumber label="Exchange rate" value={getValue(w.id, 'rate', 0)} onChange={(v) => setValue(w.id, 'rate', v)} step="0.0001" />
+                  <MiniNumber label="Foreign tax paid (R)" value={getValue(w.id, 'foreignTax', 0)} onChange={(v) => setValue(w.id, 'foreignTax', v)} />
+                </div>
+                <InvestmentResult
+                  title="Foreign income estimate"
+                  lines={[
+                    ['Rand amount to check against bank proof', formatRand(randValue)],
+                    ['Foreign tax paid to disclose/check', formatRand(foreignTax)],
+                  ]}
+                  note="Use actual bank conversion records or the SARS-accepted exchange rate approach for the return. Foreign tax credits need supporting proof."
+                />
+              </div>
+            )
+          })()}
         </div>
       ))}
+    </div>
+  )
+}
+
+function MiniNumber({ label, value, onChange, step = '0.01' }: {
+  label: string
+  value: number | string
+  onChange: (value: number) => void
+  step?: string
+}) {
+  return (
+    <label className="space-y-1">
+      <span className="text-xs text-ink-2">{label}</span>
+      <input
+        type="number"
+        min="0"
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="input w-full text-sm"
+      />
+    </label>
+  )
+}
+
+function InvestmentResult({ title, lines, note }: { title: string; lines: [string, string][]; note: string }) {
+  return (
+    <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+      <p className="text-xs font-semibold text-emerald-300">{title}</p>
+      <div className="mt-2 space-y-1">
+        {lines.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-3 text-xs">
+            <span className="text-ink-2">{label}</span>
+            <span className="font-semibold text-ink-1 tabular-nums">{value}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-ink-3 mt-2 leading-relaxed">{note}</p>
     </div>
   )
 }

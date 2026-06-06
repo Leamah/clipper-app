@@ -439,7 +439,7 @@ export default function OnboardingPage() {
                   <div className="space-y-3">
                     {([
                       { value: 'freelance' as EmploymentType, label: 'Freelance / Consulting',   sub: 'I work for myself and invoice clients' },
-                      { value: 'employee'  as EmploymentType, label: 'Employee',                  sub: 'I receive a salary and IRP5 certificate' },
+                      { value: 'employee'  as EmploymentType, label: 'Employee',                  sub: 'I receive a salary and employer tax certificate (IRP5)' },
                       { value: 'mixed'     as EmploymentType, label: 'Both (salary + freelance)', sub: 'I have a salary and also freelance income' },
                     ]).map((opt) => (
                       <button key={opt.value}
