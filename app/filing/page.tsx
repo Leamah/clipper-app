@@ -10,7 +10,7 @@ import {
   Check, ChevronRight, ChevronLeft, Loader2,
   FileText, ClipboardList, ExternalLink, Download, AlertCircle, Lock
 } from 'lucide-react'
-import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
+import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip, KlippaDocument, DocumentType } from '@/lib/types'
 import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { isProfessionalOrAbove } from '@/lib/tier'
@@ -28,6 +28,7 @@ interface FilingData {
   incomeRecords: KlippaIncomeRecord[]
   expenseRecords: KlippaExpenseRecord[]
   mileageTrips:  KlippaMileageTrip[]
+  documents:     KlippaDocument[]
 }
 
 export default function FilingPage() {
@@ -54,10 +55,11 @@ export default function FilingPage() {
 
     if (!profile || !taxReturn) { setLoading(false); return }
 
-    const [incRes, expRes, mileRes] = await Promise.all([
+    const [incRes, expRes, mileRes, docRes] = await Promise.all([
       supabase.from('klippa_income_records').select('*').eq('tax_return_id', taxReturn.id).order('received_date', { ascending: false }),
       supabase.from('klippa_expense_records').select('*').eq('tax_return_id', taxReturn.id).eq('classification_status', 'confirmed'),
       supabase.from('klippa_mileage_trips').select('*').eq('tax_return_id', taxReturn.id),
+      supabase.from('klippa_documents').select('*').eq('user_id', user.id).or(`tax_return_id.eq.${taxReturn.id},tax_year.eq.${taxReturn.tax_year}`),
     ])
 
     setData({
@@ -66,6 +68,7 @@ export default function FilingPage() {
       incomeRecords:  (incRes.data ?? []) as KlippaIncomeRecord[],
       expenseRecords: (expRes.data ?? []) as KlippaExpenseRecord[],
       mileageTrips:   (mileRes.data ?? []) as KlippaMileageTrip[],
+      documents:      (docRes.data ?? []) as KlippaDocument[],
     })
     setSarsRef(taxReturn.sars_reference ?? '')
     setSubmitted(taxReturn.status === 'submitted')
@@ -160,7 +163,7 @@ export default function FilingPage() {
     )
   }
 
-  const { profile, taxReturn, incomeRecords, expenseRecords, mileageTrips } = data
+  const { profile, taxReturn, incomeRecords, expenseRecords, mileageTrips, documents } = data
   const totalIncome       = incomeRecords.reduce((s, r) => s + r.amount, 0)
   const taxEstimateIncome = incomeRecords.filter(r => isIncludedInTaxEstimate(r.income_type)).reduce((s, r) => s + r.amount, 0)
   const totalDeductible   = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
@@ -306,6 +309,7 @@ export default function FilingPage() {
             payeInput={payeInput}
             businessKm={businessKm}
             taxYear={taxReturn.tax_year}
+            documents={documents}
             onPrev={() => setStep(0)}
             onNext={() => setStep(2)}
           />
@@ -443,19 +447,15 @@ export default function FilingPage() {
             </div>
 
             <div className="rounded-2xl border border-edge divide-y divide-edge overflow-hidden">
-              {[
-                { label: 'Proof of all freelance income',          required: true },
-                { label: 'Bank statements for the full tax year',   required: true },
-                { label: 'All receipts for claimed expenses',       required: expenseRecords.length > 0 },
-                { label: 'RA certificate from your fund provider',  required: profile.has_ra },
-                { label: 'Home office floor plan or photos',        required: profile.works_from_home },
-                { label: 'Vehicle logbook (business km)',           required: profile.has_vehicle },
-                { label: 'Employer tax certificate if you had a job', required: profile.employment_type !== 'freelance' },
-                { label: 'Bank or investment tax certificate if savings/investments paid you', required: profile.has_interest_savings || profile.has_tfsa || incomeRecords.some(r => ['interest', 'dividends', 'capital_gains', 'crypto'].includes(r.income_type)) },
-              ].filter((i) => i.required).map((item, i) => (
+              {buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents }).map((item, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-4 h-4 rounded-full border-2 border-emerald-500/50 flex-shrink-0" />
-                  <p className="text-sm text-ink-1">{item.label}</p>
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${item.ready ? 'border-emerald-500 bg-emerald-500' : 'border-amber-500/70'}`}>
+                    {item.ready && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <p className="text-sm text-ink-1">{item.label}</p>
+                    <p className="text-xs text-ink-3 mt-0.5">{item.ready ? 'Document found or generated in Klippa' : item.hint}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -569,17 +569,58 @@ function StepNav({ onPrev, onNext }: { onPrev: () => void; onNext: () => void })
   )
 }
 
-function SarsPreview({ profile, incomeRecords, expenseRecords, taxResult, payeInput, businessKm, taxYear, onPrev, onNext }: {
+type ReturnSectionStatus = 'Ready' | 'Needs document' | 'Needs info' | 'Check carefully' | 'Not applicable'
+
+interface ReturnSection {
+  id: string
+  section: string
+  applies: boolean
+  plain: string
+  answer: string
+  examples: string
+  code: string
+  sars: string
+  value: string
+  status: ReturnSectionStatus
+  hint: string
+  documentTypes: DocumentType[]
+  documentNames: string[]
+}
+
+interface MissingItem {
+  title: string
+  detail: string
+  href?: string
+}
+
+function hasDoc(documents: KlippaDocument[], types: DocumentType[]) {
+  return documents.some((d) => types.includes(d.document_type))
+}
+
+function docNames(documents: KlippaDocument[], types: DocumentType[]) {
+  return documents
+    .filter((d) => types.includes(d.document_type))
+    .map((d) => d.original_filename || `${d.document_type} document`)
+}
+
+function sectionStatus(applies: boolean, hasEvidence: boolean, needsInfo = false, review = false): ReturnSectionStatus {
+  if (!applies) return 'Not applicable'
+  if (needsInfo) return 'Needs info'
+  if (!hasEvidence) return 'Needs document'
+  if (review) return 'Check carefully'
+  return 'Ready'
+}
+
+function buildReturnSections(input: {
   profile: KlippaProfile
   incomeRecords: KlippaIncomeRecord[]
   expenseRecords: KlippaExpenseRecord[]
+  documents: KlippaDocument[]
   taxResult: ReturnType<typeof calculateTax>
   payeInput: number
   businessKm: number
-  taxYear: number
-  onPrev: () => void
-  onNext: () => void
-}) {
+}): ReturnSection[] {
+  const { profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm } = input
   const groupedIncome = incomeRecords.reduce((groups, r) => {
     const existing = groups.find((g) => g.type === r.income_type)
     if (existing) existing.amount += r.amount
@@ -588,118 +629,276 @@ function SarsPreview({ profile, incomeRecords, expenseRecords, taxResult, payeIn
   }, [] as { type: KlippaIncomeRecord['income_type']; amount: number }[])
 
   const confirmedExpenseTotal = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
-  const previewRows = [
-    ...groupedIncome.map(({ type, amount }) => {
-      const meta = INCOME_TYPE_META[type]
-      return {
-        section: meta.section,
-        plain:   meta.question,
-        examples: meta.examples,
-        code:    meta.sarsCode,
-        sars:    meta.sarsLabel,
-        value:   formatRand(amount),
-        status:  needsHumanReview(type) ? 'Check carefully' : 'Ready',
-        hint:    meta.documentHint,
-      }
-    }),
-    profile.has_ra && taxResult.section11fRa > 0 ? {
-      section: 'Retirement savings',
-      plain:   'You paid into your own retirement plan.',
-      examples: 'Examples: Allan Gray RA, Sygnia RA, 10X RA, Old Mutual RA.',
-      code:    SARS_DEDUCTION_CODES.section11f.code,
-      sars:    SARS_DEDUCTION_CODES.section11f.label,
-      value:   formatRand(taxResult.section11fRa),
-      status:  'Ready',
-      hint:    'Keep the retirement tax certificate from your provider.',
-    } : null,
-    profile.has_pension && taxResult.section11fRa > 0 ? {
-      section: 'Employer retirement',
-      plain:   'Your employer took retirement money off your payslip.',
-      examples: 'Examples: pension fund, provident fund, company retirement fund.',
-      code:    SARS_DEDUCTION_CODES.pension.code,
-      sars:    SARS_DEDUCTION_CODES.pension.label,
-      value:   formatRand(profile.pension_contributions ?? 0),
-      status:  'Ready',
-      hint:    'This is usually shown on your employer tax certificate.',
-    } : null,
-    profile.has_medical ? {
-      section: 'Medical aid',
-      plain:   'You paid for medical aid.',
-      examples: 'Examples: Discovery, Bonitas, Momentum, Medihelp, Bestmed.',
-      code:    SARS_DEDUCTION_CODES.medical.code,
-      sars:    SARS_DEDUCTION_CODES.medical.label,
-      value:   formatRand(taxResult.medicalAidCredits),
-      status:  'Ready',
-      hint:    'Keep the medical aid tax certificate for the tax year.',
-    } : null,
-    taxResult.homeOffice > 0 ? {
-      section: 'Working from home',
-      plain:   'You work from a dedicated space at home.',
-      examples: 'Examples: separate study, office room, work-only room.',
-      code:    SARS_DEDUCTION_CODES.home_office.code,
-      sars:    SARS_DEDUCTION_CODES.home_office.label,
-      value:   formatRand(taxResult.homeOffice),
-      status:  'Check carefully',
-      hint:    'Keep proof of home costs and how you calculated the work area percentage.',
-    } : null,
-    taxResult.travel > 0 ? {
-      section: 'Driving for work',
-      plain:   'You drove for work and kept a logbook.',
-      examples: 'Examples: client visits, site trips, business travel.',
-      code:    SARS_DEDUCTION_CODES.travel.code,
-      sars:    SARS_DEDUCTION_CODES.travel.label,
-      value:   `${formatRand(taxResult.travel)} (${businessKm.toLocaleString('en-ZA')} business km)`,
-      status:  'Ready',
-      hint:    'Keep the vehicle logbook and opening/closing odometer readings.',
-    } : null,
-    confirmedExpenseTotal > 0 ? {
-      section: 'Business expenses',
-      plain:   'You spent money to earn your income.',
-      examples: 'Examples: software, data, equipment, training, bank fees, professional fees.',
-      code:    SARS_DEDUCTION_CODES.other_biz.code,
-      sars:    SARS_DEDUCTION_CODES.other_biz.label,
-      value:   formatRand(confirmedExpenseTotal),
-      status:  'Ready',
-      hint:    'Keep receipts and proof that each expense was for work.',
-    } : null,
-    payeInput > 0 ? {
-      section: 'Tax already taken off',
-      plain:   'Your employer already paid some tax for you.',
-      examples: 'This is the tax deducted from your payslip during the year.',
-      code:    SARS_DEDUCTION_CODES.employees_tax.code,
-      sars:    SARS_DEDUCTION_CODES.employees_tax.label,
-      value:   formatRand(payeInput),
-      status:  'Ready',
-      hint:    'Check this against the employer tax certificate.',
-    } : null,
-  ].filter(Boolean) as {
-    section: string
-    plain: string
-    examples: string
-    code: string
-    sars: string
-    value: string
-    status: string
-    hint: string
-  }[]
+  const incomeDocTypes: Partial<Record<KlippaIncomeRecord['income_type'], DocumentType[]>> = {
+    salary:         ['irp5'],
+    freelance:      ['invoice', 'bank_statement'],
+    commission:     ['irp5', 'invoice'],
+    rental:         ['bank_statement', 'other'],
+    interest:       ['investment_certificate', 'bank_statement'],
+    dividends:      ['investment_certificate'],
+    capital_gains:  ['investment_certificate'],
+    crypto:         ['investment_certificate', 'other'],
+    foreign_income: ['invoice', 'bank_statement', 'other'],
+    other:          ['bank_statement', 'other'],
+  }
 
-  const missingRows = [
-    profile.has_interest_savings && !incomeRecords.some(r => r.income_type === 'interest')
-      ? 'You said a bank or savings account pays you interest, but no bank interest amount has been added yet.'
-      : null,
-    profile.has_tfsa
-      ? 'You said you have a tax-free savings account. Keep the certificate or statement, even if no tax is due on growth.'
-      : null,
-    profile.employment_type !== 'freelance' && payeInput === 0
-      ? 'You said you had employment income, but no tax already taken off has been entered yet.'
-      : null,
-  ].filter(Boolean) as string[]
+  const sections: ReturnSection[] = groupedIncome.map(({ type, amount }) => {
+    const meta = INCOME_TYPE_META[type]
+    const docs = incomeDocTypes[type] ?? ['other']
+    const hasEvidence = hasDoc(documents, docs)
+    return {
+      id: `income-${type}`,
+      section: meta.section,
+      applies: true,
+      plain: meta.question,
+      answer: 'Yes, based on income records you added.',
+      examples: meta.examples,
+      code: meta.sarsCode,
+      sars: meta.sarsLabel,
+      value: formatRand(amount),
+      status: sectionStatus(true, hasEvidence, false, needsHumanReview(type)),
+      hint: meta.documentHint,
+      documentTypes: docs,
+      documentNames: docNames(documents, docs),
+    }
+  })
+
+  const addSection = (row: ReturnSection | null) => {
+    if (row) sections.push(row)
+  }
+
+  addSection(profile.has_ra ? {
+    id: 'retirement-ra',
+    section: 'Retirement savings',
+    applies: true,
+    plain: 'Did you pay into your own retirement plan?',
+    answer: taxResult.section11fRa > 0 ? 'Yes, an amount is included.' : 'Yes, but no amount has been entered yet.',
+    examples: 'Examples: Allan Gray RA, Sygnia RA, 10X RA, Old Mutual RA.',
+    code: SARS_DEDUCTION_CODES.section11f.code,
+    sars: SARS_DEDUCTION_CODES.section11f.label,
+    value: taxResult.section11fRa > 0 ? formatRand(taxResult.section11fRa) : 'R0',
+    status: sectionStatus(true, hasDoc(documents, ['ra_certificate']), taxResult.section11fRa === 0),
+    hint: 'Upload or keep the retirement tax certificate from your provider.',
+    documentTypes: ['ra_certificate'],
+    documentNames: docNames(documents, ['ra_certificate']),
+  } : null)
+
+  addSection(profile.has_pension ? {
+    id: 'retirement-employer',
+    section: 'Employer retirement',
+    applies: true,
+    plain: 'Did your employer take retirement money off your payslip?',
+    answer: (profile.pension_contributions ?? 0) > 0 ? 'Yes, an amount is included.' : 'Yes, but no amount has been entered yet.',
+    examples: 'Examples: pension fund, provident fund, company retirement fund.',
+    code: SARS_DEDUCTION_CODES.pension.code,
+    sars: SARS_DEDUCTION_CODES.pension.label,
+    value: formatRand(profile.pension_contributions ?? 0),
+    status: sectionStatus(true, hasDoc(documents, ['irp5']), (profile.pension_contributions ?? 0) === 0),
+    hint: 'This is usually shown on your employer tax certificate.',
+    documentTypes: ['irp5'],
+    documentNames: docNames(documents, ['irp5']),
+  } : null)
+
+  addSection(profile.has_medical ? {
+    id: 'medical',
+    section: 'Medical aid',
+    applies: true,
+    plain: 'Did you pay for medical aid?',
+    answer: `Yes, ${profile.medical_aid_members || 1} member${(profile.medical_aid_members || 1) === 1 ? '' : 's'} included.`,
+    examples: 'Examples: Discovery, Bonitas, Momentum, Medihelp, Bestmed.',
+    code: SARS_DEDUCTION_CODES.medical.code,
+    sars: SARS_DEDUCTION_CODES.medical.label,
+    value: formatRand(taxResult.medicalAidCredits),
+    status: sectionStatus(true, hasDoc(documents, ['medical'])),
+    hint: 'Upload or keep the medical aid tax certificate for the tax year.',
+    documentTypes: ['medical'],
+    documentNames: docNames(documents, ['medical']),
+  } : null)
+
+  addSection(profile.works_from_home ? {
+    id: 'home-office',
+    section: 'Working from home',
+    applies: true,
+    plain: 'Did you work from a dedicated space at home?',
+    answer: taxResult.homeOffice > 0 ? 'Yes, a home office amount is included.' : 'Yes, but home costs or percentage are incomplete.',
+    examples: 'Examples: separate study, office room, work-only room.',
+    code: SARS_DEDUCTION_CODES.home_office.code,
+    sars: SARS_DEDUCTION_CODES.home_office.label,
+    value: taxResult.homeOffice > 0 ? formatRand(taxResult.homeOffice) : 'R0',
+    status: sectionStatus(true, true, taxResult.homeOffice === 0, true),
+    hint: 'Keep proof of home costs, floor area, and how you calculated the work percentage.',
+    documentTypes: ['other'],
+    documentNames: docNames(documents, ['other']),
+  } : null)
+
+  addSection(profile.has_vehicle ? {
+    id: 'travel',
+    section: 'Driving for work',
+    applies: true,
+    plain: 'Did you drive for work and keep a logbook?',
+    answer: taxResult.travel > 0 ? 'Yes, a travel amount is included.' : 'Yes, but vehicle value or kilometres are incomplete.',
+    examples: 'Examples: client visits, site trips, business travel.',
+    code: SARS_DEDUCTION_CODES.travel.code,
+    sars: SARS_DEDUCTION_CODES.travel.label,
+    value: taxResult.travel > 0 ? `${formatRand(taxResult.travel)} (${businessKm.toLocaleString('en-ZA')} business km)` : 'R0',
+    status: sectionStatus(true, true, taxResult.travel === 0),
+    hint: 'Keep the vehicle logbook and opening/closing odometer readings.',
+    documentTypes: ['other'],
+    documentNames: docNames(documents, ['other']),
+  } : null)
+
+  addSection(confirmedExpenseTotal > 0 ? {
+    id: 'business-expenses',
+    section: 'Business expenses',
+    applies: true,
+    plain: 'Did you spend money to earn your income?',
+    answer: 'Yes, confirmed expenses are included.',
+    examples: 'Examples: software, data, equipment, training, bank fees, professional fees.',
+    code: SARS_DEDUCTION_CODES.other_biz.code,
+    sars: SARS_DEDUCTION_CODES.other_biz.label,
+    value: formatRand(confirmedExpenseTotal),
+    status: sectionStatus(true, hasDoc(documents, ['receipt', 'invoice', 'bank_statement'])),
+    hint: 'Keep receipts and proof that each expense was for work.',
+    documentTypes: ['receipt', 'invoice', 'bank_statement'],
+    documentNames: docNames(documents, ['receipt', 'invoice', 'bank_statement']),
+  } : null)
+
+  addSection(payeInput > 0 || profile.employment_type !== 'freelance' ? {
+    id: 'paye',
+    section: 'Tax already taken off',
+    applies: true,
+    plain: 'Did an employer already pay some tax for you?',
+    answer: payeInput > 0 ? 'Yes, PAYE is included.' : 'Maybe, but no amount has been entered yet.',
+    examples: 'This is the tax deducted from your payslip during the year.',
+    code: SARS_DEDUCTION_CODES.employees_tax.code,
+    sars: SARS_DEDUCTION_CODES.employees_tax.label,
+    value: payeInput > 0 ? formatRand(payeInput) : 'R0',
+    status: sectionStatus(true, hasDoc(documents, ['irp5']), payeInput === 0),
+    hint: 'Check this against the employer tax certificate.',
+    documentTypes: ['irp5'],
+    documentNames: docNames(documents, ['irp5']),
+  } : null)
+
+  addSection(profile.has_tfsa ? {
+    id: 'tfsa',
+    section: 'Tax-free savings',
+    applies: true,
+    plain: 'Do you have a tax-free savings account?',
+    answer: 'Yes, keep the statement even if no tax is due on growth.',
+    examples: 'Examples: EasyEquities TFSA, bank TFSA, Satrix TFSA.',
+    code: 'N/A',
+    sars: 'Tax-free investment disclosure / supporting record',
+    value: 'No tax amount',
+    status: sectionStatus(true, hasDoc(documents, ['investment_certificate', 'bank_statement'])),
+    hint: 'Upload or keep the TFSA certificate or annual statement.',
+    documentTypes: ['investment_certificate', 'bank_statement'],
+    documentNames: docNames(documents, ['investment_certificate', 'bank_statement']),
+  } : null)
+
+  return sections
+}
+
+function buildMissingItems(sections: ReturnSection[], profile: KlippaProfile, incomeRecords: KlippaIncomeRecord[], payeInput: number): MissingItem[] {
+  const missing = sections
+    .filter((s) => ['Needs document', 'Needs info', 'Check carefully'].includes(s.status))
+    .map((s) => ({
+      title: `${s.section}: ${s.status}`,
+      detail: s.status === 'Needs document' ? s.hint : `${s.answer} ${s.hint}`,
+      href: s.id.startsWith('income-') ? '/income' : s.id === 'paye' || s.id.includes('retirement') || s.id === 'medical' || s.id === 'tfsa' ? '/settings' : undefined,
+    }))
+
+  if (profile.has_interest_savings && !incomeRecords.some(r => r.income_type === 'interest')) {
+    missing.push({
+      title: 'Bank interest amount missing',
+      detail: 'You said a bank or savings account pays you interest, but no bank interest amount has been added yet.',
+      href: '/income?add=1',
+    })
+  }
+  if (profile.employment_type !== 'freelance' && payeInput === 0) {
+    missing.push({
+      title: 'Tax already taken off is R0',
+      detail: 'If your employer took tax off your payslip, add the full-year amount so the refund or amount due is realistic.',
+      href: '/income',
+    })
+  }
+
+  return missing
+}
+
+function buildLifeEvents(sections: ReturnSection[], profile: KlippaProfile) {
+  const active = new Set(sections.filter((s) => s.applies).map((s) => s.id))
+  return [
+    { question: 'Did you have a job where tax was taken off your payslip?', answer: profile.employment_type !== 'freelance' || active.has('income-salary') || active.has('paye') },
+    { question: 'Did clients pay you for work you did yourself?', answer: active.has('income-freelance') || profile.employment_type !== 'employee' },
+    { question: 'Did a bank or savings account pay you interest?', answer: profile.has_interest_savings || active.has('income-interest') },
+    { question: 'Did shares, ETFs, crypto, property, or investments pay out or get sold?', answer: ['income-dividends', 'income-capital_gains', 'income-crypto', 'tfsa'].some((id) => active.has(id)) },
+    { question: 'Did someone pay you rent for a property, room, cottage, or Airbnb?', answer: active.has('income-rental') },
+    { question: 'Did someone outside South Africa pay you?', answer: active.has('income-foreign_income') },
+    { question: 'Did you pay medical aid?', answer: profile.has_medical },
+    { question: 'Did you pay into retirement savings?', answer: profile.has_ra || profile.has_pension },
+    { question: 'Did you drive for work?', answer: profile.has_vehicle },
+    { question: 'Did you work from a dedicated space at home?', answer: profile.works_from_home },
+  ]
+}
+
+function buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents }: {
+  profile: KlippaProfile
+  incomeRecords: KlippaIncomeRecord[]
+  expenseRecords: KlippaExpenseRecord[]
+  documents: KlippaDocument[]
+}) {
+  const investmentIncome = incomeRecords.some(r => ['interest', 'dividends', 'capital_gains', 'crypto'].includes(r.income_type))
+  return [
+    { label: 'Proof of money clients paid you', required: incomeRecords.some(r => ['freelance', 'commission', 'other'].includes(r.income_type)), ready: hasDoc(documents, ['invoice', 'bank_statement']), hint: 'Upload invoices, bank statements, or proof of payment.' },
+    { label: 'Bank statements for the full tax year', required: incomeRecords.length > 0 || expenseRecords.length > 0, ready: hasDoc(documents, ['bank_statement']), hint: 'Upload a bank statement if income or expenses came from your bank account.' },
+    { label: 'Receipts for claimed expenses', required: expenseRecords.length > 0, ready: hasDoc(documents, ['receipt', 'invoice']), hint: 'Upload receipts or invoices for expenses you want to claim.' },
+    { label: 'Retirement certificate', required: profile.has_ra, ready: hasDoc(documents, ['ra_certificate']), hint: 'Upload the certificate from your retirement provider.' },
+    { label: 'Medical aid certificate', required: profile.has_medical, ready: hasDoc(documents, ['medical']), hint: 'Upload the annual certificate from your medical aid.' },
+    { label: 'Employer tax certificate', required: profile.employment_type !== 'freelance' || incomeRecords.some(r => r.income_type === 'salary'), ready: hasDoc(documents, ['irp5']), hint: 'Upload the employer tax certificate if you had a job.' },
+    { label: 'Bank or investment tax certificate', required: profile.has_interest_savings || profile.has_tfsa || investmentIncome, ready: hasDoc(documents, ['investment_certificate', 'bank_statement']), hint: 'Upload the certificate or statement from your bank or investment app.' },
+    { label: 'Vehicle logbook', required: profile.has_vehicle, ready: false, hint: 'Export or keep the Klippa vehicle logbook for SARS.' },
+    { label: 'Home office proof', required: profile.works_from_home, ready: false, hint: 'Keep photos, floor area calculation, and home cost proof.' },
+  ].filter((item) => item.required)
+}
+
+function SarsPreview({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm, taxYear, onPrev, onNext }: {
+  profile: KlippaProfile
+  incomeRecords: KlippaIncomeRecord[]
+  expenseRecords: KlippaExpenseRecord[]
+  documents: KlippaDocument[]
+  taxResult: ReturnType<typeof calculateTax>
+  payeInput: number
+  businessKm: number
+  taxYear: number
+  onPrev: () => void
+  onNext: () => void
+}) {
+  const previewRows = buildReturnSections({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm })
+  const missingRows = buildMissingItems(previewRows, profile, incomeRecords, payeInput)
+  const lifeEvents = buildLifeEvents(previewRows, profile)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-ink-1">Your SARS return preview</h1>
         <p className="text-sm text-ink-2 mt-1">This is a plain-English mirror of the sections Klippa expects on your ITR12 for tax year {taxYear}.</p>
+      </div>
+
+      <div className="rounded-2xl border border-edge bg-surface/30 p-4 space-y-3">
+        <div>
+          <p className="text-xs font-semibold text-ink-1 uppercase tracking-wider">What happened this year</p>
+          <p className="text-xs text-ink-3 mt-0.5">Klippa answers these from your profile and records, then maps them to SARS sections.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {lifeEvents.map((event) => (
+            <div key={event.question} className="flex items-start gap-2 rounded-lg bg-raised/50 px-3 py-2">
+              <span className={`mt-0.5 inline-flex w-4 h-4 rounded-full items-center justify-center flex-shrink-0 ${event.answer ? 'bg-emerald-500 text-white' : 'border border-edge text-ink-3'}`}>
+                {event.answer ? <Check className="w-3 h-3" /> : null}
+              </span>
+              <p className="text-xs text-ink-2 leading-snug">{event.question}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-edge overflow-hidden">
@@ -716,9 +915,10 @@ function SarsPreview({ profile, incomeRecords, expenseRecords, taxResult, payeIn
               <div>
                 <p className="text-sm font-semibold text-ink-1">{row.section}</p>
                 <p className="text-sm text-ink-2 mt-0.5">{row.plain}</p>
+                <p className="text-xs text-emerald-500/80 mt-1">{row.answer}</p>
               </div>
               <div className="flex items-center gap-2 sm:justify-end">
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${row.status === 'Ready' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${row.status === 'Ready' ? 'bg-emerald-500/15 text-emerald-400' : row.status === 'Needs document' || row.status === 'Needs info' ? 'bg-red-500/15 text-red-400' : 'bg-amber-500/15 text-amber-400'}`}>
                   {row.status}
                 </span>
                 <span className="font-bold text-ink-1 tabular-nums">{row.value}</span>
@@ -729,7 +929,11 @@ function SarsPreview({ profile, incomeRecords, expenseRecords, taxResult, payeIn
               <span className="font-mono text-ink-2">SARS {row.code}</span>
               <span className="text-ink-3">{row.sars}</span>
             </div>
-            <p className="text-xs text-ink-2">{row.hint}</p>
+            <div className="rounded-lg bg-raised/40 px-3 py-2">
+              <p className="text-xs text-ink-2">
+                Evidence: {row.documentNames.length > 0 ? row.documentNames.join(', ') : row.hint}
+              </p>
+            </div>
           </div>
         ))}
       </div>
@@ -738,7 +942,13 @@ function SarsPreview({ profile, incomeRecords, expenseRecords, taxResult, payeIn
         <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 space-y-2">
           <p className="text-sm text-amber-200 font-medium">Things to check before filing</p>
           {missingRows.map((row, i) => (
-            <p key={i} className="text-xs text-amber-300/80 leading-relaxed">{row}</p>
+            <div key={i} className="flex items-start justify-between gap-3 rounded-lg bg-amber-500/5 px-3 py-2">
+              <div>
+                <p className="text-xs font-semibold text-amber-200">{row.title}</p>
+                <p className="text-xs text-amber-300/80 leading-relaxed mt-0.5">{row.detail}</p>
+              </div>
+              {row.href && <Link href={row.href} className="text-xs text-amber-200 underline whitespace-nowrap">Fix</Link>}
+            </div>
           ))}
         </div>
       )}
