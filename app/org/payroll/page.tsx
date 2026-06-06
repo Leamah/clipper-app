@@ -99,7 +99,7 @@ export default function PayrollPage() {
   }
 
   const deletePeriod = async (id: string) => {
-    if (!confirm('Delete this payroll period?')) return
+    if (!confirm('Delete this payment period?')) return
     setDeletingId(id)
     await fetch('/api/org/payroll', {
       method:  'DELETE',
@@ -136,7 +136,7 @@ export default function PayrollPage() {
             </Link>
             <div className="flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-emerald-500" />
-              <h1 className="text-lg font-semibold">Payroll periods</h1>
+              <h1 className="text-lg font-semibold">Payment periods</h1>
             </div>
           </div>
           {isOwner && (
@@ -158,7 +158,7 @@ export default function PayrollPage() {
         {/* ── Create form ─────────────────────────────────────── */}
         {showForm && (
           <form onSubmit={handleCreate} className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 space-y-4">
-            <p className="text-sm font-semibold text-ink-1">New payroll period</p>
+            <p className="text-sm font-semibold text-ink-1">New payment period</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-ink-2">Period start</label>
@@ -173,7 +173,7 @@ export default function PayrollPage() {
                   className="input" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-ink-2">Submission deadline</label>
+                <label className="text-xs font-medium text-ink-2">Contractor submission deadline</label>
                 <input type="date" required value={form.deadline}
                   onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))}
                   className="input" />
@@ -202,8 +202,8 @@ export default function PayrollPage() {
         {periods.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-edge p-16 text-center space-y-3">
             <CalendarDays className="w-8 h-8 text-edge mx-auto" />
-            <p className="text-sm text-ink-2">No payroll periods yet</p>
-            <p className="text-xs text-ink-3">Create a period to track submission deadlines and send automated reminders.</p>
+            <p className="text-sm text-ink-2">No payment periods yet</p>
+            <p className="text-xs text-ink-3">Create a period to track placement time, client sign-off, billing readiness, and contractor payment readiness.</p>
           </div>
         ) : (
           <div className="rounded-2xl border border-edge overflow-hidden overflow-x-auto">

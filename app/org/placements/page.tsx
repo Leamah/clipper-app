@@ -254,8 +254,8 @@ export default function PlacementsPage() {
   }
 
   const exportBillingPack = () => {
-    downloadCsv('klippa-client-billing-pack.csv', [
-      ['Client', 'Contractor', 'Role', 'Site', 'Hours', 'Bill rate', 'Expected bill', 'Client signed', 'Ready to bill', 'Blockers'],
+    downloadCsv('klippa-placement-billing-readiness-pack.csv', [
+      ['Client', 'Contractor', 'Role', 'Site', 'Hours', 'Bill rate', 'Expected bill', 'Client signed', 'Ready to invoice', 'Blockers'],
       ...placements.map(row => [
         row.client?.name ?? '',
         row.consultant.full_name ?? row.consultant.email,
@@ -272,8 +272,8 @@ export default function PlacementsPage() {
   }
 
   const exportPaymentPack = () => {
-    downloadCsv('klippa-contractor-payment-pack.csv', [
-      ['Contractor', 'Client', 'Role', 'Hours', 'Pay rate', 'Expected pay', 'Approved', 'Compliance score', 'Ready to pay', 'Blockers', 'Risk flags'],
+    downloadCsv('klippa-contractor-payment-readiness-pack.csv', [
+      ['Contractor', 'Client', 'Role', 'Hours', 'Pay rate', 'Expected pay', 'Placement house approved', 'Compliance score', 'Ready to pay', 'Blockers', 'Risk flags'],
       ...placements.map(row => [
         row.consultant.full_name ?? row.consultant.email,
         row.client?.name ?? '',
@@ -315,19 +315,19 @@ export default function PlacementsPage() {
           <div className="flex items-center gap-3">
             <BriefcaseBusiness className="w-5 h-5 text-emerald-500" />
             <div>
-              <h1 className="text-lg font-semibold">Client placements</h1>
-              <p className="text-xs text-ink-2 mt-0.5">Track who is placed where, what can be billed, and what is blocking payment.</p>
+              <h1 className="text-lg font-semibold">Placement control centre</h1>
+              <p className="text-xs text-ink-2 mt-0.5">Track each contractor placement, what can be invoiced, what can be paid, and what is blocking the run.</p>
             </div>
           </div>
           {isOwner && (
             <div className="flex flex-wrap gap-2">
               <button onClick={exportBillingPack}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-edge hover:bg-raised transition-colors">
-                <Download className="w-3.5 h-3.5" /> Billing pack
+                <Download className="w-3.5 h-3.5" /> Invoice pack
               </button>
               <button onClick={exportPaymentPack}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-edge hover:bg-raised transition-colors">
-                <Download className="w-3.5 h-3.5" /> Payment pack
+                <Download className="w-3.5 h-3.5" /> Pay pack
               </button>
               <button onClick={() => setShowClientForm(v => !v)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-edge hover:bg-raised transition-colors">
@@ -349,7 +349,7 @@ export default function PlacementsPage() {
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <SummaryCard icon={BriefcaseBusiness} label="Active placements" value={summary?.active ?? 0} />
-          <SummaryCard icon={Check} label="Ready to bill" value={summary?.ready_to_bill ?? 0} sub="client invoice ready" />
+          <SummaryCard icon={Check} label="Ready to invoice" value={summary?.ready_to_bill ?? 0} sub="client billing ready" />
           <SummaryCard icon={Users} label="Ready to pay" value={summary?.ready_to_pay ?? 0} sub="contractor payment ready" />
           <SummaryCard icon={TriangleAlert} label="Blocked" value={summary?.blocked ?? 0} alert={(summary?.blocked ?? 0) > 0} sub={`${summary?.client_approval_due ?? 0} need client sign-off`} />
           <SummaryCard icon={CircleDollarSign} label="Margin" value={money(summary?.projected_margin ?? 0)} sub={summary?.margin_pct == null ? 'no billable hours yet' : `${summary.margin_pct}% projected`} />
@@ -412,8 +412,8 @@ export default function PlacementsPage() {
 
         <div className="rounded-2xl border border-edge overflow-hidden">
           <div className="px-5 py-4 border-b border-edge bg-surface/60">
-            <p className="text-sm font-semibold">Placement readiness</p>
-            <p className="text-xs text-ink-2 mt-0.5">A placement is ready when the client has signed time, Klippa has approval, compliance is complete, and rates are valid.</p>
+            <p className="text-sm font-semibold">Billing and pay readiness</p>
+            <p className="text-xs text-ink-2 mt-0.5">A placement is ready when client sign-off is recorded, your team has approved it, compliance is complete, and bill/pay rates are valid.</p>
           </div>
           {placements.length === 0 ? (
             <div className="px-5 py-14 text-center space-y-2">
@@ -445,7 +445,7 @@ export default function PlacementsPage() {
                       <td className="px-5 py-3.5">
                         <div className="flex flex-col gap-1">
                           <span className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(row.ready_to_bill, row.blockers.length > 0)}`}>
-                            {row.ready_to_bill ? 'Ready to bill' : row.blockers.length ? 'Blocked' : 'Waiting'}
+                            {row.ready_to_bill ? 'Ready to invoice' : row.blockers.length ? 'Blocked' : 'Waiting'}
                           </span>
                           <span className={`w-fit px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(row.ready_to_pay, false)}`}>
                             {row.ready_to_pay ? 'Ready to pay' : 'Pay not ready'}

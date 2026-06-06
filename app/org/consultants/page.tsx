@@ -312,7 +312,7 @@ export default function ConsultantsPage() {
   }
 
   const removeMember = async (memberId: string) => {
-    if (!confirm('Remove this consultant from your organisation?')) return
+    if (!confirm('Remove this contractor from your placement workspace?')) return
     setRemovingId(memberId)
     const res  = await fetch('/api/org/members', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId }) })
     const json = await res.json()
@@ -360,7 +360,7 @@ export default function ConsultantsPage() {
             <span className="font-semibold text-sm tracking-tight">Klippa</span>
           </Link>
           <span className="text-edge">·</span>
-          <span className="text-sm font-medium text-ink-2">{org?.name ?? 'Organisation'}</span>
+          <span className="text-sm font-medium text-ink-2">{org?.name ?? 'Contracting house'}</span>
         </div>
       </header>
 
@@ -372,7 +372,7 @@ export default function ConsultantsPage() {
           </Link>
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-500" />
-            <h1 className="text-lg font-semibold">Consultants</h1>
+            <h1 className="text-lg font-semibold">Contractors</h1>
           </div>
         </div>
 
@@ -386,8 +386,8 @@ export default function ConsultantsPage() {
         {isOwner && (
           <div className="rounded-2xl border border-edge bg-surface/40 p-6 space-y-4">
             <div>
-              <p className="text-sm font-semibold">Invite a consultant</p>
-              <p className="text-xs text-ink-2 mt-0.5">They'll receive a link to join your workspace on Klippa.</p>
+              <p className="text-sm font-semibold">Invite a contractor</p>
+              <p className="text-xs text-ink-2 mt-0.5">They'll receive a link to join your placement workspace and submit linked timesheets.</p>
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -395,7 +395,7 @@ export default function ConsultantsPage() {
                 <input type="email" value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendInvite()}
-                  placeholder="consultant@example.com"
+                  placeholder="contractor@example.com"
                   className="input pl-9 py-2.5" />
               </div>
               <button onClick={sendInvite} disabled={sending || !inviteEmail.trim()}
@@ -427,7 +427,7 @@ export default function ConsultantsPage() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className="text-xs text-ink-2">Copy and share this link with the consultant:</p>
+                <p className="text-xs text-ink-2">Copy and share this link with the contractor:</p>
                 <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono break-all">{acceptUrl}</div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => navigator.clipboard.writeText(acceptUrl)}
@@ -479,10 +479,10 @@ export default function ConsultantsPage() {
           </div>
         )}
 
-        {/* ── Active consultants ───────────────────────────────────── */}
+        {/* ── Active contractors ───────────────────────────────────── */}
         <div className="rounded-2xl border border-edge overflow-hidden">
           <div className="px-5 py-4 border-b border-edge bg-surface/60">
-            <p className="text-sm font-semibold">Active consultants
+            <p className="text-sm font-semibold">Active contractors
               <span className="ml-2 text-xs text-ink-2">({consultants.length})</span>
             </p>
           </div>
@@ -490,8 +490,8 @@ export default function ConsultantsPage() {
           {consultants.length === 0 ? (
             <div className="px-5 py-12 text-center space-y-2">
               <UserRound className="w-8 h-8 text-edge mx-auto" />
-              <p className="text-sm text-ink-2">No active consultants yet</p>
-              <p className="text-xs text-ink-3">Consultants will appear here after accepting their invite.</p>
+              <p className="text-sm text-ink-2">No active contractors yet</p>
+              <p className="text-xs text-ink-3">Contractors will appear here after accepting their invite.</p>
             </div>
           ) : (
             <div className="divide-y divide-edge/40">
@@ -599,7 +599,7 @@ export default function ConsultantsPage() {
                               placeholder="you@company.co.za" className="input text-xs" />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-xs text-ink-2">Notes (new consultant name, reason, etc.)</label>
+                            <label className="text-xs text-ink-2">Notes (new contractor name, reason, etc.)</label>
                             <input type="text" value={reassignNotes}
                               onChange={e => setReassignNotes(e.target.value)}
                               placeholder="Reassign to Jane Doe. John resigned." className="input text-xs" />

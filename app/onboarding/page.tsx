@@ -92,7 +92,7 @@ export default function OnboardingPage() {
       // Auto-enable the optional modules from the answers we already have,
       // so the user doesn't have to hunt for a separate opt-in in Settings:
       //  • Logbook/Mileage  → only if they drive for work
-      //  • Timesheets       → consultants who invoice (freelance / mixed)
+      //  • Timesheets       → independent consultants who invoice (freelance / mixed)
       //  • Provisional tax  → non-PAYE earners (freelance / mixed) file IRP6
       const drivesForWork  = state.has_vehicle ?? false
       const invoicesClients = state.employment_type === 'freelance' || state.employment_type === 'mixed'
@@ -140,7 +140,7 @@ export default function OnboardingPage() {
 
   // ── Save: B2B complete ────────────────────────────────────────────
   async function handleB2BComplete() {
-    if (!state.org_name.trim()) { setError('Please enter your organisation name'); return }
+    if (!state.org_name.trim()) { setError(state.user_type === 'practitioner' ? 'Please enter your practice name' : 'Please enter your contracting house name'); return }
     setSaving(true); setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -224,8 +224,8 @@ export default function OnboardingPage() {
                   {
                     type:  'company_owner' as UserType,
                     icon:  <Users className="w-6 h-6 text-violet-400" />,
-                    label: 'Company: manage consultants',
-                    sub:   'Onboard my team, track their timesheets, and approve work',
+                    label: 'Contracting house',
+                    sub:   'I place contractors at client companies and manage their billing, pay, and compliance',
                     badge: 'B2B',
                   },
                   {
@@ -294,25 +294,25 @@ export default function OnboardingPage() {
               <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-6">
                 <div>
                   <h2 className="text-xl font-bold">
-                    {state.user_type === 'practitioner' ? 'Set up your practice' : 'Set up your company'}
+                    {state.user_type === 'practitioner' ? 'Set up your practice' : 'Set up your contracting workspace'}
                   </h2>
                   <p className="text-sm text-ink-2 mt-1">
                     {state.user_type === 'practitioner'
                       ? 'Create your practice workspace. You can invite clients once you\'re in.'
-                      : 'Create your company workspace. You can invite consultants once you\'re in.'}
+                      : 'Create your placement workspace. You can add clients, create placements, and invite contractors once you\'re in.'}
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-ink-2">
-                    {state.user_type === 'practitioner' ? 'Practice / firm name' : 'Company name'}
+                    {state.user_type === 'practitioner' ? 'Practice / firm name' : 'Contracting house name'}
                   </label>
                   <input
                     type="text"
                     value={state.org_name}
                     onChange={(e) => setState((s) => ({ ...s, org_name: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter' && state.org_name.trim()) { setError(null); next() } }}
-                    placeholder={state.user_type === 'practitioner' ? 'e.g. Smith & Associates' : 'e.g. Klippa Consulting'}
+                    placeholder={state.user_type === 'practitioner' ? 'e.g. Smith & Associates' : 'e.g. Lesedi Contracting'}
                     className="input"
                     autoFocus
                   />
@@ -338,8 +338,8 @@ export default function OnboardingPage() {
                 <div>
                   <h2 className="text-xl font-bold">How many seats do you need?</h2>
                   <p className="text-sm text-ink-2 mt-1">
-                    One seat per {state.user_type === 'practitioner' ? 'team member' : 'consultant'} you invite to your workspace.
-                    You can change this later. You&apos;ll only pay when you {state.user_type === 'practitioner' ? 'add your first client' : 'invite your first consultant'}.
+                    One seat per {state.user_type === 'practitioner' ? 'team member' : 'contractor'} you invite to your workspace.
+                    You can change this later. You&apos;ll only pay when you {state.user_type === 'practitioner' ? 'add your first client' : 'invite your first contractor'}.
                   </p>
                 </div>
 

@@ -134,7 +134,7 @@ function OrgBillingContent() {
         <div>
           <h1 className="text-lg font-semibold">Seats & billing</h1>
           <p className="text-sm text-ink-2 mt-1">
-            {data ? data.name : 'Your organisation'} · billed annually via instant EFT
+            {data ? data.name : 'Your workspace'} · billed annually via instant EFT
           </p>
         </div>
 
@@ -150,7 +150,7 @@ function OrgBillingContent() {
                 <div className="text-xs">
                   <p className="font-semibold text-amber-300">Activate your workspace to continue</p>
                   <p className="text-ink-2 mt-0.5">
-                    Pay for your seats to {isPractice ? 'add your first client' : 'invite your first consultant'}. You can keep exploring in the meantime.
+                    Pay for your seats to {isPractice ? 'add your first client' : 'invite your first contractor'}. You can keep exploring in the meantime.
                   </p>
                 </div>
               </div>
@@ -271,7 +271,7 @@ function OrgBillingContent() {
                     <textarea
                       value={customNotes}
                       onChange={e => setCustomNotes(e.target.value)}
-                      placeholder="e.g. 12 consultants on 6-month rolling contracts, need custom billing cycle…"
+                      placeholder="e.g. 12 contractors on 6-month placements, need custom billing cycle…"
                       rows={3}
                       className="input w-full resize-none"
                     />

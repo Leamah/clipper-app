@@ -38,13 +38,13 @@ export async function POST(request: Request) {
   const orgId = profile.organisation_id
 
   // ── Soft payment gate ─────────────────────────────────────
-  // Inviting the first consultant is the first value action — require the org
+  // Inviting the first contractor is the first value action — require the workspace
   // to have paid for its seats before any invite goes out. The owner can still
   // create the workspace and look around unpaid; only this action is gated.
   const ent = await getOrgEntitlement(admin, orgId)
   if (!ent.entitled) {
     return NextResponse.json(
-      { error: 'Activate your workspace to invite consultants.', gate: 'payment', checkoutUrl: '/org/billing?gate=1' },
+      { error: 'Activate your workspace to invite contractors.', gate: 'payment', checkoutUrl: '/org/billing?gate=1' },
       { status: 402 },
     )
   }
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   // ── Seat-cap enforcement ──────────────────────────────────
-  // Each invited consultant (org_role='member') + pending invite consumes one
+  // Each invited contractor (org_role='member') + pending invite consumes one
   // paid seat. The owner/admin is not counted. Buying more seats lifts the cap.
   const limit = ent.seat_count > 0 ? ent.seat_count : 1
 
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   const used = (memberCount ?? 0) + (pendingCount ?? 0)
   if (used >= limit) {
     return NextResponse.json(
-      { error: `You've used all ${limit} paid seat${limit === 1 ? '' : 's'}. Add more seats to invite another consultant.`, gate: 'seats', checkoutUrl: '/org/billing' },
+      { error: `You've used all ${limit} paid seat${limit === 1 ? '' : 's'}. Add more seats to invite another contractor.`, gate: 'seats', checkoutUrl: '/org/billing' },
       { status: 402 },
     )
   }
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 
   const siteUrl    = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
   const acceptUrl  = `${siteUrl}/invite/${token}`
-  const orgName    = orgRow?.name        ?? 'an organisation'
+  const orgName    = orgRow?.name        ?? 'a contracting workspace'
   const brandColor = orgRow?.brand_color ?? '#10b981'
 
   // Send invite email via Brevo
@@ -240,7 +240,7 @@ function buildInviteEmail({ orgName, inviterName, acceptUrl, brandColor = '#10b9
         <!-- Body -->
         <tr><td style="padding:32px;">
           <p style="margin:0 0 8px;color:#f5f5f5;font-size:22px;font-weight:700;line-height:1.3;">You&rsquo;re invited to join<br><span style="color:${brandColor};">${orgName}</span></p>
-          <p style="margin:16px 0 0;color:#a0a0a0;font-size:14px;line-height:1.6;">${inviterName} has invited you to their workspace on Klippa — South Africa&rsquo;s freelancer tax platform. Accept the invite to track timesheets, manage expenses, and stay SARS-compliant together.</p>
+          <p style="margin:16px 0 0;color:#a0a0a0;font-size:14px;line-height:1.6;">${inviterName} has invited you to their contractor placement workspace on Klippa. Accept the invite to submit placement timesheets, keep your records together, and stay SARS-compliant.</p>
           <!-- CTA -->
           <table cellpadding="0" cellspacing="0" style="margin:28px 0;">
             <tr><td style="background:${brandColor};border-radius:10px;">

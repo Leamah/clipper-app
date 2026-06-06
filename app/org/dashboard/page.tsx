@@ -185,13 +185,13 @@ export default function OrgDashboardPage() {
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Link href="/org/payroll" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
-              <CalendarDays className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Payroll</span>
+              <CalendarDays className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Pay runs</span>
             </Link>
             <Link href="/org/placements" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors">
               <BriefcaseBusiness className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Placements</span>
             </Link>
             <Link href="/org/consultants" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-              <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Team</span>
+              <Users className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Contractors</span>
             </Link>
             <Link href="/org/settings" className="p-2 rounded-lg text-ink-2 hover:text-ink-1 hover:bg-raised border border-edge transition-colors">
               <Settings className="w-3.5 h-3.5" />
@@ -215,7 +215,7 @@ export default function OrgDashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <StatCard icon={BriefcaseBusiness} label="Placements" value={intel?.placement_summary?.active ?? 0}
             color="blue"
-            sub={`${intel?.placement_summary?.ready_to_bill ?? 0} ready to bill`}
+            sub={`${intel?.placement_summary?.ready_to_bill ?? 0} ready to invoice`}
           />
           <StatCard icon={CircleDollarSign} label="Projected margin" value={formatMoney(intel?.placement_summary?.projected_margin ?? 0)}
             color={(intel?.placement_summary?.projected_margin ?? 0) < 0 ? 'red' : 'emerald'}
@@ -236,7 +236,7 @@ export default function OrgDashboardPage() {
             alert={expiring.length > 0}
             sub={expiring.length > 0 ? 'within 30 days' : 'none in 30 days'}
           />
-          <StatCard icon={CalendarDays} label="Payroll deadline" value={
+          <StatCard icon={CalendarDays} label="Pay-run deadline" value={
             deadline == null ? '—'
             : deadline === 0 ? 'Today'
             : deadline < 0  ? 'Overdue'
@@ -263,7 +263,7 @@ export default function OrgDashboardPage() {
           </div>
         )}
 
-        {/* ── Payroll period alert banner ─────────────────────── */}
+        {/* ── Pay-run period alert banner ─────────────────────── */}
         {period && missing.length > 0 && (
           <div className={`rounded-2xl border p-5 space-y-4 ${
             deadline != null && deadline <= 2
@@ -276,13 +276,13 @@ export default function OrgDashboardPage() {
                 <div>
                   <p className="text-sm font-semibold text-ink-1">
                     {deadline != null && deadline <= 0
-                      ? `Payroll deadline passed: ${period.name}`
+                      ? `Payment deadline passed: ${period.name}`
                       : deadline === 0
-                      ? `Payroll closes today: ${period.name}`
-                      : `Payroll closes in ${deadline} day${deadline !== 1 ? 's' : ''}: ${period.name}`}
+                      ? `Payment run closes today: ${period.name}`
+                      : `Payment run closes in ${deadline} day${deadline !== 1 ? 's' : ''}: ${period.name}`}
                   </p>
                   <p className="text-xs text-ink-2 mt-0.5">
-                    {missing.length} consultant{missing.length !== 1 ? 's haven\'t' : ' hasn\'t'} submitted yet
+                    {missing.length} contractor{missing.length !== 1 ? 's haven\'t' : ' hasn\'t'} submitted placement time yet
                   </p>
                 </div>
               </div>
@@ -328,8 +328,8 @@ export default function OrgDashboardPage() {
         {!period && isOwner && (
           <div className="rounded-2xl border border-dashed border-edge p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-ink-1">No open payroll period</p>
-              <p className="text-xs text-ink-2 mt-0.5">Set a payroll period to track deadlines and submission rates.</p>
+              <p className="text-sm font-medium text-ink-1">No open payment period</p>
+              <p className="text-xs text-ink-2 mt-0.5">Set a payment period to track placement deadlines, submissions, billing, and pay readiness.</p>
             </div>
             <Link href="/org/payroll" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
               <Plus className="w-3.5 h-3.5" /> Set period
@@ -364,11 +364,11 @@ export default function OrgDashboardPage() {
           </div>
         )}
 
-        {/* ── Consultants table ───────────────────────────────── */}
+        {/* ── Contractors table ───────────────────────────────── */}
         <div className="rounded-2xl border border-edge overflow-hidden">
           <div className="px-5 py-4 border-b border-edge bg-surface/60 flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold">Consultants</p>
+              <p className="text-sm font-semibold">Contractors</p>
               <p className="text-xs text-ink-2 mt-0.5">{intel?.active_consultants ?? 0} active</p>
             </div>
             <Link href="/org/consultants" className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline">
@@ -379,9 +379,9 @@ export default function OrgDashboardPage() {
           {!intel?.consultants?.length ? (
             <div className="px-5 py-12 text-center space-y-3">
               <Users className="w-8 h-8 text-edge mx-auto" />
-              <p className="text-sm text-ink-2">No consultants yet</p>
+              <p className="text-sm text-ink-2">No contractors yet</p>
               <Link href="/org/consultants" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Invite consultant
+                <Plus className="w-3.5 h-3.5" /> Invite contractor
               </Link>
             </div>
           ) : (
@@ -389,7 +389,7 @@ export default function OrgDashboardPage() {
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-edge/50 bg-surface/40">
-                    {['Consultant', 'Contract', 'Compliance', 'Timesheet', ''].map(h => (
+                    {['Contractor', 'Contract', 'Compliance', 'Placement time', ''].map(h => (
                       <th key={h} className="text-left px-5 py-3 text-xs font-medium text-ink-2">{h}</th>
                     ))}
                   </tr>
