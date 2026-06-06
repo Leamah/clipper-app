@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient }       from '@supabase/supabase-js'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
+import { calculatePracticeReadiness } from '@/lib/practice-readiness'
 
 async function resolvePracticeContext() {
   const cookieStore = cookies()
@@ -76,7 +77,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return { ...d, signed_url }
   }))
 
-  return NextResponse.json({ client, linkedReturn, documents })
+  const readiness = calculatePracticeReadiness(client, documents, linkedReturn)
+
+  return NextResponse.json({ client, linkedReturn, documents, readiness })
 }
 
 // PATCH /api/practice/clients/[id] — update a client (status, fee, details…)

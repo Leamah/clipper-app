@@ -15,7 +15,7 @@ import {
 } from '@/lib/types'
 import type {
   KlippaPracticeClient, FilingStatus, ChecklistItem, ClientReturnType,
-  KlippaPracticeClientDocument,
+  KlippaPracticeClientDocument, PracticeReadinessScore,
 } from '@/lib/types'
 
 const zar = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -35,6 +35,7 @@ export default function PracticeClientDetail() {
   const [client,    setClient]    = useState<KlippaPracticeClient | null>(null)
   const [linked,    setLinked]    = useState<LinkedReturn>(null)
   const [documents, setDocuments] = useState<KlippaPracticeClientDocument[]>([])
+  const [readiness, setReadiness] = useState<PracticeReadinessScore | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState<string | null>(null)
   const [busy,      setBusy]      = useState(false)
@@ -58,6 +59,7 @@ export default function PracticeClientDetail() {
     setClient(c)
     setLinked(json.linkedReturn ?? null)
     setDocuments(json.documents ?? [])
+    setReadiness(json.readiness ?? null)
     setDeadline(c.deadline ?? '')
     setFee(String(c.fee ?? 0))
     setNotes(c.notes ?? '')
@@ -177,6 +179,14 @@ export default function PracticeClientDetail() {
   const dl       = c.deadline ? Math.ceil((new Date(c.deadline).getTime() - Date.now()) / 86_400_000) : null
   const overdue  = dl != null && dl < 0 && c.filing_status !== 'filed' && c.filing_status !== 'assessed'
   const received = c.doc_checklist.filter(i => i.received).length
+  const readinessTone = readiness?.label === 'Ready' ? 'text-emerald-500'
+    : readiness?.label === 'Nearly ready' ? 'text-blue-500'
+    : readiness?.label === 'At risk' ? 'text-amber-500'
+    : 'text-red-400'
+  const readinessBar = readiness?.label === 'Ready' ? 'bg-emerald-500'
+    : readiness?.label === 'Nearly ready' ? 'bg-blue-500'
+    : readiness?.label === 'At risk' ? 'bg-amber-500'
+    : 'bg-red-500'
 
   return (
     <div className="min-h-screen bg-base text-ink-1">
@@ -223,6 +233,91 @@ export default function PracticeClientDetail() {
             <Trash2 className="w-3.5 h-3.5" /> Archive
           </button>
         </div>
+
+        {/* Compliance readiness workbench */}
+        {readiness && (
+          <div className="rounded-2xl border border-edge bg-surface p-5 sm:p-6 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold">Compliance readiness</p>
+                <p className="text-xs text-ink-2">Tax workflow score based on documents, deadline risk, client identity, return status, and review readiness.</p>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className={`text-3xl font-bold tabular-nums ${readinessTone}`}>{readiness.score}%</p>
+                <p className={`text-xs font-semibold ${readinessTone}`}>{readiness.label}</p>
+              </div>
+            </div>
+
+            <div className="h-2 rounded-full bg-raised overflow-hidden">
+              <div className={`h-full rounded-full ${readinessBar}`} style={{ width: `${readiness.score}%` }} />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {[
+                ['Documents', readiness.checks.documents, 35],
+                ['Deadline', readiness.checks.deadline, 15],
+                ['Identity', readiness.checks.identity, 10],
+                ['Workflow', readiness.checks.workflow, 25],
+                ['Review', readiness.checks.review, 15],
+              ].map(([label, value, max]) => (
+                <div key={label} className="rounded-xl border border-edge bg-raised/30 px-3 py-2.5">
+                  <p className="text-[11px] text-ink-3">{label}</p>
+                  <p className="text-sm font-semibold text-ink-1 tabular-nums">{value}/{max}</p>
+                </div>
+              ))}
+            </div>
+
+            {(readiness.blockers.length > 0 || readiness.next_actions.length > 0) && (
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-red-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    <p className="text-xs font-semibold uppercase">Blockers</p>
+                  </div>
+                  {readiness.blockers.length === 0 ? (
+                    <p className="text-xs text-ink-2">No hard blockers.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {readiness.blockers.map(b => (
+                        <div key={b.id} className="text-xs">
+                          <p className="font-medium text-ink-1">{b.label}</p>
+                          {b.detail && <p className="text-ink-3 mt-0.5">{b.detail}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-amber-500">
+                    <ListChecks className="w-4 h-4" />
+                    <p className="text-xs font-semibold uppercase">Next actions</p>
+                  </div>
+                  <div className="space-y-2">
+                    {readiness.next_actions.length === 0 ? (
+                      <p className="text-xs text-ink-2">Ready for final practitioner review.</p>
+                    ) : readiness.next_actions.map(a => (
+                      <div key={a.id} className="flex items-start gap-2 text-xs text-ink-2">
+                        <span className={`mt-1 h-1.5 w-1.5 rounded-full flex-shrink-0 ${a.status === 'blocker' ? 'bg-red-400' : 'bg-amber-400'}`} />
+                        <span>{a.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {readiness.warnings.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {readiness.warnings.map(w => (
+                  <span key={w.id} className="rounded-full bg-edge px-2.5 py-1 text-[11px] text-ink-2">
+                    {w.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filing pipeline stepper */}
         <div className="rounded-2xl border border-edge bg-surface p-5 sm:p-6 space-y-4">

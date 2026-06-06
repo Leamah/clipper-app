@@ -507,6 +507,28 @@ export interface KlippaPracticeClientDocument {
   signed_url?:       string   // populated on read for the practice UI
 }
 
+export interface PracticeReadinessItem {
+  id:       string
+  label:    string
+  status:   'ok' | 'warn' | 'blocker'
+  detail?:  string
+}
+
+export interface PracticeReadinessScore {
+  score:       number
+  label:       'Blocked' | 'At risk' | 'Nearly ready' | 'Ready'
+  blockers:    PracticeReadinessItem[]
+  warnings:    PracticeReadinessItem[]
+  next_actions: PracticeReadinessItem[]
+  checks:      {
+    documents: number
+    deadline:  number
+    identity:  number
+    workflow:  number
+    review:    number
+  }
+}
+
 export interface PracticeStats {
   total_clients:    number
   due_soon:         number   // deadline within 14 days, not yet filed
