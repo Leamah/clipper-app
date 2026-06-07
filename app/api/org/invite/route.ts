@@ -3,6 +3,7 @@ import { createClient }       from '@supabase/supabase-js'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 import { getOrgEntitlement }  from '@/lib/billing'
+import { sendBrevoEmail }     from '@/lib/brevo'
 
 export async function POST(request: Request) {
   const cookieStore = cookies()
@@ -180,34 +181,6 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ invites: invites ?? [] })
-}
-
-// ── Brevo transactional email ─────────────────────────────
-
-async function sendBrevoEmail({ apiKey, to, subject, html }: {
-  apiKey:  string
-  to:      string
-  subject: string
-  html:    string
-}) {
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method:  'POST',
-    headers: {
-      'accept':       'application/json',
-      'api-key':      apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      sender:      { name: 'Klippa', email: 'noreply@mail.klippa.co.za' },
-      to:          [{ email: to }],
-      subject,
-      htmlContent: html,
-    }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Brevo ${res.status}: ${body}`)
-  }
 }
 
 // ── Email template ────────────────────────────────────────

@@ -369,6 +369,13 @@ export default function ConsultantsPage() {
 
   const pendingInvites = invites.filter(i => i.status === 'pending')
 
+  // Consultants with timesheets awaiting org review
+  const pendingReviewConsultants = consultants.filter(c =>
+    c.latest_timesheet?.status === 'submitted' && !c.latest_timesheet?.org_approved_at
+  )
+  const pendingCount   = pendingReviewConsultants.length
+  const firstPendingId = pendingReviewConsultants[0]?.id ?? null
+
   return (
     <div className="min-h-screen bg-base text-ink-1">
       <header className="border-b border-edge/60 bg-surface/80 backdrop-blur-sm sticky top-0 z-20">
@@ -394,6 +401,18 @@ export default function ConsultantsPage() {
             <Users className="w-5 h-5 text-emerald-500" />
             <h1 className="text-lg font-semibold">Contractors</h1>
           </div>
+          {isOwner && pendingCount > 0 && (
+            <div className="ml-auto flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-300">
+                {pendingCount} pending review
+              </span>
+              {firstPendingId && (
+                <Link href={`/org/consultants/${firstPendingId}`} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">
+                  Review first →
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
         {error && (
@@ -516,8 +535,9 @@ export default function ConsultantsPage() {
           ) : (
             <div className="divide-y divide-edge/40">
               {consultants.map(c => {
-                const expanded     = expandedId === c.id
-                const showContract = contractFormId === c.id
+                const expanded        = expandedId === c.id
+                const showContract    = contractFormId === c.id
+                const isPendingReview = c.latest_timesheet?.status === 'submitted' && !c.latest_timesheet?.org_approved_at
 
                 return (
                   <div key={c.id}>
@@ -558,7 +578,7 @@ export default function ConsultantsPage() {
                       </div>
 
                       {/* Latest TS */}
-                      <div className="flex-shrink-0 hidden md:block w-24 text-right">
+                      <div className="flex-shrink-0 hidden md:flex md:flex-col md:items-end gap-1 w-28">
                         {c.latest_timesheet ? (
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             { draft: 'bg-edge text-ink-2', submitted: 'bg-amber-500/15 text-amber-600 dark:text-amber-300', approved: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' }[c.latest_timesheet.status] ?? 'bg-edge text-ink-2'
@@ -567,6 +587,14 @@ export default function ConsultantsPage() {
                           </span>
                         ) : (
                           <span className="text-xs text-ink-3">No TS</span>
+                        )}
+                        {isOwner && isPendingReview && (
+                          <Link
+                            href={`/org/consultants/${c.id}`}
+                            className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25 transition-colors"
+                          >
+                            Review →
+                          </Link>
                         )}
                       </div>
 

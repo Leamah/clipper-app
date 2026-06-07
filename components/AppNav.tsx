@@ -36,9 +36,11 @@ export interface FeatureFlags {
 }
 
 interface AppNavProps {
-  activePage:      ActivePage
-  featureFlags?:   FeatureFlags
-  logbookPending?: number
+  activePage:          ActivePage
+  featureFlags?:       FeatureFlags
+  logbookPending?:     number
+  pendingApprovals?:   number   // org-admin: count of submitted-but-not-approved timesheets
+  rejectedTimesheet?:  boolean  // member: their own TS was returned for revision
 }
 
 interface NavItem {
@@ -64,7 +66,9 @@ const DEFAULT_FLAGS: FeatureFlags = { timesheets: false, logbook: true, provisio
 export default function AppNav({
   activePage,
   featureFlags: propFlags,
-  logbookPending = 0,
+  logbookPending    = 0,
+  pendingApprovals  = 0,
+  rejectedTimesheet = false,
 }: AppNavProps) {
   const [flags, setFlags]         = useState<FeatureFlags>(propFlags ?? DEFAULT_FLAGS)
   const [collapsed, setCollapsed] = useState(false)
@@ -117,11 +121,13 @@ export default function AppNav({
     { page: 'expenses',  href: '/expenses',  icon: Receipt,         label: 'Expenses' },
     { page: 'documents', href: '/documents', icon: FileText,        label: 'Documents' },
   ]
-  if (flags.timesheets)  items.push({ page: 'timesheets', href: '/timesheets', icon: Clock,        label: 'Timesheets' })
+  if (flags.timesheets)  items.push({ page: 'timesheets', href: '/timesheets', icon: Clock, label: 'Timesheets',
+    badge: rejectedTimesheet ? 1 : undefined })
   if (flags.logbook)     items.push({ page: 'mileage',    href: '/mileage',    icon: Car,          label: 'Mileage', badge: logbookPending })
   if (flags.provisional) items.push({ page: 'provisional', href: '/provisional', icon: CalendarDays, label: 'Provisional' })
   items.push({ page: 'filing', href: '/filing', icon: ClipboardCheck, label: 'File Return', divider: true })
-  if (flags.is_org_user) items.push({ page: 'org' as ActivePage, href: '/org/dashboard', icon: Users, label: 'My Team', divider: true })
+  if (flags.is_org_user) items.push({ page: 'org' as ActivePage, href: '/org/dashboard', icon: Users, label: 'My Team', divider: true,
+    badge: pendingApprovals > 0 ? pendingApprovals : undefined })
 
   function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
     return (

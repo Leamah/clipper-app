@@ -255,6 +255,12 @@ export interface KlippaTimesheet {
   client_signed_at:      string | null  // ISO timestamp — manually confirmed by consultant
   client_name:           string | null  // denormalised at sign time
   client_contact:        string | null  // denormalised at sign time
+  // Placement-house review columns (added migration 015)
+  org_approved_at:       string | null  // set when org admin approves the timesheet
+  org_approved_by:       string | null  // UUID of the admin who approved
+  org_rejected_at:       string | null  // set when org admin bounces back to draft
+  org_review_note:       string | null  // optional note attached to approve/reject
+  locked_at:             string | null  // set at approval; prevents consultant edits
   created_at:            string
   updated_at:            string
 }
@@ -406,7 +412,13 @@ export interface OrgConsultantRow {
   email:            string
   full_name:        string | null
   org_role:         string | null
-  latest_timesheet: { status: string; month: string } | null
+  latest_timesheet: {
+    id:               string
+    status:           string
+    month:            string
+    org_approved_at:  string | null
+    client_signed_at: string | null
+  } | null
   contract:         KlippaConsultantContract | null
   compliance:       KlippaConsultantCompliance | null
   compliance_score: number   // 0-5 checks passed

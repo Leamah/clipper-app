@@ -11,7 +11,7 @@ import {
   CalendarDays, AlertTriangle, CheckCircle2,
   Clock, TrendingUp, Bell, Plus, Loader2,
   FileX, ChevronRight, Check, X,
-  BriefcaseBusiness, CircleDollarSign,
+  BriefcaseBusiness, CircleDollarSign, FileSignature,
 } from 'lucide-react'
 import type { KlippaOrganisation, OrgIntelligence, OrgConsultantRow } from '@/lib/types'
 
@@ -161,6 +161,11 @@ export default function OrgDashboardPage() {
   const deadline = intel?.days_until_deadline
   const missing  = intel?.missing_timesheets ?? []
   const expiring = intel?.expiring_contracts ?? []
+
+  // Consultants whose latest TS is submitted but not yet approved by org admin
+  const pendingApprovals = (intel?.consultants ?? []).filter(c =>
+    c.latest_timesheet?.status === 'submitted' && !c.latest_timesheet?.org_approved_at
+  )
 
   const deadlineColor = deadline == null ? 'blue'
     : deadline <= 2 ? 'red'
@@ -361,6 +366,45 @@ export default function OrgDashboardPage() {
             <Link href="/org/consultants" className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
               Manage contracts <ChevronRight className="w-3 h-3" />
             </Link>
+          </div>
+        )}
+
+        {/* ── Pending approval queue ──────────────────────────── */}
+        {isOwner && pendingApprovals.length > 0 && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <FileSignature className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <p className="text-sm font-semibold text-ink-1">
+                {pendingApprovals.length} timesheet{pendingApprovals.length !== 1 ? 's' : ''} awaiting your review
+              </p>
+            </div>
+            <div className="space-y-2">
+              {pendingApprovals.map(c => (
+                <div key={c.id} className="rounded-xl bg-surface border border-edge px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-ink-1 truncate">{c.full_name ?? c.email}</p>
+                    {c.latest_timesheet?.month && (
+                      <p className="text-xs text-ink-2">
+                        {new Date(c.latest_timesheet.month + '-01').toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    href={`/org/consultants/${c.id}`}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+                  >
+                    Review →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isOwner && (intel?.consultants?.length ?? 0) > 0 && pendingApprovals.length === 0 && (
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            All timesheets reviewed — nothing pending approval
           </div>
         )}
 

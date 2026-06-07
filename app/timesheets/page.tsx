@@ -8,7 +8,7 @@ import AppNav from '@/components/AppNav'
 import {
   Plus, ChevronLeft, ChevronRight, Download, CheckCircle2,
   Clock, Briefcase, Pencil, X, Check, AlertCircle, Users,
-  PenLine, Lock, Save, Loader2, Zap, RotateCcw,
+  PenLine, Lock, Save, Loader2, Zap, RotateCcw, Building2,
 } from 'lucide-react'
 import {
   format, startOfMonth, getDaysInMonth, getDay, getYear, getMonth,
@@ -979,7 +979,7 @@ export default function TimesheetsPage() {
   if (!profile?.feature_timesheets) {
     return (
       <div className="app-shell bg-base text-ink-1">
-        <AppNav activePage="timesheets" featureFlags={featureFlags} />
+        <AppNav activePage="timesheets" featureFlags={featureFlags} rejectedTimesheet={!!timesheet?.org_rejected_at} />
         <div className="max-w-lg mx-auto px-6 py-24 text-center">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
             <Clock className="w-5 h-5 text-emerald-400" />
@@ -1003,7 +1003,7 @@ export default function TimesheetsPage() {
   if (clients.length === 0) {
     return (
       <div className="app-shell bg-base text-ink-1">
-        <AppNav activePage="timesheets" featureFlags={featureFlags} />
+        <AppNav activePage="timesheets" featureFlags={featureFlags} rejectedTimesheet={!!timesheet?.org_rejected_at} />
         <div className="max-w-lg mx-auto px-6 py-24 text-center">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-5">
             <Users className="w-5 h-5 text-emerald-400" />
@@ -1030,7 +1030,7 @@ export default function TimesheetsPage() {
   // ── Main view ─────────────────────────────────────────
   return (
     <div className="app-shell bg-base text-ink-1 pb-32">
-      <AppNav activePage="timesheets" featureFlags={featureFlags} />
+      <AppNav activePage="timesheets" featureFlags={featureFlags} rejectedTimesheet={!!timesheet?.org_rejected_at} />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {/* Client tabs + month nav */}
@@ -1102,6 +1102,71 @@ export default function TimesheetsPage() {
           </div>
         )}
 
+        {/* Org placement context banners — only for org-invited consultants with a placement-linked client */}
+        {activeClient?.org_placement_id && orgBranding && (() => {
+          const orgName   = orgBranding.orgName
+          const isLocked  = !!timesheet?.locked_at
+          const isReturned = !!timesheet?.org_rejected_at && !isLocked
+          const isApproved = !!timesheet?.org_approved_at && !isLocked && !isReturned
+
+          return (
+            <div className="mb-4 space-y-2">
+              {/* Identity bar — always shown in an org placement */}
+              <div className="flex items-center gap-2 rounded-xl border border-edge bg-surface/60 px-4 py-2.5 text-xs text-ink-2">
+                <Building2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                <span>Billing through <span className="font-semibold text-ink-1">{orgName}</span></span>
+                {activeClient.position && (
+                  <>
+                    <span className="text-edge">·</span>
+                    <span>{activeClient.position}</span>
+                  </>
+                )}
+              </div>
+
+              {/* Locked — org has approved and locked this timesheet */}
+              {isLocked && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5 text-xs">
+                  <Lock className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                  <span className="text-emerald-700 dark:text-emerald-300 font-medium">
+                    Approved &amp; locked by {orgName}
+                    {timesheet?.locked_at && (
+                      <> on {format(parseISO(timesheet.locked_at), 'd MMM yyyy')}</>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Returned — org bounced it back for revision */}
+              {isReturned && (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 space-y-1">
+                  <div className="flex items-center gap-2 text-xs">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                    <span className="text-amber-700 dark:text-amber-300 font-medium">
+                      Returned for revision by {orgName} — please update and resubmit
+                    </span>
+                  </div>
+                  {timesheet?.org_review_note && (
+                    <p className="ml-5 text-xs text-ink-2 italic">&ldquo;{timesheet.org_review_note}&rdquo;</p>
+                  )}
+                </div>
+              )}
+
+              {/* Approved but not yet locked */}
+              {isApproved && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5 text-xs">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                  <span className="text-emerald-700 dark:text-emerald-300">
+                    Approved by {orgName}
+                    {timesheet?.org_approved_at && (
+                      <> on {format(parseISO(timesheet.org_approved_at), 'd MMM yyyy')}</>
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* Smart fill bar */}
         <div className="mb-5 flex items-center gap-3 bg-surface border border-edge rounded-xl px-4 py-3">
             <span className="text-sm text-ink-2 flex-1">Fill all working days with</span>
@@ -1170,7 +1235,7 @@ export default function TimesheetsPage() {
                 key={ds}
                 dateStr={ds}
                 entry={entryMap.get(ds) ?? null}
-                locked={!!timesheet?.consultant_signed_at}
+                locked={!!timesheet?.consultant_signed_at || !!timesheet?.locked_at}
                 onSave={saveEntry}
                 onDelete={deleteEntry}
               />

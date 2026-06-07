@@ -10,7 +10,7 @@ import AppNav from '@/components/AppNav'
 import {
   TrendingUp, AlertCircle, CheckCircle2,
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car, Zap,
-  ShieldCheck, ShieldAlert, PiggyBank,
+  ShieldCheck, ShieldAlert, PiggyBank, Users,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
 import { useRouter } from 'next/navigation'
@@ -49,6 +49,10 @@ export default function Dashboard() {
   const [userId,         setUserId]         = useState<string | null>(null)
   const [loading,        setLoading]        = useState(true)
   const [showBreakdown,  setShowBreakdown]  = useState(false)
+  // Org membership
+  const [orgName,              setOrgName]              = useState<string | null>(null)
+  const [latestTsStatus,       setLatestTsStatus]       = useState<string | null>(null)
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
 
   const loadData = useCallback(async (uid: string) => {
     const [profileRes, returnRes, reviewsRes] = await Promise.all([
@@ -80,6 +84,32 @@ export default function Dashboard() {
       setMileageTrips((mileRes.data ?? []) as KlippaMileageTrip[])
       setPendingExpenses(pendRes.count ?? 0)
     }
+    // ── Org membership context ──────────────────────────────
+    // Only fires for consultants who accepted an org invite
+    if (prof?.organisation_id) {
+      const [orgRes, tsRes] = await Promise.all([
+        supabase.from('klippa_organisations').select('name').eq('id', prof.organisation_id).single(),
+        supabase.from('klippa_timesheets').select('status').eq('user_id', uid)
+          .order('month', { ascending: false }).limit(1).maybeSingle(),
+      ])
+      if (orgRes.data) setOrgName(orgRes.data.name)
+      if (tsRes.data)  setLatestTsStatus(tsRes.data.status)
+
+      // Org admins: count pending timesheet approvals for AppNav badge
+      if (prof.org_role === 'org-admin') {
+        try {
+          const res  = await fetch('/api/org/intelligence')
+          const json = await res.json()
+          const cnt  = (json.consultants ?? []).filter((c: { latest_timesheet?: { status: string; org_approved_at?: string | null } | null }) =>
+            c.latest_timesheet?.status === 'submitted' && !c.latest_timesheet?.org_approved_at
+          ).length
+          setPendingApprovalCount(cnt)
+        } catch {
+          // non-fatal — badge just stays at 0
+        }
+      }
+    }
+
     setLoading(false)
   }, [])
 
@@ -202,7 +232,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base">
-        <AppNav activePage="dashboard" featureFlags={featureFlags} />
+        <AppNav activePage="dashboard" featureFlags={featureFlags} pendingApprovals={pendingApprovalCount} />
         <div className="flex items-center justify-center py-32">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -216,7 +246,7 @@ export default function Dashboard() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-600/[0.06] blur-[120px] rounded-full" />
       </div>
 
-      <AppNav activePage="dashboard" featureFlags={featureFlags} logbookPending={logbookPending} />
+      <AppNav activePage="dashboard" featureFlags={featureFlags} logbookPending={logbookPending} pendingApprovals={pendingApprovalCount} />
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
 
@@ -263,6 +293,41 @@ export default function Dashboard() {
             highlight
           />
         </div>
+
+        {/* Org membership card — org-invited consultants only */}
+        {profile?.organisation_id && orgName && (
+          <div className="rounded-2xl border border-edge bg-surface p-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink-1 truncate">{orgName}</p>
+                <p className="text-xs text-ink-2">Placement workspace</p>
+                {latestTsStatus && (
+                  <span className={`mt-1 inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                    latestTsStatus === 'approved'
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                      : latestTsStatus === 'submitted'
+                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                        : 'bg-raised text-ink-2'
+                  }`}>
+                    {latestTsStatus === 'approved'  ? 'Last TS approved'
+                     : latestTsStatus === 'submitted' ? 'Awaiting review'
+                     : latestTsStatus === 'draft'    ? 'Draft in progress'
+                     : latestTsStatus}
+                  </span>
+                )}
+              </div>
+            </div>
+            <Link
+              href="/timesheets"
+              className="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+            >
+              View timesheets
+            </Link>
+          </div>
+        )}
 
         {/* Provisional tax deadline nudge */}
         {provisionalRunway && (
