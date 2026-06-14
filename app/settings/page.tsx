@@ -103,16 +103,17 @@ function DobPicker({ value, onChange }: {
 }
 
 // ── Toggle row — full row is the tap target ───────────────
-function ToggleRow({ label, sub, value, onChange, impact }: {
-  label:    string
-  sub:      string
-  value:    boolean
-  onChange: (v: boolean) => void
-  impact?:  string
+function ToggleRow({ label, sub, value, onChange, impact, disabled }: {
+  label:     string
+  sub:       string
+  value:     boolean
+  onChange:  (v: boolean) => void
+  impact?:   string
+  disabled?: boolean
 }) {
   return (
-    <button type="button" onClick={() => onChange(!value)}
-      className="w-full flex items-center justify-between gap-4 py-3 text-left group">
+    <button type="button" onClick={() => !disabled && onChange(!value)}
+      className={`w-full flex items-center justify-between gap-4 py-3 text-left group ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
       <div className="flex-1 min-w-0">
         <p className="text-sm text-ink-1 group-hover:text-ink-1 transition-colors">{label}</p>
         <p className="text-xs text-ink-2 mt-0.5 leading-snug">{sub}</p>
@@ -311,6 +312,7 @@ export default function SettingsPage() {
         feature_timesheets:       profile.feature_timesheets ?? false,
         feature_logbook:          profile.feature_logbook ?? true,
         feature_provisional:      profile.feature_provisional ?? false,
+        invest_enabled:           profile.invest_enabled ?? false,
         // Retirement
         has_ra:                profile.has_ra,
         ra_contributions:      profile.ra_contributions ?? 0,
@@ -603,6 +605,25 @@ export default function SettingsPage() {
             onChange={(v) => update('feature_provisional', v)}
           />
         </Section>
+
+        {/* ── Invest & Portfolio ── */}
+        {profile.user_type === 'freelancer' && (
+          <Section title="Invest &amp; Portfolio" hint="FINscope Invest helps you put your Safe-to-Spend to work on the JSE with AI-powered company analysis.">
+            <ToggleRow
+              label="FINscope Invest"
+              sub="Unlock JSE company screener, philosophy-driven picks, portfolio tracker, and SENS alerts"
+              impact={!profile.feature_invest_basic ? 'Upgrade your plan to unlock FINscope Invest' : undefined}
+              value={profile.invest_enabled ?? false}
+              onChange={(v) => update('invest_enabled', v)}
+              disabled={!profile.feature_invest_basic}
+            />
+            {profile.invest_enabled && !profile.feature_invest_full && (
+              <p className="text-xs text-ink-3 mt-1 pl-1">
+                You have Basic Invest (screener + Buffett). <a href="/subscription" className="text-emerald-500 hover:underline">Upgrade to Starter</a> for full access — all 13 modules, SENS alerts, and portfolio builder.
+              </p>
+            )}
+          </Section>
+        )}
 
         {/* ── Filing year ── */}
         <Section title="Filing year">

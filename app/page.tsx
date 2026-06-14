@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import {
   ArrowRight, Check, Smartphone, Laptop, Car,
   ShieldCheck, TrendingUp, FileCheck, Receipt, FileText,
-  X, Zap, BookOpen, AlertCircle,
+  X, Zap, BookOpen, AlertCircle, BarChart2,
 } from 'lucide-react'
 
 // ── Scroll-reveal wrapper ─────────────────────────────────
@@ -182,22 +182,22 @@ export default function LandingPage() {
 
               {/* Transformation headline */}
               <h1 className="text-5xl sm:text-6xl font-bold tracking-tight leading-[1.06]">
-                Receipts{' '}
-                <span className="text-ink-3">→</span>{' '}
                 <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">
-                  sorted.
+                  Track.
+                </span>
+                {' '}
+                <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">
+                  File.
                 </span>
                 <br />
-                Tax{' '}
-                <span className="text-ink-3">→</span>{' '}
                 <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">
-                  ready.
+                  Invest.
                 </span>
               </h1>
 
               <p className="text-lg text-ink-2 leading-relaxed max-w-md">
-                Organise your receipts, invoices and expenses automatically and
-                stay ready for SARS all year.
+                The financial operating system for South African freelancers.
+                Manage your money, file your tax, and grow your wealth — all in one place.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -217,10 +217,10 @@ export default function LandingPage() {
               {/* Recognition bullets — states not questions */}
               <div className="space-y-2 pt-1">
                 {[
-                  'Know exactly what to set aside for SARS every month',
-                  'Every expense categorized, partial deductions calculated',
-                  'Audit-ready evidence list built automatically',
-                  'File in minutes with your exact eFiling line numbers',
+                  'Know your real Safe-to-Spend balance after SARS provision',
+                  'Every expense categorised and deduction calculated automatically',
+                  'File your tax return in under 10 minutes with exact eFiling numbers',
+                  'Invest smarter with JSE company analysis, philosophy screening, and TFSA guidance',
                 ].map((s) => (
                   <div key={s} className="flex items-center gap-2.5 text-sm text-ink-2">
                     <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -327,9 +327,9 @@ export default function LandingPage() {
       <section className="relative z-10 border-t border-edge/50">
         <div className="max-w-5xl mx-auto px-6 py-16">
           <Reveal>
-            <p className="text-xs text-ink-3 uppercase tracking-widest mb-3">How Klippa helps</p>
+            <p className="text-xs text-ink-3 uppercase tracking-widest mb-3">Track · File · Invest</p>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-10">
-              Messy today. Tax-ready tomorrow.
+              Everything your financial life needs.
             </h2>
           </Reveal>
           <div className="grid sm:grid-cols-3 gap-5">
@@ -337,20 +337,20 @@ export default function LandingPage() {
               {
                 icon:  <Receipt className="w-5 h-5 text-emerald-400" />,
                 from:  'Scattered receipts',
-                to:    'Organized & categorized',
-                body:  'Snap a photo, import a bank CSV, or upload. Klippa categorizes every expense and calculates the deductible amount automatically.',
-              },
-              {
-                icon:  <TrendingUp className="w-5 h-5 text-emerald-400" />,
-                from:  'Uncertainty',
-                to:    'Exact numbers',
-                body:  'See your real Safe-to-Spend balance after SARS provision, any time.',
+                to:    'Organised & categorised',
+                body:  'Snap a photo, import a bank CSV, or upload. Klippa categorises every expense and calculates the deductible amount automatically.',
               },
               {
                 icon:  <FileCheck className="w-5 h-5 text-emerald-400" />,
                 from:  'October panic',
                 to:    '10-minute filing',
                 body:  'Your personalised eFiling cheat sheet with exact rand values, SARS line numbers, and all supporting documents already attached.',
+              },
+              {
+                icon:  <BarChart2 className="w-5 h-5 text-emerald-400" />,
+                from:  'Earning',
+                to:    'Growing',
+                body:  'Know exactly what\'s safe to invest after your SARS provision. Screen JSE companies using proven value, growth, and quality investing criteria. Track dividends and capital gains — they flow back into your ITR12 automatically.',
               },
             ].map((pillar, i) => (
               <Reveal key={i} delay={i * 0.08}>
@@ -378,7 +378,7 @@ export default function LandingPage() {
               <p className="text-xs text-ink-3 uppercase tracking-widest">Why Klippa is different</p>
               <h2 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
                 Not just a calculator.{' '}
-                <span className="text-ink-2">Your tax intelligence layer.</span>
+                <span className="text-ink-2">Your financial intelligence layer.</span>
               </h2>
               <p className="text-sm text-ink-2 leading-relaxed max-w-lg">
                 Any spreadsheet can add up your income. Klippa knows SARS rules and applies them to your specific situation automatically.
@@ -528,15 +528,15 @@ export default function LandingPage() {
               <div className="space-y-5">
                 <p className="text-xs text-ink-3 uppercase tracking-widest">Always working in the background</p>
                 <h2 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
-                  Your tax co-pilot,{' '}
+                  Your financial co-pilot,{' '}
                   <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 bg-clip-text text-transparent">
                     always on.
                   </span>
                 </h2>
                 <p className="text-base text-ink-2 leading-relaxed max-w-md">
-                  While you work, Klippa reads your receipts, sorts every expense, sets aside
-                  your SARS provision, and keeps your evidence trail audit-ready. Nothing to
-                  scramble for when filing season arrives.
+                  While you work, Klippa tracks your income, reads your receipts, sets aside
+                  your SARS provision, and keeps your investment tax records audit-ready.
+                  Nothing to scramble for.
                 </p>
               </div>
             </Reveal>
@@ -688,8 +688,8 @@ export default function LandingPage() {
                 </span>
               </h2>
               <p className="text-base text-ink-2 leading-relaxed">
-                Join South African freelancers who capture receipts as they happen,
-                know their tax position in real time, and file without the scramble.
+                Join South African freelancers who know their money, file their tax in minutes,
+                and invest what&apos;s left — without the scramble.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                 <motion.div whileTap={{ scale: 0.97 }}>
@@ -714,7 +714,7 @@ export default function LandingPage() {
             <div className="w-5 h-5 rounded-md bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center">
               <ShieldCheck className="w-2.5 h-2.5 text-white" />
             </div>
-            <span className="text-xs font-medium text-ink-3">© 2026 Klippa. Built for South African taxpayers.</span>
+            <span className="text-xs font-medium text-ink-3">© 2026 Klippa. Built for South African freelancers.</span>
           </div>
           <div className="flex items-center gap-4 text-xs text-ink-3">
             <Link href="/terms" className="hover:text-ink-2 transition-colors">Terms &amp; Conditions</Link>

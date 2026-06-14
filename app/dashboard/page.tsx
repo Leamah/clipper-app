@@ -10,7 +10,7 @@ import AppNav from '@/components/AppNav'
 import {
   TrendingUp, AlertCircle, CheckCircle2,
   ChevronRight, ChevronDown, Clock, Plus, FileText, Receipt, ArrowUpRight, Car, Zap,
-  ShieldCheck, ShieldAlert, PiggyBank, Users,
+  ShieldCheck, ShieldAlert, PiggyBank, Users, BarChart2,
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip } from '@/lib/types'
 import { useRouter } from 'next/navigation'
@@ -327,6 +327,45 @@ export default function Dashboard() {
               View timesheets
             </Link>
           </div>
+        )}
+
+        {/* FINscope Invest card — freelancers only, suppressed for org members */}
+        {!profile?.organisation_id && (
+          profile?.invest_enabled ? (
+            /* Variant B: opted in */
+            <Link href="/invest/dashboard"
+              className="group flex items-center justify-between gap-4 rounded-2xl border border-edge bg-surface/40 hover:border-emerald-500/30 hover:bg-surface/60 p-4 transition-all">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                  <BarChart2 className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink-1">FINscope Invest</p>
+                  <p className="text-xs text-ink-2">JSE analysis, screener &amp; portfolio</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500 shrink-0 transition-colors" />
+            </Link>
+          ) : (
+            /* Variant A: opt-in teaser */
+            profile?.feature_invest_basic ? (
+              <div className="rounded-2xl border border-edge bg-surface/40 p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <BarChart2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink-1">Grow money on the JSE</p>
+                    <p className="text-xs text-ink-2">FINscope Invest is ready for you — enable it in Settings</p>
+                  </div>
+                </div>
+                <Link href="/settings"
+                  className="shrink-0 px-3 py-1.5 rounded-lg border border-edge text-xs text-ink-2 hover:text-ink-1 hover:border-zinc-500 transition-colors">
+                  Enable →
+                </Link>
+              </div>
+            ) : null
+          )
         )}
 
         {/* Provisional tax deadline nudge */}

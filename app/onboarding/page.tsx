@@ -40,6 +40,7 @@ interface OnboardingState {
   financial_products: Set<FinancialProduct>
   medical_aid_members: number
   tax_year:           number
+  invest_enabled:     boolean
 }
 
 export default function OnboardingPage() {
@@ -60,10 +61,11 @@ export default function OnboardingPage() {
     financial_products:  new Set(),
     medical_aid_members: 1,
     tax_year:            CURRENT_YEAR,
+    invest_enabled:      false,
   })
 
   const hasMedical  = state.financial_products.has('medical')
-  const totalSteps  = hasMedical ? 6 : 5
+  const totalSteps  = hasMedical ? 7 : 6
 
   const toggleProduct = (p: FinancialProduct) => {
     setState((s) => {
@@ -116,6 +118,7 @@ export default function OnboardingPage() {
           has_tfsa:             fp.has('tfsa'),
           has_interest_savings: fp.has('interest_savings'),
           tax_year:             state.tax_year,
+          invest_enabled:       state.invest_enabled,
           onboarding_complete:  true,
         }, { onConflict: 'id' })
 
@@ -595,8 +598,45 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {/* Last step: Tax year */}
+              {/* Step: FINscope Invest opt-in */}
               {((step === 4 && !hasMedical) || step === 5) && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-bold">Also want to grow money on the JSE?</h2>
+                    <p className="text-sm text-ink-2 mt-1 leading-relaxed">
+                      FINscope Invest helps you put your Safe-to-Spend to work on the Johannesburg Stock Exchange — with plain-English explanations of every company. You can join now or later from Settings.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => { setState((s) => ({ ...s, invest_enabled: true })); next() }}
+                      className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xl">📈</span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-ink-1">Yes, set me up</p>
+                        <p className="text-xs text-ink-2 mt-0.5">Unlock the JSE screener, company analysis, and investment tools</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500" />
+                    </button>
+                    <button
+                      onClick={() => { setState((s) => ({ ...s, invest_enabled: false })); next() }}
+                      className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-edge hover:border-edge/80 hover:bg-raised/30 transition-all group"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-ink-1">Skip for now</p>
+                        <p className="text-xs text-ink-2 mt-0.5">You can always enable this later from Settings</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-ink-2" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Last step: Tax year */}
+              {((step === 5 && !hasMedical) || step === 6) && (
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-xl font-bold">Which tax year are we filing?</h2>

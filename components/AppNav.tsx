@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   ShieldCheck, LayoutDashboard, TrendingUp, Receipt, FileText,
   Clock, Car, CalendarDays, ClipboardCheck, Settings, Users,
-  Menu, X, PanelLeftClose, PanelLeftOpen, MessageCircle,
+  Menu, X, PanelLeftClose, PanelLeftOpen, MessageCircle, BarChart2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import UserNav        from '@/components/UserNav'
@@ -13,6 +13,7 @@ import ThemeToggle    from '@/components/ThemeToggle'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import TaxChatbot     from '@/components/TaxChatbot'
 import { supabase }  from '@/lib/supabase'
+import type { FeatureFlags as SharedFeatureFlags } from '@/lib/types'
 
 export type ActivePage =
   | 'dashboard'
@@ -27,13 +28,10 @@ export type ActivePage =
   | 'pricing'
   | 'subscription'
   | 'org'
+  | 'invest'
 
-export interface FeatureFlags {
-  timesheets:  boolean
-  logbook:     boolean
-  provisional: boolean
-  is_org_user?: boolean   // company_owner | practitioner
-}
+export type { FeatureFlags } from '@/lib/types'
+type FeatureFlags = SharedFeatureFlags
 
 interface AppNavProps {
   activePage:          ActivePage
@@ -61,7 +59,7 @@ function navCls(page: ActivePage, active: ActivePage, collapsed: boolean) {
   return collapsed ? `${base} justify-center px-0` : base
 }
 
-const DEFAULT_FLAGS: FeatureFlags = { timesheets: false, logbook: true, provisional: false, is_org_user: false }
+const DEFAULT_FLAGS: FeatureFlags = { timesheets: false, logbook: true, provisional: false, is_org_user: false, invest_basic: false, invest_enabled: false }
 
 export default function AppNav({
   activePage,
@@ -80,16 +78,18 @@ export default function AppNav({
       if (!user) return
       supabase
         .from('klippa_profiles')
-        .select('feature_timesheets, feature_logbook, feature_provisional, user_type')
+        .select('feature_timesheets, feature_logbook, feature_provisional, feature_invest_basic, invest_enabled, user_type')
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
           if (data) {
             setFlags({
-              timesheets:  data.feature_timesheets  ?? false,
-              logbook:     data.feature_logbook     ?? true,
-              provisional: data.feature_provisional ?? false,
-              is_org_user: data.user_type === 'company_owner' || data.user_type === 'practitioner',
+              timesheets:     data.feature_timesheets    ?? false,
+              logbook:        data.feature_logbook       ?? true,
+              provisional:    data.feature_provisional   ?? false,
+              is_org_user:    data.user_type === 'company_owner' || data.user_type === 'practitioner',
+              invest_basic:   data.feature_invest_basic  ?? false,
+              invest_enabled: data.invest_enabled        ?? false,
             })
           }
         })
@@ -128,6 +128,7 @@ export default function AppNav({
   items.push({ page: 'filing', href: '/filing', icon: ClipboardCheck, label: 'File Return', divider: true })
   if (flags.is_org_user) items.push({ page: 'org' as ActivePage, href: '/org/dashboard', icon: Users, label: 'My Team', divider: true,
     badge: pendingApprovals > 0 ? pendingApprovals : undefined })
+  if (flags.invest_enabled && flags.invest_basic) items.push({ page: 'invest' as ActivePage, href: '/invest/dashboard', icon: BarChart2, label: 'Invest', divider: !flags.is_org_user })
 
   function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
     return (

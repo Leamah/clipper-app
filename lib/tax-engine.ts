@@ -248,6 +248,14 @@ export function calculateTax(input: TaxCalculationInput): TaxCalculationResult {
   // 11. Net tax
   const netTaxPayable = taxPayable - employeesTaxPaid
 
+  // 12. FINscope Invest: DWT + CGT (optional; defaults to 0)
+  const marginalRate = grossTax > 0 && taxableIncome > 0
+    ? grossTax / taxableIncome  // effective marginal proxy; accurate enough for the disclaimer context
+    : 0
+  const dwtOnDividends  = calcDividendWithholdingTax(input.dividendIncome ?? 0)
+  const cgtPayable      = calcCapitalGainsTax(input.capitalGains ?? 0, marginalRate)
+  const investTaxPayable = round2(dwtOnDividends + cgtPayable)
+
   return {
     grossIncome,
     section11fRa:      round2(section11fRa),
@@ -266,7 +274,23 @@ export function calculateTax(input: TaxCalculationInput): TaxCalculationResult {
     taxPayable:        round2(taxPayable),
     employeesTaxPaid:  round2(employeesTaxPaid),
     netTaxPayable:     round2(netTaxPayable),
+    dwtOnDividends:    round2(dwtOnDividends),
+    cgtPayable:        round2(cgtPayable),
+    investTaxPayable,
   }
+}
+
+// ── FINscope Invest tax helpers ───────────────────────────────────────────
+
+export function calcDividendWithholdingTax(dividendIncome: number): number {
+  return round2(Math.max(0, dividendIncome) * 0.20)
+}
+
+export function calcCapitalGainsTax(gains: number, marginalRate: number): number {
+  const exempt        = 40_000   // SA annual CGT exclusion (individual)
+  const inclusionRate = 0.40     // SA individual inclusion rate
+  const taxable       = Math.max(0, gains - exempt) * inclusionRate
+  return round2(taxable * marginalRate)
 }
 
 function computeGrossTax(taxableIncome: number, brackets: TaxBracket[]): number {

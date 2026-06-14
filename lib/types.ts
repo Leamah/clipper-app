@@ -99,7 +99,15 @@ export interface KlippaProfile {
   feature_timesheets:   boolean
   feature_logbook:      boolean
   feature_provisional:  boolean
+  feature_invest_basic: boolean  // FINscope: screener + Buffett + basic snapshots
+  feature_invest_full:  boolean  // FINscope: all 13 modules + SENS + portfolio
   feature_overrides:    boolean  // true = admin has manually set flags; tier changes won't overwrite
+  // FINscope Invest opt-in and persona
+  invest_enabled:       boolean
+  invest_persona:       'beginner' | 'novice' | 'prosumer' | null
+  invest_goal:          string | null
+  invest_horizon:       '3m' | '6m' | '1y' | '3y' | '5y_plus' | null
+  invest_risk_band:     'conservative' | 'balanced' | 'aggressive' | null
   // Retirement savings
   has_ra:               boolean
   ra_contributions:     number
@@ -554,7 +562,7 @@ export interface PracticeStats {
 export interface KlippaTierFeature {
   id:          string
   tier:        SubscriptionTier
-  feature_key: 'timesheets' | 'logbook' | 'provisional'
+  feature_key: 'timesheets' | 'logbook' | 'provisional' | 'invest_basic' | 'invest_full'
   enabled:     boolean
   updated_at:  string
 }
@@ -595,6 +603,9 @@ export interface TaxCalculationInput {
   age:                  number    // for rebate tier + interest exemption threshold
   employeesTaxPaid:     number    // PAYE already deducted (IRP5 code 4102)
   taxYear?:             number    // SARS tax year (e.g. 2025 = 2024/2025). Defaults to 2025.
+  // FINscope Invest extensions (optional — defaults to 0)
+  dividendIncome?:      number    // gross SA dividends received in tax year
+  capitalGains?:        number    // net realised gains, excluding TFSA holdings
 }
 
 export interface TaxCalculationResult {
@@ -615,6 +626,10 @@ export interface TaxCalculationResult {
   taxPayable:           number    // after rebates + medical credits
   employeesTaxPaid:     number
   netTaxPayable:        number    // positive = owe SARS, negative = refund
+  // FINscope Invest additions
+  dwtOnDividends:       number    // 20% of dividendIncome (Section 64J)
+  cgtPayable:           number    // (capitalGains − 40 000) × 0.40 × marginalRate
+  investTaxPayable:     number    // dwtOnDividends + cgtPayable
 }
 
 // ── AI Classification Types ────────────────────────────────
@@ -677,6 +692,115 @@ export const WORK_LOCATION_LABELS: Record<WorkLocation, string> = {
 }
 
 // Client entertainment is only 50% deductible per SARS
+// ── Feature Flags (shared between AppNav and invest pages) ──
+
+export interface FeatureFlags {
+  timesheets:      boolean
+  logbook:         boolean
+  provisional:     boolean
+  is_org_user?:    boolean
+  invest_basic?:   boolean
+  invest_enabled?: boolean
+}
+
+// ── FINscope Invest Types ──────────────────────────────────
+
+export interface InvestCompany {
+  code:           string
+  name:           string
+  sector:         string | null
+  industry:       string | null
+  listed_at:      string | null
+  fiscal_year_end: string | null
+  auditor:        string | null
+  market_cap_zar: number | null
+  is_altx:        boolean
+  updated_at:     string
+}
+
+export interface InvestFinancials {
+  company_code:      string
+  fiscal_year:       number
+  income_statement:  Record<string, unknown>
+  balance_sheet:     Record<string, unknown>
+  cash_flow:         Record<string, unknown>
+  source:            'sharedata' | 'manual' | 'pdf_extract'
+  ingested_at:       string
+}
+
+export interface InvestAnalysisRun {
+  id:                  string
+  company_code:        string
+  fiscal_year_range:   string
+  module_outputs:      Record<string, unknown>
+  ai_commentary:       Record<string, unknown>
+  health_score:        number | null
+  going_concern_score: number | null
+  computed_at:         string
+}
+
+export interface InvestWatchlistEntry {
+  user_id:             string
+  company_code:        string
+  added_at:            string
+  sens_alerts_enabled: boolean
+  company?:            InvestCompany
+}
+
+export interface InvestPortfolio {
+  id:         string
+  user_id:    string
+  name:       string
+  created_at: string
+  holdings?:  InvestHolding[]
+}
+
+export interface InvestHolding {
+  id:               string
+  user_id:          string
+  portfolio_id:     string
+  company_code:     string
+  shares:           number
+  cost_basis_zar:   number
+  acquired_at:      string
+  in_tfsa:          boolean
+  closed_at:        string | null
+  closed_price_zar: number | null
+  company?:         InvestCompany
+}
+
+export interface InvestSensEvent {
+  id:                       string
+  company_code:             string
+  sens_id:                  string
+  category:                 string | null
+  published_at:             string
+  pdf_url:                  string | null
+  extracted_payload:        Record<string, unknown> | null
+  re_analysis_triggered_at: string | null
+  alerts_dispatched_at:     string | null
+  alerts_dispatched_count:  number | null
+  company?:                 InvestCompany
+}
+
+export type InvestPhilosophy = 'buffett' | 'lynch' | 'pabrai' | 'graham' | 'greenblatt'
+
+export const INVEST_PHILOSOPHY_LABELS: Record<InvestPhilosophy, string> = {
+  buffett:    'Warren Buffett',
+  lynch:      'Peter Lynch',
+  pabrai:     'Mohnish Pabrai',
+  graham:     'Benjamin Graham',
+  greenblatt: 'Joel Greenblatt',
+}
+
+export const INVEST_PHILOSOPHY_TAGLINES: Record<InvestPhilosophy, string> = {
+  buffett:    'Wonderful companies at fair prices — held forever',
+  lynch:      'Invest in what you know; find growth before Wall Street does',
+  pabrai:     'Shameless cloning of the best ideas; heads I win, tails I don\'t lose much',
+  graham:     'Margin of safety above all — price is what you pay, value is what you get',
+  greenblatt: 'Magic Formula: high earnings yield + high return on capital',
+}
+
 export const CATEGORY_DEFAULT_DEDUCTIBLE_PCT: Record<ExpenseCategory, number> = {
   phone_internet:         65,   // typical business usage estimate
   home_office:            100,

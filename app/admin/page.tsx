@@ -8,7 +8,7 @@ import Link from 'next/link'
 import {
   ShieldCheck, ArrowLeft, Loader2, Shield, FileText,
   RefreshCw, AlertCircle, ChevronDown, Tag, Plus,
-  ToggleLeft, ToggleRight, Trash2, SlidersHorizontal,
+  ToggleLeft, ToggleRight, Trash2, SlidersHorizontal, BarChart2,
 } from 'lucide-react'
 import type { KlippaTierFeature } from '@/lib/types'
 
@@ -63,7 +63,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function AdminPage() {
   const router = useRouter()
-  const [tab,       setTab]      = useState<'users' | 'ocr' | 'promotions' | 'plan_features'>('users')
+  const [tab,       setTab]      = useState<'users' | 'ocr' | 'promotions' | 'plan_features' | 'invest_companies'>('users')
   const [users,     setUsers]    = useState<UserRow[]>([])
   const [docs,      setDocs]     = useState<DocRow[]>([])
   const [promos,    setPromos]   = useState<PromoRow[]>([])
@@ -88,6 +88,16 @@ export default function AdminPage() {
   const [tierFeatures,    setTierFeatures]    = useState<KlippaTierFeature[]>([])
   const [togglingFeature, setTogglingFeature] = useState<string | null>(null)
   const [syncMsg,         setSyncMsg]         = useState<string | null>(null)
+
+  // Invest Companies state
+  const [investCompanies, setInvestCompanies] = useState<{
+    code: string; name: string; sector: string | null; is_tracked: boolean
+    yahoo_ticker: string | null; last_synced_at: string | null
+  }[]>([])
+  const [newTicker,      setNewTicker]      = useState('')
+  const [addingTicker,   setAddingTicker]   = useState(false)
+  const [syncing,        setSyncing]        = useState(false)
+  const [syncResult,     setSyncResult]     = useState<string | null>(null)
 
   const loadUsers = useCallback(() => {
     setLoading(true); setError(null)
@@ -119,10 +129,18 @@ export default function AdminPage() {
       .catch((e) => setError(e.message))
   }, [])
 
+  const loadInvestCompanies = useCallback(() => {
+    fetch('/api/admin/invest/companies')
+      .then((r) => r.json())
+      .then((d) => { if (d.error) throw new Error(d.error); setInvestCompanies(d.companies ?? []) })
+      .catch((e) => setError(e.message))
+  }, [])
+
   useEffect(() => { loadUsers() }, [loadUsers])
   useEffect(() => { if (tab === 'ocr') loadDocs() }, [tab, loadDocs])
   useEffect(() => { if (tab === 'promotions') loadPromos() }, [tab, loadPromos])
   useEffect(() => { if (tab === 'plan_features') loadTierFeatures() }, [tab, loadTierFeatures])
+  useEffect(() => { if (tab === 'invest_companies') loadInvestCompanies() }, [tab, loadInvestCompanies])
 
   const changeTier = async (userId: string, tier: string) => {
     setUpdating(userId)
@@ -219,11 +237,59 @@ export default function AdminPage() {
     finally { setCreating(false) }
   }
 
+  const addInvestCompany = async () => {
+    if (!newTicker.trim()) return
+    setAddingTicker(true); setError(null)
+    try {
+      const r = await fetch('/api/admin/invest/companies', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: newTicker.trim() }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      setNewTicker('')
+      loadInvestCompanies()
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
+    finally { setAddingTicker(false) }
+  }
+
+  const toggleTracked = async (code: string, is_tracked: boolean) => {
+    setInvestCompanies(prev => prev.map(c => c.code === code ? { ...c, is_tracked } : c))
+    await fetch('/api/admin/invest/companies', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, is_tracked }),
+    })
+  }
+
+  const removeCompany = async (code: string) => {
+    await fetch('/api/admin/invest/companies', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+    setInvestCompanies(prev => prev.filter(c => c.code !== code))
+  }
+
+  const runSync = async () => {
+    setSyncing(true); setSyncResult(null)
+    try {
+      const secret = prompt('Enter INTERNAL_CRON_SECRET:')
+      if (!secret) return
+      const r = await fetch('/api/admin/invest/sync', {
+        method: 'POST', headers: { Authorization: `Bearer ${secret}` },
+      })
+      const d = await r.json()
+      setSyncResult(`Synced ${d.synced ?? 0} companies. Errors: ${d.errors?.length ?? 0}. No data: ${d.no_data ?? 0}`)
+      loadInvestCompanies()
+    } catch (e: unknown) { setSyncResult(`Error: ${e instanceof Error ? e.message : String(e)}`) }
+    finally { setSyncing(false) }
+  }
+
   const tabs = [
-    { key: 'users',         label: 'Users',         icon: <Shield              className="w-3.5 h-3.5" /> },
-    { key: 'ocr',           label: 'OCR Queue',     icon: <FileText            className="w-3.5 h-3.5" /> },
-    { key: 'promotions',    label: 'Promotions',    icon: <Tag                 className="w-3.5 h-3.5" /> },
-    { key: 'plan_features', label: 'Plan Features', icon: <SlidersHorizontal  className="w-3.5 h-3.5" /> },
+    { key: 'users',            label: 'Users',            icon: <Shield             className="w-3.5 h-3.5" /> },
+    { key: 'ocr',              label: 'OCR Queue',        icon: <FileText           className="w-3.5 h-3.5" /> },
+    { key: 'promotions',       label: 'Promotions',       icon: <Tag                className="w-3.5 h-3.5" /> },
+    { key: 'plan_features',    label: 'Plan Features',    icon: <SlidersHorizontal  className="w-3.5 h-3.5" /> },
+    { key: 'invest_companies', label: 'Invest Companies', icon: <BarChart2          className="w-3.5 h-3.5" /> },
   ] as const
 
   return (
@@ -400,9 +466,11 @@ export default function AdminPage() {
                   </thead>
                   <tbody>
                     {([
-                      { key: 'logbook',     label: 'Logbook',     desc: 'SARS vehicle logbook & mileage tracking' },
-                      { key: 'timesheets',  label: 'Timesheets',  desc: 'Consultant timesheet management & signoff' },
-                      { key: 'provisional', label: 'Provisional', desc: 'Provisional tax returns (IRP6)' },
+                      { key: 'logbook',      label: 'Logbook',          desc: 'SARS vehicle logbook & mileage tracking' },
+                      { key: 'timesheets',   label: 'Timesheets',       desc: 'Consultant timesheet management & signoff' },
+                      { key: 'provisional',  label: 'Provisional',      desc: 'Provisional tax returns (IRP6)' },
+                      { key: 'invest_basic', label: 'Invest Basic',     desc: 'FINscope: screener + Buffett philosophy + read-only snapshots' },
+                      { key: 'invest_full',  label: 'Invest Full',      desc: 'FINscope: all 13 modules + SENS alerts + portfolio builder + Going Concern' },
                     ] as const).map(({ key: featureKey, label, desc }) => (
                       <tr key={featureKey} className="border-b border-edge/60 last:border-0">
                         <td className="px-5 py-4">
@@ -626,6 +694,92 @@ export default function AdminPage() {
                       </td>
                       <td className="px-4 py-3">
                         <button onClick={() => deletePromo(p.id)} className="text-ink-3 hover:text-red-400 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        {/* ── Invest Companies tab ── */}
+        {tab === 'invest_companies' && (
+          <div className="space-y-6">
+            {/* Add company */}
+            <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-4">
+              <h2 className="text-sm font-semibold text-ink-1 flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-emerald-400" />
+                Tracked JSE Companies
+              </h2>
+              <p className="text-xs text-ink-2">Enter a JSE ticker code (e.g. <span className="font-mono text-emerald-300">SOL</span> for Sasol). Metadata is fetched from Yahoo Finance automatically. The nightly cron syncs financials for all tracked companies.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  value={newTicker}
+                  onChange={(e) => setNewTicker(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && addInvestCompany()}
+                  placeholder="JSE ticker (e.g. SOL)"
+                  className="flex-1 bg-raised border border-edge rounded-lg px-3 py-2 text-sm font-mono text-ink-1 placeholder:text-ink-3 focus:outline-none focus:border-emerald-500/50"
+                />
+                <button
+                  onClick={addInvestCompany}
+                  disabled={addingTicker || !newTicker.trim()}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold"
+                >
+                  {addingTicker ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Add
+                </button>
+                <button
+                  onClick={runSync}
+                  disabled={syncing}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-edge hover:bg-raised text-xs text-ink-2 hover:text-ink-1"
+                >
+                  {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Sync Now
+                </button>
+              </div>
+              {syncResult && (
+                <p className="text-xs text-emerald-300 bg-emerald-500/10 rounded-lg px-3 py-2">{syncResult}</p>
+              )}
+            </div>
+
+            {/* Company list */}
+            <div className="rounded-2xl border border-edge overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-edge bg-surface/60">
+                    {['Code', 'Name', 'Sector', 'Yahoo Ticker', 'Last Synced', 'Tracked', ''].map((h) => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-medium text-ink-2">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {investCompanies.length === 0 ? (
+                    <tr><td colSpan={7} className="text-center py-12 text-ink-2 text-xs">No companies yet — add a JSE ticker above</td></tr>
+                  ) : investCompanies.map((c) => (
+                    <tr key={c.code} className="border-b border-edge/60 hover:bg-surface/30 transition-colors">
+                      <td className="px-4 py-3 text-xs font-mono text-emerald-300">{c.code}</td>
+                      <td className="px-4 py-3 text-xs text-ink-1 max-w-[180px] truncate">{c.name}</td>
+                      <td className="px-4 py-3 text-xs text-ink-2">{c.sector ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs font-mono text-ink-3">{c.yahoo_ticker ?? `${c.code}.JO`}</td>
+                      <td className="px-4 py-3 text-xs text-ink-3">
+                        {c.last_synced_at
+                          ? new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(c.last_synced_at))
+                          : 'Never'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => toggleTracked(c.code, !c.is_tracked)} className="flex items-center gap-1">
+                          {c.is_tracked
+                            ? <ToggleRight className="w-5 h-5 text-emerald-400" />
+                            : <ToggleLeft  className="w-5 h-5 text-ink-3" />}
+                          <span className={`text-xs ${c.is_tracked ? 'text-emerald-400' : 'text-ink-3'}`}>
+                            {c.is_tracked ? 'On' : 'Off'}
+                          </span>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => removeCompany(c.code)} className="text-ink-3 hover:text-red-400 transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
