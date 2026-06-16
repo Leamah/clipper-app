@@ -19,6 +19,9 @@ export async function GET() {
   const { data: { user } } = await anon.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: profile } = await anon.from('klippa_profiles').select('subscription_tier').eq('id', user.id).single()
+  if (profile?.subscription_tier !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const apiKey = (process.env.BREVO_API_KEY ?? '').trim()
 
   if (!apiKey) {

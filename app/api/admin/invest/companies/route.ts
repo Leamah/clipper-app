@@ -1,6 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse }  from 'next/server'
-import yahooFinance      from 'yahoo-finance2'
+import { createClient }       from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies }            from 'next/headers'
+import { NextResponse }       from 'next/server'
+import yahooFinance           from 'yahoo-finance2'
 
 interface YahooMeta {
   price?: { longName?: string | null; shortName?: string | null; marketCap?: number | null }
@@ -13,8 +15,24 @@ function adminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key)
 }
 
+async function requireAdmin(): Promise<{ error: Response } | { error: null }> {
+  const cookieStore = cookies()
+  const anon = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll() { return cookieStore.getAll() }, setAll() {} } },
+  )
+  const { data: { user } } = await anon.auth.getUser()
+  if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) as unknown as Response }
+  const { data: profile } = await anon.from('klippa_profiles').select('subscription_tier').eq('id', user.id).single()
+  if (profile?.subscription_tier !== 'admin') return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as unknown as Response }
+  return { error: null }
+}
+
 // GET — list all invest companies with tracking status
 export async function GET() {
+  const auth = await requireAdmin()
+  if (auth.error) return auth.error
   const admin = adminClient()
   const { data, error } = await admin
     .from('klippa_invest_companies')
@@ -27,6 +45,8 @@ export async function GET() {
 
 // POST — add a company by JSE code; looks up metadata from Yahoo Finance
 export async function POST(request: Request) {
+  const auth = await requireAdmin()
+  if (auth.error) return auth.error
   const { code } = await request.json()
   if (!code) return NextResponse.json({ error: 'code required' }, { status: 400 })
 
@@ -79,6 +99,8 @@ export async function POST(request: Request) {
 
 // PATCH — toggle is_tracked or set a custom yahoo_ticker
 export async function PATCH(request: Request) {
+  const auth = await requireAdmin()
+  if (auth.error) return auth.error
   const { code, is_tracked, yahoo_ticker } = await request.json()
   if (!code) return NextResponse.json({ error: 'code required' }, { status: 400 })
 
@@ -94,6 +116,8 @@ export async function PATCH(request: Request) {
 
 // DELETE — remove a company (financials + analyses cascade-delete)
 export async function DELETE(request: Request) {
+  const auth = await requireAdmin()
+  if (auth.error) return auth.error
   const { code } = await request.json()
   if (!code) return NextResponse.json({ error: 'code required' }, { status: 400 })
 

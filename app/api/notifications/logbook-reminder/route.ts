@@ -65,6 +65,11 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = cookies()
+  const anon = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  )
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -75,9 +80,9 @@ export async function POST(request: Request) {
   const isAll = url.searchParams.get('all') === '1'
 
   if (isAll) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await anon.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const { data: profile } = await supabase.from('klippa_profiles').select('subscription_tier').eq('id', user.id).single()
+    const { data: profile } = await anon.from('klippa_profiles').select('subscription_tier').eq('id', user.id).single()
     if (profile?.subscription_tier !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

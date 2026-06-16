@@ -172,6 +172,7 @@ export async function GET() {
     .single()
 
   if (!profile?.organisation_id) return NextResponse.json({ invites: [] })
+  if (profile.org_role !== 'org-admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: invites, error } = await admin
     .from('klippa_org_invites')
