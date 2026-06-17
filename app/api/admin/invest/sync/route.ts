@@ -2,7 +2,9 @@ import { createClient }       from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
-import yahooFinance           from 'yahoo-finance2'
+import YahooFinance           from 'yahoo-finance2'
+
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] })
 
 // yahoo-finance2 quoteSummary result shape for the modules we request
 interface YahooSummary {

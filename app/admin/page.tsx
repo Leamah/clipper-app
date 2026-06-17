@@ -275,7 +275,8 @@ export default function AdminPage() {
       const r = await fetch('/api/admin/invest/sync', { method: 'POST' })
       const d = await r.json()
       if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`)
-      setSyncResult(`Synced ${d.synced ?? 0} companies. Errors: ${d.errors?.length ?? 0}. No data: ${d.no_data ?? 0}`)
+      const firstErr = d.errors?.[0] ? ` | First error [${d.errors[0].code}]: ${d.errors[0].message}` : ''
+      setSyncResult(`Synced ${d.synced ?? 0} companies. Errors: ${d.errors?.length ?? 0}. No data: ${d.no_data ?? 0}${firstErr}`)
       loadInvestCompanies()
     } catch (e: unknown) { setSyncResult(`Error: ${e instanceof Error ? e.message : String(e)}`) }
     finally { setSyncing(false) }
