@@ -71,8 +71,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Notify the Klippa team
-  const brevoKey = (process.env.BREVO_API_KEY ?? '').trim() || null
-  if (brevoKey) {
+  if ((process.env.BREVO_API_KEY ?? '').trim()) {
     const typeLabel: Record<LeadType, string> = {
       custom_org_pricing: 'Custom org pricing inquiry',
       seat_reassignment:  'Seat reassignment request',
@@ -116,7 +115,6 @@ export async function POST(req: NextRequest) {
 
     try {
       await sendBrevoEmail({
-        apiKey:   brevoKey,
         to:       'info@leamah.co.za',
         subject:  `[Klippa lead] ${typeLabel[lead_type]} — ${orgName || userEmail}`,
         html,

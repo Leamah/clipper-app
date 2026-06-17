@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Webhook } from 'standardwebhooks'
+import { sendBrevoEmail } from '@/lib/brevo'
 
 export const runtime = 'nodejs'
 
@@ -27,30 +28,6 @@ function buildActionUrl(tokenHash: string, type: ActionType, redirectTo: string)
   return `${supabaseUrl}/auth/v1/verify?token=${tokenHash}&type=${type}&redirect_to=${encodeURIComponent(redirectTo)}`
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
-  const apiKey = process.env.BREVO_API_KEY
-  if (!apiKey) throw new Error('BREVO_API_KEY not configured')
-
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method:  'POST',
-    headers: {
-      'accept':       'application/json',
-      'api-key':      apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      sender:      { name: 'Klippa', email: 'noreply@mail.klippa.co.za' },
-      to:          [{ email: to }],
-      subject,
-      htmlContent: html,
-    }),
-  })
-
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Brevo ${res.status}: ${body}`)
-  }
-}
 
 function emailShell(content: string): string {
   return `<!DOCTYPE html>
@@ -214,7 +191,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { subject, html } = buildEmail(email_action_type, actionUrl, user.email)
-    await sendEmail(user.email, subject, html)
+    await sendBrevoEmail({ to: user.email, subject, html })
   } catch (err) {
     console.error('[email-hook] Failed to send email:', err)
     return NextResponse.json({ error: 'Email send failed' }, { status: 500 })

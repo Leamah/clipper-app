@@ -1,30 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { escapeHtml } from '@/lib/security'
+import { sendBrevoEmail } from '@/lib/brevo'
 
 export const dynamic = 'force-dynamic'
 
 const MAX_BYTES     = 15 * 1024 * 1024  // 15 MB
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp', 'application/pdf']
 
-async function sendBrevoEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
-  const apiKey = process.env.BREVO_API_KEY
-  if (!apiKey) return  // notification is best-effort — never block an upload
-  try {
-    await fetch('https://api.brevo.com/v3/smtp/email', {
-      method:  'POST',
-      headers: { 'accept': 'application/json', 'api-key': apiKey, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        sender:      { name: 'Klippa', email: 'noreply@mail.klippa.co.za' },
-        to:          [{ email: to }],
-        subject,
-        htmlContent: html,
-      }),
-    })
-  } catch (e) {
-    console.error('[portal upload] Brevo notify failed:', e)
-  }
-}
 
 // POST /api/portal/[token]/upload — client uploads a document (multipart form)
 // Fields: file (required), checklist_item_id (optional)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { sendBrevoEmail } from '@/lib/brevo'
 import {
   startOfWeek, addWeeks, isBefore, getISOWeek, getISOWeekYear,
 } from 'date-fns'
@@ -35,29 +36,6 @@ function countPendingWeeks(taxYear: number, reviewedWeeks: Set<string>): number 
   return count
 }
 
-async function sendBrevoEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
-  const apiKey = process.env.BREVO_API_KEY
-  if (!apiKey) throw new Error('BREVO_API_KEY not configured')
-
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method:  'POST',
-    headers: {
-      'accept':       'application/json',
-      'api-key':      apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      sender:      { name: 'Klippa', email: 'noreply@mail.klippa.co.za' },
-      to:          [{ email: to }],
-      subject,
-      htmlContent: html,
-    }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Brevo ${res.status}: ${body}`)
-  }
-}
 
 export async function POST(request: Request) {
   if (!process.env.BREVO_API_KEY) {

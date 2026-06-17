@@ -2,22 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient }       from '@supabase/supabase-js'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
-
-async function sendBrevoEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
-  const apiKey = (process.env.BREVO_API_KEY ?? '').trim()
-  if (!apiKey) throw new Error('BREVO_API_KEY not configured')
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method:  'POST',
-    headers: { 'accept': 'application/json', 'api-key': apiKey, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      sender:      { name: 'Klippa', email: 'noreply@mail.klippa.co.za' },
-      to:          [{ email: to }],
-      subject,
-      htmlContent: html,
-    }),
-  })
-  if (!res.ok) throw new Error(`Brevo ${res.status}: ${await res.text()}`)
-}
+import { sendBrevoEmail }     from '@/lib/brevo'
 
 // POST /api/org/reminders — send reminder emails to missing consultants
 // Body: { consultant_ids?: string[] }  — omit to send to ALL missing

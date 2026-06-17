@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { sendBrevoEmail } from '@/lib/brevo'
 
 export async function POST(req: NextRequest) {
   // Rate-limit: 5 submissions per IP per minute
@@ -18,12 +19,6 @@ export async function POST(req: NextRequest) {
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
-    }
-
-    const apiKey = (process.env.BREVO_API_KEY ?? '').trim()
-    if (!apiKey) {
-      console.error('[feedback] BREVO_API_KEY not set')
-      return NextResponse.json({ error: 'Email not configured' }, { status: 500 })
     }
 
     const subjectLine = subject?.trim()
@@ -58,27 +53,17 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`
 
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method:  'POST',
-      headers: { 'accept': 'application/json', 'api-key': apiKey, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        sender:      { name: 'Klippa Feedback', email: 'noreply@mail.klippa.co.za' },
-        to:          [{ email: 'info@leamah.co.za', name: 'Klippa Support' }],
-        replyTo:     email ? { email } : undefined,
-        subject:     subjectLine,
-        htmlContent: html,
-      }),
+    await sendBrevoEmail({
+      to:          'info@leamah.co.za',
+      subject:     subjectLine,
+      html,
+      replyTo:     email,
+      senderName:  'Klippa Feedback',
     })
-
-    if (!res.ok) {
-      const body = await res.text()
-      console.error('[feedback] Brevo error:', res.status, body)
-      return NextResponse.json({ error: 'Failed to send feedback' }, { status: 500 })
-    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[feedback] Unexpected error:', err)
-    return NextResponse.json({ error: 'Unexpected error' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to send feedback' }, { status: 500 })
   }
 }
