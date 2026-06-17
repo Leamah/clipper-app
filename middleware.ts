@@ -14,8 +14,9 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/auth/') ||
     pathname === '/api/payments/ozow/notify' ||
-    pathname === '/api/auth/send-otp' ||   // public: no session needed to request a magic link
-    pathname === '/api/feedback' ||        // feedback can be sent by anyone (even logged-out landing page visitors)
+    pathname === '/api/auth/send-otp' ||      // public: no session needed to request a magic link
+    pathname === '/api/auth/email-hook' ||  // Supabase calls this server-side — no user session, auth via webhook signature
+    pathname === '/api/feedback' ||         // feedback can be sent by anyone (even logged-out landing page visitors)
     pathname.startsWith('/portal/') ||
     pathname.startsWith('/api/portal/')
   ) {
