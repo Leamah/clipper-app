@@ -272,12 +272,9 @@ export default function AdminPage() {
   const runSync = async () => {
     setSyncing(true); setSyncResult(null)
     try {
-      const secret = prompt('Enter INTERNAL_CRON_SECRET:')
-      if (!secret) return
-      const r = await fetch('/api/admin/invest/sync', {
-        method: 'POST', headers: { Authorization: `Bearer ${secret}` },
-      })
+      const r = await fetch('/api/admin/invest/sync', { method: 'POST' })
       const d = await r.json()
+      if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`)
       setSyncResult(`Synced ${d.synced ?? 0} companies. Errors: ${d.errors?.length ?? 0}. No data: ${d.no_data ?? 0}`)
       loadInvestCompanies()
     } catch (e: unknown) { setSyncResult(`Error: ${e instanceof Error ? e.message : String(e)}`) }

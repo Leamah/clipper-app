@@ -1,6 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse }  from 'next/server'
-import yahooFinance      from 'yahoo-finance2'
+import { createClient }       from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies }            from 'next/headers'
+import { NextResponse }       from 'next/server'
+import yahooFinance           from 'yahoo-finance2'
 
 // yahoo-finance2 quoteSummary result shape for the modules we request
 interface YahooSummary {
@@ -142,14 +144,26 @@ async function syncCompany(
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
-// Vercel Cron calls this daily at 20:00 UTC (22:00 SAST).
-// Auth: Authorization: Bearer <INTERNAL_CRON_SECRET>
+// Auth: either Vercel Cron bearer token OR an active admin session cookie.
 export async function POST(request: Request) {
   const authHeader = request.headers.get('Authorization')
   const secret     = process.env.INTERNAL_CRON_SECRET
 
-  if (!secret || authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const isCron = secret && authHeader === `Bearer ${secret}`
+
+  if (!isCron) {
+    // Fall back to session-based admin check
+    const cookieStore = cookies()
+    const anon = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll() { return cookieStore.getAll() }, setAll() {} } },
+    )
+    const { data: { user } } = await anon.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const { data: profile } = await admin.from('klippa_profiles').select('subscription_tier').eq('id', user.id).single()
+    if (profile?.subscription_tier !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
