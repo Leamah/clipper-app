@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import AppNav from '@/components/AppNav'
+import { supabase }  from '@/lib/supabase'
+import AppNav        from '@/components/AppNav'
 import { BookOpen, Loader2, Lock, ChevronRight } from 'lucide-react'
 import type { KlippaProfile, FeatureFlags } from '@/lib/types'
 
@@ -25,9 +25,19 @@ const MODULES = [
   { id: 'M13', label: 'Risk-Adjusted Return',   ifrs: 'IFRS 7 — Financial Instruments Disclosures' },
 ]
 
+interface ModuleContent {
+  standard:       string
+  description:    string
+  ratios:         string[]
+  worked_example: string
+}
+
 export default function InvestLearningPage() {
   const [profile,      setProfile]      = useState<KlippaProfile | null>(null)
   const [loading,      setLoading]      = useState(true)
+  const [expanded,     setExpanded]     = useState<string | null>(null)
+  const [content,      setContent]      = useState<Record<string, ModuleContent>>({})
+  const [fetching,     setFetching]     = useState<string | null>(null)
   const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({ timesheets: false, logbook: false, provisional: false })
 
   useEffect(() => {
@@ -66,6 +76,19 @@ export default function InvestLearningPage() {
     </div>
   )
 
+  async function toggleModule(id: string) {
+    if (expanded === id) { setExpanded(null); return }
+    setExpanded(id)
+    if (content[id]) return
+    setFetching(id)
+    const res = await fetch(`/api/invest/learning/${id}`)
+    if (res.ok) {
+      const d = await res.json()
+      setContent((prev) => ({ ...prev, [id]: d }))
+    }
+    setFetching(null)
+  }
+
   const isFull = profile?.feature_invest_full ?? false
 
   return (
@@ -92,19 +115,46 @@ export default function InvestLearningPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {MODULES.map((m) => (
-              <Link key={m.id} href={`/api/invest/learning/${m.id}`}
-                className="flex items-center justify-between gap-3 rounded-xl border border-edge bg-surface/40 hover:bg-surface hover:border-emerald-500/30 px-4 py-3.5 transition-all group">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-edge font-mono text-ink-3">{m.id}</span>
-                    <p className="text-sm font-medium text-ink-1 group-hover:text-ink-1">{m.label}</p>
-                  </div>
-                  <p className="text-xs text-ink-3 mt-0.5">{m.ifrs}</p>
+            {MODULES.map((m) => {
+              const isOpen = expanded === m.id
+              const c      = content[m.id]
+              return (
+                <div key={m.id} className="rounded-xl border border-edge bg-surface/40 overflow-hidden transition-all">
+                  <button
+                    onClick={() => toggleModule(m.id)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-surface transition-colors group text-left"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-edge font-mono text-ink-3">{m.id}</span>
+                        <p className="text-sm font-medium text-ink-1">{m.label}</p>
+                      </div>
+                      <p className="text-xs text-ink-3 mt-0.5">{m.ifrs}</p>
+                    </div>
+                    {fetching === m.id
+                      ? <Loader2 className="w-4 h-4 text-ink-3 animate-spin flex-shrink-0" />
+                      : <ChevronRight className={`w-4 h-4 text-ink-3 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    }
+                  </button>
+                  {isOpen && c && (
+                    <div className="border-t border-edge px-4 py-4 space-y-3">
+                      <p className="text-xs text-ink-2 leading-relaxed">{c.description}</p>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wide">Key ratios</p>
+                        {c.ratios.map((r) => (
+                          <p key={r} className="text-xs font-mono text-emerald-400 bg-surface border border-edge rounded-lg px-3 py-1.5">{r}</p>
+                        ))}
+                      </div>
+                      <div className="rounded-lg bg-surface/60 border border-edge px-3 py-2.5">
+                        <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wide mb-1">Worked example</p>
+                        <p className="text-xs text-ink-2 leading-relaxed">{c.worked_example}</p>
+                      </div>
+                      <p className="text-[10px] text-ink-3">{c.standard}</p>
+                    </div>
+                  )}
                 </div>
-                <ChevronRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500 flex-shrink-0 transition-colors" />
-              </Link>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>

@@ -139,12 +139,12 @@ export default function InvestPortfolioPage() {
                   <div key={p.id} className="rounded-2xl border border-edge bg-surface/40 p-4 flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-semibold text-ink-1">{p.name}</p>
-                      <p className="text-xs text-ink-3 mt-0.5">Created {new Date(p.created_at).toLocaleDateString('en-ZA')}</p>
+                      <p className="text-xs text-ink-3 mt-0.5">
+                        Created {new Date(p.created_at).toLocaleDateString('en-ZA')}
+                        {Array.isArray((p as unknown as { holdings?: unknown[] }).holdings) &&
+                          ` · ${(p as unknown as { holdings: unknown[] }).holdings.length} holding${(p as unknown as { holdings: unknown[] }).holdings.length === 1 ? '' : 's'}`}
+                      </p>
                     </div>
-                    <Link href={`/api/invest/portfolio/${p.id}`}
-                      className="text-xs text-emerald-500 hover:underline">
-                      View →
-                    </Link>
                   </div>
                 ))}
               </div>

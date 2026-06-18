@@ -167,14 +167,71 @@ export default function InvestComparePage() {
             </div>
 
             {/* Comparison results */}
-            {comparison && (
-              <div className="rounded-2xl border border-edge bg-surface/40 p-5 overflow-x-auto">
-                <p className="text-sm font-semibold text-ink-1 mb-4">Comparison results</p>
-                <pre className="text-xs text-ink-2 whitespace-pre-wrap leading-relaxed">
-                  {JSON.stringify(comparison, null, 2)}
-                </pre>
-              </div>
-            )}
+            {comparison && (() => {
+              const data = comparison as {
+                companies: { code: string; name: string; sector: string | null }[]
+                analyses:  Record<string, { health_score: number; module_outputs: Record<string, { label: string; value: number | null; unit: string }> }>
+              }
+              const companies = data.companies ?? []
+              const ROWS = [
+                { key: 'M01', label: 'ROE' },
+                { key: 'M02', label: 'D/E' },
+                { key: 'M03', label: 'Current Ratio' },
+                { key: 'M04', label: 'EPS Growth' },
+                { key: 'M05', label: 'Net Margin' },
+                { key: 'M06', label: 'Cash Flow Quality' },
+                { key: 'M07', label: 'Gross Margin' },
+                { key: 'M08', label: 'Revenue Growth' },
+                { key: 'M09', label: 'Interest Coverage' },
+                { key: 'M10', label: 'Asset Turnover' },
+                { key: 'M11', label: 'Retained Earnings' },
+                { key: 'M12', label: 'Payout Ratio' },
+                { key: 'M13', label: 'Altman Z\'' },
+              ]
+              return (
+                <div className="rounded-2xl border border-edge bg-surface/40 overflow-x-auto">
+                  <table className="w-full text-xs min-w-[500px]">
+                    <thead>
+                      <tr className="border-b border-edge bg-surface/60">
+                        <th className="text-left px-4 py-3 text-ink-3 font-medium w-36">Metric</th>
+                        {companies.map((c) => (
+                          <th key={c.code} className="text-left px-4 py-3 font-medium">
+                            <Link href={`/invest/companies/${c.code}`} className="text-emerald-400 hover:underline">{c.code}</Link>
+                            <p className="text-[10px] text-ink-3 font-normal truncate max-w-[120px]">{c.name}</p>
+                          </th>
+                        ))}
+                      </tr>
+                      <tr className="border-b border-edge bg-surface/30">
+                        <td className="px-4 py-2 text-ink-3">Health Score</td>
+                        {companies.map((c) => {
+                          const hs = data.analyses[c.code]?.health_score ?? null
+                          return (
+                            <td key={c.code} className="px-4 py-2 font-semibold text-emerald-400">
+                              {hs !== null ? `${hs}%` : '—'}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ROWS.map((row, i) => (
+                        <tr key={row.key} className={`border-b border-edge/50 ${i % 2 === 0 ? '' : 'bg-surface/20'}`}>
+                          <td className="px-4 py-2.5 text-ink-3">{row.label}</td>
+                          {companies.map((c) => {
+                            const m = data.analyses[c.code]?.module_outputs?.[row.key]
+                            return (
+                              <td key={c.code} className="px-4 py-2.5 text-ink-1">
+                                {m?.value != null ? `${m.value}${m.unit}` : '—'}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </>
         )}
 
