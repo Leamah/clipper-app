@@ -37,6 +37,28 @@ function computeMetrics(f: FinRow) {
   }
 }
 
+function fmt(n: number | null, suffix = '%'): string {
+  if (n == null || !isFinite(n)) return 'N/A'
+  return `${n.toFixed(1)}${suffix}`
+}
+
+function buildRationale(name: InvestPhilosophy, m: ReturnType<typeof computeMetrics>): string {
+  switch (name) {
+    case 'buffett':
+      return `ROE ${fmt(m.roe)} · Net margin ${fmt(m.margin)} · D/E ${fmt(m.de, 'x')} · FCF ${m.fcf > 0 ? 'positive' : 'negative'} · Gross margin ${fmt(m.grossMargin)}`
+    case 'graham':
+      return `Current ratio ${fmt(m.currentRatio, 'x')} · D/E ${fmt(m.de, 'x')} · Net margin ${fmt(m.margin)} · Payout ratio ${fmt(m.payoutRatio)} · FCF ${m.fcf > 0 ? 'positive' : 'negative'}`
+    case 'lynch':
+      return `Net margin ${fmt(m.margin)} · ROE ${fmt(m.roe)} · FCF ${m.fcf > 0 ? 'positive' : 'negative'} · D/E ${fmt(m.de, 'x')}`
+    case 'pabrai':
+      return `ROE ${fmt(m.roe)} · D/E ${fmt(m.de, 'x')} · Net margin ${fmt(m.margin)} · FCF ${m.fcf > 0 ? 'positive' : 'negative'}`
+    case 'greenblatt':
+      return `ROE ${fmt(m.roe)} · EBIT R${(m.ebit / 1e6).toFixed(0)}m · Net margin ${fmt(m.margin)}`
+    default:
+      return ''
+  }
+}
+
 function applyFilter(
   name: InvestPhilosophy,
   companies: CompanyRow[],
@@ -97,7 +119,13 @@ function applyFilter(
     .filter(c => c.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
-    .map(({ code, name: cName, sector, metrics, score }) => ({ code, name: cName, sector, metrics, score }))
+    .map(({ code, name: cName, sector, metrics, score }) => ({
+      company_code: code,
+      company_name: cName,
+      sector,
+      fit_score:    score,
+      rationale:    buildRationale(name, metrics),
+    }))
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
