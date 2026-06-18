@@ -19,6 +19,7 @@ interface PhilosophyResult {
   company_code: string
   company_name: string
   fit_score:    number
+  max_score:    number
   rationale:    string
 }
 
@@ -129,7 +130,7 @@ export default function PhilosophyPage() {
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-ink-3">Top 5 JSE companies ranked by {label} fit score</p>
+              <p className="text-xs text-ink-3">Top JSE companies ranked by {label} fit score</p>
               <button onClick={runPhilosophy} disabled={running}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold disabled:opacity-50 transition-colors">
                 {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Star className="w-3.5 h-3.5" />}
@@ -154,7 +155,10 @@ export default function PhilosophyPage() {
                         <p className="text-xs text-ink-3 mt-0.5">{r.company_code}</p>
                       </div>
                       <div className="flex-shrink-0 text-right">
-                        <p className="text-lg font-bold text-emerald-500">{r.fit_score}</p>
+                        <p className="text-lg font-bold text-emerald-500">
+                          {r.fit_score}
+                          <span className="text-sm font-normal text-ink-3"> / {r.max_score}</span>
+                        </p>
                         <p className="text-[10px] text-ink-3">fit score</p>
                       </div>
                     </div>

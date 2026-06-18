@@ -59,11 +59,21 @@ function buildRationale(name: InvestPhilosophy, m: ReturnType<typeof computeMetr
   }
 }
 
+const MAX_SCORE: Record<InvestPhilosophy, number> = {
+  buffett:    10, // 3+2+2+2+1
+  graham:     10, // 3+2+2+2+1
+  lynch:      10, // 2+2+2+2+2
+  pabrai:     10, // 3+3+2+2
+  greenblatt:  8, // 4+2+2
+}
+
 function applyFilter(
   name: InvestPhilosophy,
   companies: CompanyRow[],
   latestFin: Record<string, FinRow>
 ) {
+  const maxScore  = MAX_SCORE[name]
+  const threshold = Math.ceil(maxScore * 0.4) // must pass at least 40% of criteria
   type Scored = CompanyRow & { metrics: ReturnType<typeof computeMetrics>; score: number }
   const scored: Scored[] = []
 
@@ -116,14 +126,15 @@ function applyFilter(
   }
 
   return scored
-    .filter(c => c.score > 0)
+    .filter(c => c.score >= threshold)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 20)
+    .slice(0, 10)
     .map(({ code, name: cName, sector, metrics, score }) => ({
       company_code: code,
       company_name: cName,
       sector,
       fit_score:    score,
+      max_score:    maxScore,
       rationale:    buildRationale(name, metrics),
     }))
 }
