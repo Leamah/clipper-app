@@ -3,20 +3,26 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
-import { Compass, Loader2, ArrowRight } from 'lucide-react'
+import { Compass, Loader2 } from 'lucide-react'
 import type { KlippaProfile, FeatureFlags } from '@/lib/types'
 
 const FAIS_DISCLAIMER = 'Investment Compass outputs are a screened shortlist — not financial advice as defined by the FAIS Act. For personalised advice, consult an authorised Financial Services Provider.'
 
 interface CompassResult {
-  company_code: string
-  company_name: string
-  recommended_amount_zar: number
-  rationale: string
-  philosophy_fit: string
+  category:       string
+  description:    string
+  allocation_pct: number
+  allocation_zar: number
+}
+
+interface CompassResponse {
+  amount:          number
+  horizon:         string
+  risk_band:       string
+  recommendations: CompassResult[]
+  tax_note:        string
 }
 
 export default function InvestCompassPage() {
@@ -24,6 +30,7 @@ export default function InvestCompassPage() {
   const [loading,        setLoading]        = useState(true)
   const [running,        setRunning]        = useState(false)
   const [results,        setResults]        = useState<CompassResult[]>([])
+  const [taxNote,        setTaxNote]        = useState<string>('')
   const [amount,         setAmount]         = useState('')
   const [horizon,        setHorizon]        = useState('1y')
   const [risk,           setRisk]           = useState('balanced')
@@ -56,8 +63,8 @@ export default function InvestCompassPage() {
         const now = new Date()
         const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
         const [{ data: income }, { data: expenses }] = await Promise.all([
-          supabase.from('klippa_incomes').select('amount').eq('user_id', user.id).gte('received_date', monthStart),
-          supabase.from('klippa_expenses').select('deductible_amount').eq('user_id', user.id).gte('expense_date', monthStart),
+          supabase.from('klippa_income_records').select('amount').eq('user_id', user.id).gte('received_date', monthStart),
+          supabase.from('klippa_expense_records').select('deductible_amount').eq('user_id', user.id).gte('expense_date', monthStart),
         ])
         const totalIncome   = (income ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
         const totalExpenses = (expenses ?? []).reduce((s, r) => s + (r.deductible_amount ?? 0), 0)
@@ -82,8 +89,9 @@ export default function InvestCompassPage() {
     })
 
     if (res.ok) {
-      const data = await res.json()
+      const data: CompassResponse = await res.json()
       setResults(data.recommendations ?? [])
+      setTaxNote(data.tax_note ?? '')
       setSessionCount((n) => n + 1)
     }
     setRunning(false)
@@ -180,25 +188,24 @@ export default function InvestCompassPage() {
         {/* Results */}
         {results.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs text-ink-3">Showing top {results.length} matches for R{parseFloat(amount).toLocaleString('en-ZA')} · {horizon} · {risk}</p>
+            {taxNote && (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-xs text-ink-2 leading-relaxed">
+                {taxNote}
+              </div>
+            )}
+            <p className="text-xs text-ink-3">{results.length} asset categories · R{parseFloat(amount).toLocaleString('en-ZA')} · {horizon} · {risk}</p>
             {results.map((r, i) => (
-              <div key={r.company_code} className="rounded-2xl border border-edge bg-surface/40 p-4 space-y-2">
+              <div key={r.category} className="rounded-2xl border border-edge bg-surface/40 p-4 space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className="text-[10px] font-bold text-ink-3 mr-1.5">#{i + 1}</span>
-                    <span className="text-sm font-semibold text-ink-1">{r.company_name}</span>
-                    <p className="text-xs text-ink-3 mt-0.5">{r.company_code} · {r.philosophy_fit} fit</p>
+                    <span className="text-sm font-semibold text-ink-1">{r.category}</span>
+                    <p className="text-xs text-ink-3 mt-0.5">{r.allocation_pct}% allocation</p>
                   </div>
-                  <p className="text-sm font-bold text-emerald-500 flex-shrink-0">R{r.recommended_amount_zar.toLocaleString('en-ZA')}</p>
+                  <p className="text-sm font-bold text-emerald-500 flex-shrink-0">R{r.allocation_zar.toLocaleString('en-ZA')}</p>
                 </div>
-                <p className="text-xs text-ink-2 leading-relaxed">{r.rationale}</p>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-ink-3">Screened shortlist — not financial advice</p>
-                  <Link href={`/invest/companies/${r.company_code}`}
-                    className="text-[10px] text-emerald-500 hover:underline flex items-center gap-0.5">
-                    View analysis <ArrowRight className="w-2.5 h-2.5" />
-                  </Link>
-                </div>
+                <p className="text-xs text-ink-2 leading-relaxed">{r.description}</p>
+                <p className="text-[10px] text-ink-3">Screened shortlist — not financial advice</p>
               </div>
             ))}
           </div>
