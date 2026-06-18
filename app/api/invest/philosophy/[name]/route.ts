@@ -73,7 +73,6 @@ function applyFilter(
   latestFin: Record<string, FinRow>
 ) {
   const maxScore  = MAX_SCORE[name]
-  const threshold = Math.ceil(maxScore * 0.4) // must pass at least 40% of criteria
   type Scored = CompanyRow & { metrics: ReturnType<typeof computeMetrics>; score: number }
   const scored: Scored[] = []
 
@@ -126,7 +125,7 @@ function applyFilter(
   }
 
   return scored
-    .filter(c => c.score >= threshold)
+    .filter(c => c.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 10)
     .map(({ code, name: cName, sector, metrics, score }) => ({
