@@ -6,70 +6,37 @@ import YahooFinance           from 'yahoo-finance2'
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] })
 
-// yahoo-finance2 quoteSummary result shape for the modules we request
-interface YahooSummary {
-  price?: {
-    longName?: string | null
-    shortName?: string | null
-    marketCap?: number | null
-  }
-  summaryProfile?: {
-    sector?:   string | null
-    industry?: string | null
-  }
-  summaryDetail?: {
-    dividendRate?:                  number | null
-    trailingAnnualDividendRate?:    number | null
-  }
-  defaultKeyStatistics?: {
-    sharesOutstanding?: number | null
-    freeCashflow?:      number | null
-  }
-  incomeStatementHistory?: {
-    incomeStatementHistory?: Array<Record<string, unknown>>
-  }
-  balanceSheetHistory?: {
-    balanceSheetStatements?: Array<Record<string, unknown>>
-  }
-  cashflowStatementHistory?: {
-    cashflowStatements?: Array<Record<string, unknown>>
-  }
-}
-
 function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0 }
 
-function normaliseIS(raw: Record<string, unknown>, dps: number, isLatest: boolean) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normaliseFTSRow(row: Record<string, any>, dps: number, isLatest: boolean) {
+  const ocf   = n(row.operatingCashFlow ?? row.cashFlowFromContinuingOperatingActivities)
+  const capex = Math.abs(n(row.capitalExpenditure))
   return {
-    revenue:             n(raw.totalRevenue         ?? raw.revenue),
-    gross_profit:        n(raw.grossProfit),
-    ebit:                n(raw.ebit                 ?? raw.operatingIncome),
-    net_income:          n(raw.netIncome),
-    interest_expense:    raw.interestExpense != null ? -Math.abs(n(raw.interestExpense)) : 0,
-    eps:                 n(raw.dilutedEps            ?? raw.basicEps),
-    dividends_per_share: isLatest ? dps : 0,
-  }
-}
-
-function normaliseBS(raw: Record<string, unknown>) {
-  return {
-    total_assets:         n(raw.totalAssets),
-    total_equity:         n(raw.stockholdersEquity ?? raw.totalStockholderEquity),
-    total_debt:           n(raw.longTermDebt ?? 0) + n(raw.shortLongTermDebt ?? raw.currentDebt ?? 0),
-    current_assets:       n(raw.totalCurrentAssets),
-    current_liabilities:  n(raw.totalCurrentLiabilities),
-    retained_earnings:    n(raw.retainedEarnings),
-    shares_outstanding:   n(raw.commonStock),
-    working_capital:      n(raw.totalCurrentAssets) - n(raw.totalCurrentLiabilities),
-  }
-}
-
-function normaliseCF(raw: Record<string, unknown>) {
-  const ocf   = n(raw.totalCashFromOperatingActivities ?? raw.operatingCashflow)
-  const capex = Math.abs(n(raw.capitalExpenditures))
-  return {
-    operating_cash_flow: ocf,
-    capex,
-    free_cash_flow: n(raw.freeCashflow) || (ocf - capex),
+    income_statement: {
+      revenue:             n(row.totalRevenue ?? row.operatingRevenue),
+      gross_profit:        n(row.grossProfit),
+      ebit:                n(row.EBIT ?? row.operatingIncome),
+      net_income:          n(row.netIncome ?? row.netIncomeCommonStockholders),
+      interest_expense:    row.interestExpense != null ? -Math.abs(n(row.interestExpense)) : 0,
+      eps:                 n(row.dilutedEPS ?? row.basicEPS),
+      dividends_per_share: isLatest ? dps : 0,
+    },
+    balance_sheet: {
+      total_assets:        n(row.totalAssets),
+      total_equity:        n(row.stockholdersEquity ?? row.commonStockEquity),
+      total_debt:          n(row.totalDebt),
+      current_assets:      n(row.currentAssets),
+      current_liabilities: n(row.currentLiabilities),
+      retained_earnings:   n(row.retainedEarnings),
+      shares_outstanding:  n(row.ordinarySharesNumber ?? row.shareIssued),
+      working_capital:     n(row.workingCapital) || (n(row.currentAssets) - n(row.currentLiabilities)),
+    },
+    cash_flow: {
+      operating_cash_flow: ocf,
+      capex,
+      free_cash_flow: n(row.freeCashFlow) || (ocf - capex),
+    },
   }
 }
 
@@ -81,52 +48,45 @@ async function syncCompany(
 ): Promise<{ code: string; status: 'ok' | 'error' | 'no_data'; message?: string }> {
   const admin = createClient(supabaseUrl, serviceKey)
   try {
+    // Fetch company metadata from quoteSummary
+    const meta = await yahooFinance.quoteSummary(yahoo_ticker, {
+      modules: ['price', 'summaryProfile', 'summaryDetail'],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = await yahooFinance.quoteSummary(yahoo_ticker, {
-      modules: [
-        'incomeStatementHistory',
-        'balanceSheetHistory',
-        'cashflowStatementHistory',
-        'summaryProfile',
-        'summaryDetail',
-        'defaultKeyStatistics',
-        'price',
-      ],
-    }) as unknown as YahooSummary
+    }) as any
 
-    const dps = n(raw.summaryDetail?.dividendRate ?? raw.summaryDetail?.trailingAnnualDividendRate)
+    const dps = n(meta.summaryDetail?.dividendRate ?? meta.summaryDetail?.trailingAnnualDividendRate)
 
-    // Upsert company metadata
     await admin.from('klippa_invest_companies').upsert({
       code,
       yahoo_ticker,
-      name:           raw.price?.longName ?? raw.price?.shortName ?? code,
-      sector:         raw.summaryProfile?.sector   ?? null,
-      industry:       raw.summaryProfile?.industry ?? null,
-      market_cap_zar: raw.price?.marketCap         ?? null,
+      name:           meta.price?.longName ?? meta.price?.shortName ?? code,
+      sector:         meta.summaryProfile?.sector   ?? null,
+      industry:       meta.summaryProfile?.industry ?? null,
+      market_cap_zar: meta.price?.marketCap         ?? null,
       last_synced_at: new Date().toISOString(),
       updated_at:     new Date().toISOString(),
     }, { onConflict: 'code' })
 
-    const incomeList = raw.incomeStatementHistory?.incomeStatementHistory ?? []
-    const bsList     = raw.balanceSheetHistory?.balanceSheetStatements    ?? []
-    const cfList     = raw.cashflowStatementHistory?.cashflowStatements   ?? []
+    // Fetch full financials via fundamentalsTimeSeries (replaces deprecated history modules)
+    const ftsRows = await yahooFinance.fundamentalsTimeSeries(yahoo_ticker, {
+      module: 'all',
+      type:   'annual',
+      period1: new Date(new Date().getFullYear() - 6, 0, 1).toISOString(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any[]
 
-    if (incomeList.length === 0) {
-      return { code, status: 'no_data', message: 'No income statement history' }
+    if (!ftsRows || ftsRows.length === 0) {
+      return { code, status: 'no_data', message: 'No fundamentals data' }
     }
 
-    const upserts = incomeList.map((is, i) => {
-      const endDate = (is.endDate as string | Date | undefined)
-      const year    = endDate ? new Date(endDate).getFullYear() : new Date().getFullYear() - i
+    const upserts = ftsRows.map((row, i) => {
+      const year = row.date ? new Date(row.date).getFullYear() : new Date().getFullYear() - i
       return {
-        company_code:     code,
-        fiscal_year:      year,
-        income_statement: normaliseIS(is, dps, i === 0),
-        balance_sheet:    normaliseBS((bsList[i] ?? {}) as Record<string, unknown>),
-        cash_flow:        normaliseCF((cfList[i] ?? {}) as Record<string, unknown>),
-        source:           'yahoo_finance',
-        ingested_at:      new Date().toISOString(),
+        company_code: code,
+        fiscal_year:  year,
+        ...normaliseFTSRow(row, dps, i === 0),
+        source:       'yahoo_finance',
+        ingested_at:  new Date().toISOString(),
       }
     })
 
@@ -136,7 +96,6 @@ async function syncCompany(
 
     if (upsertErr) return { code, status: 'error', message: upsertErr.message }
 
-    // Bust analysis cache so next visit recomputes with fresh data
     await admin.from('klippa_invest_analysis_runs').delete().eq('company_code', code)
 
     return { code, status: 'ok' }

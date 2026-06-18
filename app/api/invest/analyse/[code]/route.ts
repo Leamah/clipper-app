@@ -87,6 +87,114 @@ function healthScore(modules: Record<string, ModuleResult>): number {
   return total ? Math.round((pass / total) * 100) : 0
 }
 
+function generateCommentary(modules: Record<string, ModuleResult>): Record<string, string> {
+  const out: Record<string, string> = {}
+  const m = modules
+
+  if (m.M01) {
+    const v = m.M01.value
+    out.M01 = v === null ? 'Insufficient data to calculate return on equity.'
+      : v >= 20  ? `Strong ROE of ${v.toFixed(1)}% — well above the 15% benchmark, indicating efficient use of shareholder capital.`
+      : v >= 15  ? `Solid ROE of ${v.toFixed(1)}% — meets the 15% benchmark for capital efficiency.`
+      : v >= 0   ? `ROE of ${v.toFixed(1)}% is below the 15% benchmark — the company is generating returns but not at an exceptional rate.`
+      : `Negative ROE of ${v.toFixed(1)}% indicates the company reported a net loss during this period.`
+  }
+  if (m.M02) {
+    const v = m.M02.value
+    out.M02 = v === null ? 'Insufficient data to assess debt levels.'
+      : v <= 0.3 ? `Very low D/E of ${v.toFixed(2)}x — minimal leverage, strong balance sheet.`
+      : v <= 0.5 ? `Conservative D/E of ${v.toFixed(2)}x — within the preferred 0.5x threshold.`
+      : v <= 1.0 ? `Moderate D/E of ${v.toFixed(2)}x — some leverage but manageable.`
+      : `Elevated D/E of ${v.toFixed(2)}x — above the 0.5x benchmark; debt level warrants monitoring.`
+  }
+  if (m.M03) {
+    const v = m.M03.value
+    out.M03 = v === null ? 'Insufficient data to calculate current ratio.'
+      : v >= 2   ? `Current ratio of ${v.toFixed(2)}x — strong short-term liquidity.`
+      : v >= 1.5 ? `Current ratio of ${v.toFixed(2)}x meets the 1.5x benchmark — adequate liquidity.`
+      : v >= 1   ? `Current ratio of ${v.toFixed(2)}x — liquid but below the 1.5x preferred level.`
+      : `Current ratio below 1.0x (${v.toFixed(2)}x) — current liabilities exceed current assets, a liquidity risk.`
+  }
+  if (m.M04) {
+    const v = m.M04.value
+    out.M04 = v === null ? 'EPS growth cannot be calculated — prior year EPS unavailable.'
+      : v >= 20  ? `Strong EPS growth of ${v.toFixed(1)}% year-on-year.`
+      : v >= 5   ? `Positive EPS growth of ${v.toFixed(1)}% — meets the 5% benchmark.`
+      : v >= 0   ? `Modest EPS growth of ${v.toFixed(1)}% — below the 5% benchmark.`
+      : `EPS declined ${Math.abs(v).toFixed(1)}% year-on-year — earnings pressure evident.`
+  }
+  if (m.M05) {
+    const v = m.M05.value
+    out.M05 = v === null ? 'Insufficient revenue data to calculate net profit margin.'
+      : v >= 20  ? `Excellent net margin of ${v.toFixed(1)}% — high profitability.`
+      : v >= 10  ? `Solid net margin of ${v.toFixed(1)}% — meets the 10% benchmark.`
+      : v >= 0   ? `Thin net margin of ${v.toFixed(1)}% — profitable but below the 10% benchmark.`
+      : `Negative net margin of ${v.toFixed(1)}% — the company is loss-making.`
+  }
+  if (m.M06) {
+    const v = m.M06.value
+    out.M06 = v === null ? 'Cannot assess cash flow quality — insufficient data.'
+      : v >= 1.5 ? `Cash flow quality ratio of ${v.toFixed(2)}x — operating cash flow substantially exceeds net income, high earnings quality.`
+      : v >= 1   ? `Cash flow quality of ${v.toFixed(2)}x — operating cash flow backs reported earnings.`
+      : v >= 0   ? `Cash flow quality of ${v.toFixed(2)}x — operating cash flow is below reported net income; investigate working capital movements.`
+      : `Negative operating cash flow (${v.toFixed(2)}x) despite reported net income — earnings quality concern.`
+  }
+  if (m.M07) {
+    const v = m.M07.value
+    out.M07 = v === null ? 'Insufficient data to calculate gross margin.'
+      : v >= 50  ? `High gross margin of ${v.toFixed(1)}% — strong pricing power or low cost structure.`
+      : v >= 30  ? `Good gross margin of ${v.toFixed(1)}% — meets the 30% benchmark.`
+      : v >= 0   ? `Gross margin of ${v.toFixed(1)}% is below the 30% benchmark.`
+      : `Negative gross margin — cost of revenue exceeds revenue, a structural concern.`
+  }
+  if (m.M08) {
+    const v = m.M08.value
+    out.M08 = v === null ? 'Revenue growth cannot be calculated — prior year data unavailable.'
+      : v >= 15  ? `Strong revenue growth of ${v.toFixed(1)}% year-on-year.`
+      : v >= 5   ? `Positive revenue growth of ${v.toFixed(1)}% — meets the 5% benchmark.`
+      : v >= 0   ? `Flat revenue growth of ${v.toFixed(1)}% — below the 5% benchmark.`
+      : `Revenue declined ${Math.abs(v).toFixed(1)}% year-on-year.`
+  }
+  if (m.M09) {
+    const v = m.M09.value
+    out.M09 = v === null ? 'Interest coverage cannot be calculated.'
+      : v >= 10  ? `Interest coverage of ${v.toFixed(1)}x — very comfortable debt servicing capacity.`
+      : v >= 3   ? `Interest coverage of ${v.toFixed(1)}x meets the 3x benchmark.`
+      : v >= 1   ? `Interest coverage of ${v.toFixed(1)}x — earnings cover interest but with limited headroom.`
+      : `Interest coverage below 1.0x — EBIT does not fully cover interest expense; financial stress risk.`
+  }
+  if (m.M10) {
+    const v = m.M10.value
+    out.M10 = v === null ? 'Asset turnover cannot be calculated.'
+      : v >= 1   ? `Asset turnover of ${v.toFixed(2)}x — efficient use of assets to generate revenue.`
+      : v >= 0.5 ? `Asset turnover of ${v.toFixed(2)}x meets the 0.5x benchmark.`
+      : `Low asset turnover of ${v.toFixed(2)}x — typical for capital-intensive industries but below 0.5x benchmark.`
+  }
+  if (m.M11) {
+    const v = m.M11.value
+    out.M11 = v === null ? 'Retained earnings ratio cannot be calculated.'
+      : v >= 50  ? `Retained earnings represent ${v.toFixed(1)}% of equity — strong reinvestment history.`
+      : v >= 0   ? `Retained earnings are ${v.toFixed(1)}% of equity — positive but modest retained capital.`
+      : `Negative retained earnings (${v.toFixed(1)}%) — accumulated deficits exceed paid-in capital.`
+  }
+  if (m.M12) {
+    const v = m.M12.value
+    out.M12 = v === null ? 'Payout ratio cannot be calculated — no EPS data.'
+      : v <= 40  ? `Conservative payout ratio of ${v.toFixed(1)}% — most earnings retained for growth.`
+      : v <= 80  ? `Sustainable payout ratio of ${v.toFixed(1)}% — meets the sub-80% benchmark.`
+      : `High payout ratio of ${v.toFixed(1)}% — dividend may not be sustainable if earnings decline.`
+  }
+  if (m.M13) {
+    const v = m.M13.value
+    out.M13 = v === null ? 'Altman Z\' score cannot be calculated — balance sheet data unavailable.'
+      : v >= 2.6 ? `Altman Z' of ${v.toFixed(2)} — in the safe zone (>2.6). Low going-concern risk.`
+      : v >= 1.1 ? `Altman Z' of ${v.toFixed(2)} — grey zone (1.1–2.6). Monitor debt and liquidity closely.`
+      : `Altman Z' of ${v.toFixed(2)} — distress zone (<1.1). Elevated going-concern risk.`
+  }
+
+  return out
+}
+
 function goingConcernScore(z: number | null): number {
   if (z === null) return 50
   if (z >= 2.6) return Math.min(100, Math.round(70 + (z - 2.6) * 10))
@@ -184,7 +292,7 @@ export async function POST(
     company_code:        code,
     fiscal_year_range:   fiscalYearRange,
     module_outputs:      moduleOutputs,
-    ai_commentary:       {},
+    ai_commentary:       generateCommentary(moduleOutputs),
     health_score:        hs,
     going_concern_score: gc,
   }
