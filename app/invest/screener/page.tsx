@@ -56,27 +56,25 @@ export default function InvestScreenerPage() {
 
   async function fetchCompanies() {
     setSearchLoading(true)
-    let q = supabase
-      .from('klippa_invest_companies')
-      .select('*')
-      .order('market_cap_zar', { ascending: false })
-      .limit(50)
-
-    if (search.trim()) q = q.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
-    if (sector.trim()) q = q.eq('sector', sector)
-
-    const { data } = await q
-    setCompanies((data ?? []) as InvestCompany[])
+    const params = new URLSearchParams({ limit: '50' })
+    if (search.trim()) params.set('q', search.trim())
+    if (sector.trim()) params.set('sector', sector.trim())
+    const res = await fetch(`/api/invest/screener?${params.toString()}`)
+    if (res.ok) {
+      const data = await res.json()
+      setCompanies((data.companies ?? []) as InvestCompany[])
+    } else {
+      setCompanies([])
+    }
     setSearchLoading(false)
   }
 
   async function addToWatchlist(code: string) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('klippa_invest_watchlist').upsert(
-      { user_id: user.id, company_code: code, sens_alerts_enabled: true },
-      { onConflict: 'user_id,company_code' }
-    )
+    await fetch('/api/invest/watchlist', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ company_code: code, sens_alerts_enabled: true }),
+    })
   }
 
   if (loading) return (

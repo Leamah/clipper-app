@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   BarChart2, Search, Compass, Star, BookOpen, GitCompare,
-  TrendingUp, Loader2, AlertCircle, Plus,
+  TrendingUp, Loader2, AlertCircle, Plus, Bell,
 } from 'lucide-react'
 import type { KlippaProfile, InvestWatchlistEntry, FeatureFlags } from '@/lib/types'
 
@@ -107,6 +107,7 @@ export default function InvestDashboardPage() {
             { href: '/invest/portfolio',            icon: <BarChart2 className="w-5 h-5 text-violet-400" />,  label: 'Portfolio Builder',     gate: isFull },
             { href: '/invest/compare',              icon: <GitCompare className="w-5 h-5 text-teal-400" />,   label: 'Compare Companies',     gate: isFull },
             { href: '/invest/learning',             icon: <BookOpen className="w-5 h-5 text-ink-2" />,        label: 'IFRS Learning Mode',    gate: isFull },
+            { href: '/invest/sens',                 icon: <Bell className="w-5 h-5 text-amber-400" />,       label: 'SENS Alerts',           gate: isFull },
           ].map(({ href, icon, label, gate }) => (
             gate ? (
               <Link key={href} href={href}

@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 
-function client() {
+function investClient() {
   const cookieStore = cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,7 +12,7 @@ function client() {
 }
 
 async function requireFullInvest() {
-  const supabase = client()
+  const supabase = investClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { supabase, user: null, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
 
@@ -29,40 +29,43 @@ async function requireFullInvest() {
   return { supabase, user, error: null }
 }
 
-export async function GET(
-  _request: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id }      = params
+export async function GET() {
   const ctx = await requireFullInvest()
   if (ctx.error || !ctx.user) return ctx.error
 
-  const { data: portfolio, error } = await ctx.supabase
+  const { data, error } = await ctx.supabase
     .from('klippa_invest_portfolios')
-    .select('*, holdings:klippa_invest_holdings(*, company:klippa_invest_companies(*))')
-    .eq('id', id)
+    .select('*, holdings:klippa_invest_holdings(id)')
     .eq('user_id', ctx.user.id)
-    .single()
-
-  if (error || !portfolio) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-  return NextResponse.json(portfolio)
-}
-
-export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params
-  const ctx = await requireFullInvest()
-  if (ctx.error || !ctx.user) return ctx.error
-
-  const { error } = await ctx.supabase
-    .from('klippa_invest_portfolios')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', ctx.user.id)
+    .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ portfolios: data ?? [] })
+}
+
+export async function POST(request: Request) {
+  const ctx = await requireFullInvest()
+  if (ctx.error || !ctx.user) return ctx.error
+
+  const { name } = await request.json()
+  const cleanName = typeof name === 'string' ? name.trim() : ''
+  if (!cleanName) return NextResponse.json({ error: 'name required' }, { status: 400 })
+
+  const { data, error } = await ctx.supabase
+    .from('klippa_invest_portfolios')
+    .insert({ user_id: ctx.user.id, name: cleanName })
+    .select('*, holdings:klippa_invest_holdings(id)')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await ctx.supabase.from('klippa_invest_recommendations_log').insert({
+    user_id:           ctx.user.id,
+    source:            'compass',
+    rationale_payload: { action: 'portfolio_create', portfolio_id: data.id, name: cleanName },
+    user_action:       'simulated_buy',
+    acted_at:          new Date().toISOString(),
+  })
+
+  return NextResponse.json(data)
 }

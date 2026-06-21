@@ -628,6 +628,7 @@ export interface TaxCalculationResult {
   netTaxPayable:        number    // positive = owe SARS, negative = refund
   // FINscope Invest additions
   dwtOnDividends:       number    // 20% of dividendIncome (Section 64J)
+  taxableCapitalGain:   number    // capital gain included in taxable income after exclusion/inclusion rate
   cgtPayable:           number    // (capitalGains − 40 000) × 0.40 × marginalRate
   investTaxPayable:     number    // dwtOnDividends + cgtPayable
 }
@@ -715,6 +716,9 @@ export interface InvestCompany {
   auditor:        string | null
   market_cap_zar: number | null
   is_altx:        boolean
+  yahoo_ticker?:  string | null
+  is_tracked?:    boolean
+  last_synced_at?: string | null
   updated_at:     string
 }
 
@@ -724,7 +728,7 @@ export interface InvestFinancials {
   income_statement:  Record<string, unknown>
   balance_sheet:     Record<string, unknown>
   cash_flow:         Record<string, unknown>
-  source:            'sharedata' | 'manual' | 'pdf_extract'
+  source:            'sharedata' | 'manual' | 'pdf_extract' | 'yahoo_finance'
   ingested_at:       string
 }
 

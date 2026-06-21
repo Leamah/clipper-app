@@ -42,13 +42,11 @@ export default function InvestPortfolioPage() {
         })
 
         if (prof.feature_invest_full) {
-          const { data: pf } = await supabase
-            .from('klippa_invest_portfolios')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-
-          setPortfolios((pf ?? []) as InvestPortfolio[])
+          const res = await fetch('/api/invest/portfolio')
+          if (res.ok) {
+            const data = await res.json()
+            setPortfolios((data.portfolios ?? []) as InvestPortfolio[])
+          }
         }
       }
 
@@ -59,17 +57,16 @@ export default function InvestPortfolioPage() {
 
   async function createPortfolio() {
     if (!newName.trim()) return
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     setCreating(true)
-    const { data } = await supabase
-      .from('klippa_invest_portfolios')
-      .insert({ user_id: user.id, name: newName.trim() })
-      .select()
-      .single()
-
-    if (data) setPortfolios((p) => [data as InvestPortfolio, ...p])
+    const res = await fetch('/api/invest/portfolio', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name: newName.trim() }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setPortfolios((p) => [data as InvestPortfolio, ...p])
+    }
     setNewName('')
     setCreating(false)
   }
@@ -139,12 +136,11 @@ export default function InvestPortfolioPage() {
                   <div key={p.id} className="rounded-2xl border border-edge bg-surface/40 p-4 flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-semibold text-ink-1">{p.name}</p>
-                      <p className="text-xs text-ink-3 mt-0.5">
-                        Created {new Date(p.created_at).toLocaleDateString('en-ZA')}
-                        {Array.isArray((p as unknown as { holdings?: unknown[] }).holdings) &&
-                          ` · ${(p as unknown as { holdings: unknown[] }).holdings.length} holding${(p as unknown as { holdings: unknown[] }).holdings.length === 1 ? '' : 's'}`}
-                      </p>
+                      <p className="text-xs text-ink-3 mt-0.5">Created {new Date(p.created_at).toLocaleDateString('en-ZA')}</p>
                     </div>
+                    <Link href={`/invest/portfolio/${p.id}`} className="text-xs text-emerald-500 hover:underline">
+                      Open →
+                    </Link>
                   </div>
                 ))}
               </div>

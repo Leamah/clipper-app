@@ -24,6 +24,19 @@ interface CompassResponse {
   risk_band:       string
   recommendations: CompassResult[]
   tax_note:        string
+  readiness?:      Readiness
+}
+
+interface Readiness {
+  monthly_income_zar:    number
+  monthly_expenses_zar:  number
+  safe_to_spend_zar:     number
+  suggested_amount_zar:  number
+  debt_like_monthly_zar: number
+  tfsa_limit_zar:        number
+  risk_flags:            string[]
+  blocks:                string[]
+  tax_due_soon:          boolean
 }
 
 export default function InvestCompassPage() {
@@ -35,6 +48,8 @@ export default function InvestCompassPage() {
   const [amount,         setAmount]         = useState('')
   const [horizon,        setHorizon]        = useState('1y')
   const [risk,           setRisk]           = useState('balanced')
+  const [readiness,      setReadiness]      = useState<Readiness | null>(null)
+  const [ackWarnings,    setAckWarnings]    = useState(false)
   const [sessionCount,   setSessionCount]   = useState(0)
   const [featureFlags,   setFeatureFlags]   = useState<FeatureFlags>({ timesheets: false, logbook: false, provisional: false })
 
@@ -61,16 +76,12 @@ export default function InvestCompassPage() {
         })
 
         // Pre-fill from Safe-to-Spend proxy (latest month income − expenses)
-        const now = new Date()
-        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-        const [{ data: income }, { data: expenses }] = await Promise.all([
-          supabase.from('klippa_income_records').select('amount').eq('user_id', user.id).gte('received_date', monthStart),
-          supabase.from('klippa_expense_records').select('deductible_amount').eq('user_id', user.id).gte('expense_date', monthStart),
-        ])
-        const totalIncome   = (income ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
-        const totalExpenses = (expenses ?? []).reduce((s, r) => s + (r.deductible_amount ?? 0), 0)
-        const sts = Math.max(0, totalIncome - totalExpenses)
-        if (sts > 0) setAmount(String(Math.round(sts * 0.2))) // suggest 20% of STS as invest amount
+        const readinessRes = await fetch('/api/invest/compass')
+        if (readinessRes.ok) {
+          const data = await readinessRes.json()
+          setReadiness(data.readiness ?? null)
+          if (data.readiness?.suggested_amount_zar > 0) setAmount(String(data.readiness.suggested_amount_zar))
+        }
       }
 
       setLoading(false)
@@ -86,14 +97,20 @@ export default function InvestCompassPage() {
     const res = await fetch('/api/invest/compass', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ amount: parseFloat(amount), horizon, risk_band: risk }),
+      body:    JSON.stringify({ amount: parseFloat(amount), horizon, risk_band: risk, acknowledge_warnings: ackWarnings }),
     })
 
     if (res.ok) {
       const data: CompassResponse = await res.json()
       setResults(data.recommendations ?? [])
       setTaxNote(data.tax_note ?? '')
+      setReadiness(data.readiness ?? null)
       setSessionCount((n) => n + 1)
+    } else if (res.status === 409) {
+      const data = await res.json()
+      setReadiness(data.readiness ?? null)
+      setResults([])
+      setTaxNote('')
     }
     setRunning(false)
   }
@@ -125,6 +142,37 @@ export default function InvestCompassPage() {
 
         {/* Form */}
         <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-5">
+          {readiness && (
+            <div className="rounded-xl border border-edge bg-raised/30 px-4 py-3 space-y-2">
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <p className="text-ink-3">Income avg</p>
+                  <p className="font-semibold text-ink-1">R{readiness.monthly_income_zar.toLocaleString('en-ZA')}</p>
+                </div>
+                <div>
+                  <p className="text-ink-3">Expense avg</p>
+                  <p className="font-semibold text-ink-1">R{readiness.monthly_expenses_zar.toLocaleString('en-ZA')}</p>
+                </div>
+                <div>
+                  <p className="text-ink-3">Safe-to-Spend</p>
+                  <p className="font-semibold text-emerald-500">R{readiness.safe_to_spend_zar.toLocaleString('en-ZA')}</p>
+                </div>
+              </div>
+              {[...readiness.blocks, ...readiness.risk_flags].length > 0 && (
+                <div className="space-y-1 border-t border-edge/50 pt-2">
+                  {[...readiness.blocks, ...readiness.risk_flags].map((msg) => (
+                    <p key={msg} className="text-xs text-amber-500">{msg}</p>
+                  ))}
+                  {readiness.blocks.length > 0 && (
+                    <label className="flex items-center gap-2 pt-1 text-xs text-ink-2 cursor-pointer">
+                      <input type="checkbox" checked={ackWarnings} onChange={(e) => setAckWarnings(e.target.checked)} />
+                      I understand these warnings and want to view the screened shortlist.
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-ink-2 uppercase tracking-wide">How much do you want to invest? (R)</label>
             <input

@@ -143,6 +143,19 @@ function getRates(taxYear?: number): YearRates {
   }
 }
 
+export function getTfsaAnnualLimit(taxYear?: number): number {
+  return (taxYear ?? 2025) >= 2027 ? 46_000 : 36_000
+}
+
+export function getCapitalGainsAnnualExclusion(taxYear?: number): number {
+  return (taxYear ?? 2025) >= 2027 ? 50_000 : 40_000
+}
+
+export function calcTaxableCapitalGain(gains: number, taxYear?: number): number {
+  const inclusionRate = 0.40
+  return round2(Math.max(0, gains - getCapitalGainsAnnualExclusion(taxYear)) * inclusionRate)
+}
+
 // ── Travel deduction ──────────────────────────────────────
 
 export function calcTravelDeduction(
@@ -227,11 +240,15 @@ export function calculateTax(input: TaxCalculationInput): TaxCalculationResult {
   // 5. Total deductions
   const totalDeductions = section11fRa + homeOffice + travel + interestExemption + otherDeductions
 
-  // 6. Taxable income
-  const taxableIncome = Math.max(0, grossIncome - totalDeductions)
+  // 6. Taxable income, including taxable capital gains when FINscope Invest feeds them in.
+  const ordinaryTaxableIncome = Math.max(0, grossIncome - totalDeductions)
+  const taxableCapitalGain   = calcTaxableCapitalGain(input.capitalGains ?? 0, taxYear)
+  const taxableIncome        = ordinaryTaxableIncome + taxableCapitalGain
 
   // 7. Gross tax from brackets
-  const grossTax = computeGrossTax(taxableIncome, rates.brackets)
+  const ordinaryGrossTax = computeGrossTax(ordinaryTaxableIncome, rates.brackets)
+  const grossTax         = computeGrossTax(taxableIncome, rates.brackets)
+  const cgtPayable       = Math.max(0, grossTax - ordinaryGrossTax)
 
   // 8. Age rebates
   const primaryRebate   = rates.primaryRebate
@@ -249,11 +266,7 @@ export function calculateTax(input: TaxCalculationInput): TaxCalculationResult {
   const netTaxPayable = taxPayable - employeesTaxPaid
 
   // 12. FINscope Invest: DWT + CGT (optional; defaults to 0)
-  const marginalRate = grossTax > 0 && taxableIncome > 0
-    ? grossTax / taxableIncome  // effective marginal proxy; accurate enough for the disclaimer context
-    : 0
   const dwtOnDividends  = calcDividendWithholdingTax(input.dividendIncome ?? 0)
-  const cgtPayable      = calcCapitalGainsTax(input.capitalGains ?? 0, marginalRate)
   const investTaxPayable = round2(dwtOnDividends + cgtPayable)
 
   return {
@@ -275,6 +288,7 @@ export function calculateTax(input: TaxCalculationInput): TaxCalculationResult {
     employeesTaxPaid:  round2(employeesTaxPaid),
     netTaxPayable:     round2(netTaxPayable),
     dwtOnDividends:    round2(dwtOnDividends),
+    taxableCapitalGain: round2(taxableCapitalGain),
     cgtPayable:        round2(cgtPayable),
     investTaxPayable,
   }
@@ -286,11 +300,8 @@ export function calcDividendWithholdingTax(dividendIncome: number): number {
   return round2(Math.max(0, dividendIncome) * 0.20)
 }
 
-export function calcCapitalGainsTax(gains: number, marginalRate: number): number {
-  const exempt        = 40_000   // SA annual CGT exclusion (individual)
-  const inclusionRate = 0.40     // SA individual inclusion rate
-  const taxable       = Math.max(0, gains - exempt) * inclusionRate
-  return round2(taxable * marginalRate)
+export function calcCapitalGainsTax(gains: number, marginalRate: number, taxYear?: number): number {
+  return round2(calcTaxableCapitalGain(gains, taxYear) * marginalRate)
 }
 
 function computeGrossTax(taxableIncome: number, brackets: TaxBracket[]): number {

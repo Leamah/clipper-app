@@ -29,6 +29,9 @@ export async function POST(request: Request) {
   if (!portfolio_id || !company_code || !shares || !cost_basis_zar || !acquired_at) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
+  if (Number(shares) <= 0 || Number(cost_basis_zar) <= 0) {
+    return NextResponse.json({ error: 'shares and cost_basis_zar must be positive' }, { status: 400 })
+  }
 
   // Verify portfolio belongs to user
   const { data: portfolio } = await supabase
@@ -60,6 +63,16 @@ export async function DELETE(request: Request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: prof } = await supabase
+    .from('klippa_profiles')
+    .select('feature_invest_full, invest_enabled')
+    .eq('id', user.id)
+    .single()
+
+  if (!prof?.invest_enabled || !prof?.feature_invest_full) {
+    return NextResponse.json({ error: 'INVEST_TIER_REQUIRED' }, { status: 403 })
+  }
 
   const { holding_id, closed_at, closed_price_zar } = await request.json()
   if (!holding_id || !closed_at || closed_price_zar == null) {

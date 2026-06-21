@@ -13,7 +13,7 @@ import {
   FileText, ClipboardList, ExternalLink, Download, AlertCircle, Lock
 } from 'lucide-react'
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip, KlippaDocument, DocumentType } from '@/lib/types'
-import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline } from '@/lib/tax-engine'
+import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline, getCapitalGainsAnnualExclusion } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { isProfessionalOrAbove } from '@/lib/tier'
 import { getIncomeTypeCopy, isIncludedInTaxEstimate, needsHumanReview } from '@/lib/sars-return-map'
@@ -31,6 +31,15 @@ interface FilingData {
   expenseRecords: KlippaExpenseRecord[]
   mileageTrips:  KlippaMileageTrip[]
   documents:     KlippaDocument[]
+  investTax:      InvestTaxTotals
+}
+
+interface InvestTaxTotals {
+  dividends:       number
+  dwtWithheld:     number
+  capitalGains:    number
+  dividendRows:    number
+  capitalGainRows: number
 }
 
 export default function FilingPage() {
@@ -57,12 +66,17 @@ export default function FilingPage() {
 
     if (!profile || !taxReturn) { setLoading(false); return }
 
-    const [incRes, expRes, mileRes, docRes] = await Promise.all([
+    const [incRes, expRes, mileRes, docRes, divRes, gainRes] = await Promise.all([
       supabase.from('klippa_income_records').select('*').eq('tax_return_id', taxReturn.id).order('received_date', { ascending: false }),
       supabase.from('klippa_expense_records').select('*').eq('tax_return_id', taxReturn.id).eq('classification_status', 'confirmed'),
       supabase.from('klippa_mileage_trips').select('*').eq('tax_return_id', taxReturn.id),
       supabase.from('klippa_documents').select('*').eq('user_id', user.id).or(`tax_return_id.eq.${taxReturn.id},tax_year.eq.${taxReturn.tax_year}`),
+      supabase.from('klippa_invest_dividends').select('amount_zar, dwt_withheld_zar').eq('user_id', user.id).eq('tax_year', taxReturn.tax_year),
+      supabase.from('klippa_invest_realised_gains').select('gain_zar, in_tfsa').eq('user_id', user.id).eq('tax_year', taxReturn.tax_year),
     ])
+
+    const dividends = (divRes.data ?? []) as { amount_zar: number | null; dwt_withheld_zar: number | null }[]
+    const gains     = (gainRes.data ?? []) as { gain_zar: number | null; in_tfsa: boolean | null }[]
 
     setData({
       profile,
@@ -71,6 +85,13 @@ export default function FilingPage() {
       expenseRecords: (expRes.data ?? []) as KlippaExpenseRecord[],
       mileageTrips:   (mileRes.data ?? []) as KlippaMileageTrip[],
       documents:      (docRes.data ?? []) as KlippaDocument[],
+      investTax: {
+        dividends:       dividends.reduce((s, r) => s + (Number(r.amount_zar) || 0), 0),
+        dwtWithheld:     dividends.reduce((s, r) => s + (Number(r.dwt_withheld_zar) || 0), 0),
+        capitalGains:    gains.filter((r) => !r.in_tfsa).reduce((s, r) => s + (Number(r.gain_zar) || 0), 0),
+        dividendRows:    dividends.length,
+        capitalGainRows: gains.filter((r) => !r.in_tfsa).length,
+      },
     })
     setSarsRef(taxReturn.sars_reference ?? '')
     setSubmitted(taxReturn.status === 'submitted')
@@ -165,7 +186,7 @@ export default function FilingPage() {
     )
   }
 
-  const { profile, taxReturn, incomeRecords, expenseRecords, mileageTrips, documents } = data
+  const { profile, taxReturn, incomeRecords, expenseRecords, mileageTrips, documents, investTax } = data
   const totalIncome       = incomeRecords.reduce((s, r) => s + r.amount, 0)
   const taxEstimateIncome = incomeRecords.filter(r => isIncludedInTaxEstimate(r.income_type)).reduce((s, r) => s + r.amount, 0)
   const totalDeductible   = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
@@ -188,13 +209,15 @@ export default function FilingPage() {
     age:                  ageFromDob(profile.date_of_birth ?? null),
     employeesTaxPaid:     payeInput,
     taxYear:              taxReturn.tax_year,
+    dividendIncome:       investTax.dividends,
+    capitalGains:         investTax.capitalGains,
   })
 
   const deadline = getITR12Deadline(taxReturn.tax_year)
-  const returnSections = buildReturnSections({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm })
+  const returnSections = buildReturnSections({ profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm, investTax, taxYear: taxReturn.tax_year })
   const missingItems = buildMissingItems(returnSections, profile, incomeRecords, payeInput)
-  const filingChecklist = buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents })
-  const investmentWorksheets = buildInvestmentWorksheets(incomeRecords, documents, taxReturn.tax_year, ageFromDob(profile.date_of_birth ?? null))
+  const filingChecklist = buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents, investTax })
+  const investmentWorksheets = buildInvestmentWorksheets(incomeRecords, documents, taxReturn.tax_year, ageFromDob(profile.date_of_birth ?? null), investTax)
 
   return (
     <div className="app-shell bg-base text-ink-1">
@@ -238,6 +261,12 @@ export default function FilingPage() {
             <div className="rounded-2xl border border-edge bg-surface/40 divide-y divide-edge">
               <SectionRow label="Income records" value={`${incomeRecords.length} records`} sub={formatRand(totalIncome)} href="/income" />
               <SectionRow label="Confirmed expenses" value={`${expenseRecords.length} records`} sub={`${formatRand(totalDeductible)} deductible`} href="/expenses" />
+              {investTax.dividends > 0 && (
+                <SectionRow label="Investment income - dividends" value={formatRand(investTax.dividends)} sub="Pulled from FINscope Invest" href="/invest/portfolio" />
+              )}
+              {investTax.capitalGains !== 0 && (
+                <SectionRow label="Capital gains" value={formatRand(investTax.capitalGains)} sub="Pulled from closed Invest holdings" href="/invest/portfolio" />
+              )}
               {/* PAYE from IRP5 — editable inline */}
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
@@ -258,6 +287,9 @@ export default function FilingPage() {
                 </div>
               </div>
               <SectionRow label="Taxable income" value={formatRand(taxResult.taxableIncome)} />
+              {taxResult.taxableCapitalGain > 0 && (
+                <SectionRow label="Taxable capital gain" value={formatRand(taxResult.taxableCapitalGain)} />
+              )}
               <SectionRow label="Tax payable" value={formatRand(taxResult.taxPayable)} highlight />
             </div>
 
@@ -352,6 +384,20 @@ export default function FilingPage() {
                   />
                 )
               })}
+              {investTax.dividends > 0 && !incomeRecords.some((r) => r.income_type === 'dividends') && (
+                <CheatRow
+                  code={SARS_INCOME_CODES.dividends.code}
+                  label={`${SARS_INCOME_CODES.dividends.label} - FINscope Invest`}
+                  value={formatRand(investTax.dividends)}
+                />
+              )}
+              {investTax.capitalGains !== 0 && !incomeRecords.some((r) => r.income_type === 'capital_gains') && (
+                <CheatRow
+                  code={SARS_INCOME_CODES.capital_gains.code}
+                  label={`${SARS_INCOME_CODES.capital_gains.label} - FINscope Invest`}
+                  value={formatRand(investTax.capitalGains)}
+                />
+              )}
 
               <div className="px-4 py-3 bg-surface/60 border-t border-b border-edge mt-2">
                 <p className="text-xs font-medium text-ink-2 uppercase tracking-wider">Deductions</p>
@@ -370,6 +416,9 @@ export default function FilingPage() {
               )}
               {taxResult.otherDeductions > 0 && (
                 <CheatRow code={SARS_DEDUCTION_CODES.other_biz.code} label={SARS_DEDUCTION_CODES.other_biz.label} value={formatRand(taxResult.otherDeductions)} />
+              )}
+              {taxResult.taxableCapitalGain > 0 && (
+                <CheatRow code="CGT" label="Taxable capital gain included in estimate" value={formatRand(taxResult.taxableCapitalGain)} />
               )}
 
               {taxResult.employeesTaxPaid > 0 && (
@@ -649,8 +698,10 @@ function buildReturnSections(input: {
   taxResult: ReturnType<typeof calculateTax>
   payeInput: number
   businessKm: number
+  investTax: InvestTaxTotals
+  taxYear: number
 }): ReturnSection[] {
-  const { profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm } = input
+  const { profile, incomeRecords, expenseRecords, documents, taxResult, payeInput, businessKm, investTax, taxYear } = input
   const groupedIncome = incomeRecords.reduce((groups, r) => {
     const existing = groups.find((g) => g.type === r.income_type)
     if (existing) {
@@ -706,6 +757,38 @@ function buildReturnSections(input: {
   const addSection = (row: ReturnSection | null) => {
     if (row) sections.push(row)
   }
+
+  addSection(investTax.dividends > 0 && !groupedIncome.some((g) => g.type === 'dividends') ? {
+    id: 'income-dividends-finscope',
+    section: 'Investment income',
+    applies: true,
+    plain: 'Did shares, ETFs, or investments pay money out to you?',
+    answer: `Yes, FINscope Invest captured ${investTax.dividendRows} dividend receipt${investTax.dividendRows === 1 ? '' : 's'}.`,
+    examples: 'Examples: JSE share dividends, ETF distributions, local company payouts.',
+    code: SARS_INCOME_CODES.dividends.code,
+    sars: `${SARS_INCOME_CODES.dividends.label} - FINscope Invest`,
+    value: formatRand(investTax.dividends),
+    status: sectionStatus(true, hasDoc(documents, ['investment_certificate']), false, true),
+    hint: 'Keep the investment tax certificate or platform statement that reconciles the dividend amount and any withholding tax.',
+    documentTypes: ['investment_certificate'],
+    documentNames: docNames(documents, ['investment_certificate']),
+  } : null)
+
+  addSection(investTax.capitalGains !== 0 && !groupedIncome.some((g) => g.type === 'capital_gains') ? {
+    id: 'income-capital_gains-finscope',
+    section: 'Capital gains',
+    applies: true,
+    plain: 'Did you sell shares, ETFs, property, or investments for more than you paid?',
+    answer: `Yes, FINscope Invest captured ${investTax.capitalGainRows} closed position${investTax.capitalGainRows === 1 ? '' : 's'}.`,
+    examples: 'Examples: sold shares, sold ETFs, closed a non-TFSA investment position.',
+    code: SARS_INCOME_CODES.capital_gains.code,
+    sars: `${SARS_INCOME_CODES.capital_gains.label} - FINscope Invest`,
+    value: `${formatRand(investTax.capitalGains)} gain, ${formatRand(taxResult.taxableCapitalGain)} taxable after ${formatRand(getCapitalGainsAnnualExclusion(taxYear))} annual exclusion`,
+    status: sectionStatus(true, hasDoc(documents, ['investment_certificate']), false, true),
+    hint: 'Keep buy price, sell price, dates, fees, and platform statements for each disposal.',
+    documentTypes: ['investment_certificate'],
+    documentNames: docNames(documents, ['investment_certificate']),
+  } : null)
 
   addSection(profile.has_ra ? {
     id: 'retirement-ra',
@@ -867,11 +950,12 @@ function buildMissingItems(sections: ReturnSection[], profile: KlippaProfile, in
 
 function buildLifeEvents(sections: ReturnSection[], profile: KlippaProfile) {
   const active = new Set(sections.filter((s) => s.applies).map((s) => s.id))
+  const hasAnyActive = (ids: string[]) => ids.some((id) => active.has(id) || Array.from(active).some((x) => x.startsWith(`${id}-`)))
   return [
     { question: 'Did you have a job where tax was taken off your payslip?', answer: profile.employment_type !== 'freelance' || active.has('income-salary') || active.has('paye') },
     { question: 'Did clients pay you for work you did yourself?', answer: active.has('income-freelance') || profile.employment_type !== 'employee' },
     { question: 'Did a bank or savings account pay you interest?', answer: profile.has_interest_savings || active.has('income-interest') },
-    { question: 'Did shares, ETFs, crypto, property, or investments pay out or get sold?', answer: ['income-dividends', 'income-capital_gains', 'income-crypto', 'tfsa'].some((id) => active.has(id)) },
+    { question: 'Did shares, ETFs, crypto, property, or investments pay out or get sold?', answer: hasAnyActive(['income-dividends', 'income-capital_gains', 'income-crypto', 'tfsa']) },
     { question: 'Did someone pay you rent for a property, room, cottage, or Airbnb?', answer: active.has('income-rental') },
     { question: 'Did someone outside South Africa pay you?', answer: active.has('income-foreign_income') },
     { question: 'Did you pay medical aid?', answer: profile.has_medical },
@@ -881,13 +965,14 @@ function buildLifeEvents(sections: ReturnSection[], profile: KlippaProfile) {
   ]
 }
 
-function buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents }: {
+function buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, documents, investTax }: {
   profile: KlippaProfile
   incomeRecords: KlippaIncomeRecord[]
   expenseRecords: KlippaExpenseRecord[]
   documents: KlippaDocument[]
+  investTax: InvestTaxTotals
 }) {
-  const investmentIncome = incomeRecords.some(r => ['interest', 'dividends', 'capital_gains', 'crypto'].includes(r.income_type))
+  const investmentIncome = incomeRecords.some(r => ['interest', 'dividends', 'capital_gains', 'crypto'].includes(r.income_type)) || investTax.dividends > 0 || investTax.capitalGains !== 0
   return [
     { label: 'Proof of money clients paid you', required: incomeRecords.some(r => ['freelance', 'commission', 'other'].includes(r.income_type)), ready: hasDoc(documents, ['invoice', 'bank_statement']), hint: 'Upload invoices, bank statements, or proof of payment.' },
     { label: 'Bank statements for the full tax year', required: incomeRecords.length > 0 || expenseRecords.length > 0, ready: hasDoc(documents, ['bank_statement']), hint: 'Upload a bank statement if income or expenses came from your bank account.' },
@@ -901,15 +986,11 @@ function buildFilingPackChecklist({ profile, incomeRecords, expenseRecords, docu
   ].filter((item) => item.required)
 }
 
-function cgtAnnualExclusion(taxYear: number) {
-  return taxYear >= 2027 ? 50_000 : 40_000
-}
-
 function interestExemptionForAge(age: number) {
   return age >= 65 ? 34_500 : 23_800
 }
 
-function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], documents: KlippaDocument[], taxYear: number, age: number): InvestmentWorksheet[] {
+function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], documents: KlippaDocument[], taxYear: number, age: number, investTax: InvestTaxTotals): InvestmentWorksheet[] {
   const investmentTypes: KlippaIncomeRecord['income_type'][] = ['interest', 'dividends', 'capital_gains', 'crypto', 'foreign_income']
   const worksheets: InvestmentWorksheet[] = []
 
@@ -962,7 +1043,7 @@ function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], document
         section: 'Capital gains',
         treatment: 'Shown separately. Klippa needs purchase cost and sale details before it can calculate a reliable taxable gain.',
         needed: ['Date bought', 'Amount paid', 'Date sold', 'Amount received', 'Platform fees or agent fees', 'Statement proving the transaction'],
-        annualExclusion: cgtAnnualExclusion(taxYear),
+        annualExclusion: getCapitalGainsAnnualExclusion(taxYear),
         inclusionRate: 0.4,
       })
       return
@@ -976,6 +1057,44 @@ function buildInvestmentWorksheets(incomeRecords: KlippaIncomeRecord[], document
       needed: ['Foreign payer name', 'Payment date', 'Original currency amount', 'Rand amount received', 'Exchange rate used', 'Any foreign tax certificate'],
     })
   })
+
+  const evidence = docNames(documents, ['investment_certificate', 'bank_statement', 'other'])
+  if (investTax.dividends > 0 && !incomeRecords.some((r) => r.income_type === 'dividends')) {
+    worksheets.push({
+      id: 'worksheet-finscope-dividends',
+      kind: 'dividends',
+      title: 'FINscope dividend worksheet',
+      section: 'Investment income',
+      amount: investTax.dividends,
+      treatment: 'Pulled from FINscope Invest dividend receipts. Check this against the broker tax certificate.',
+      known: [
+        `${investTax.dividendRows} dividend receipt${investTax.dividendRows === 1 ? '' : 's'} captured in FINscope Invest`,
+        `Total dividends captured: ${formatRand(investTax.dividends)}`,
+        `DWT recorded: ${formatRand(investTax.dwtWithheld)}`,
+      ],
+      needed: ['Investment tax certificate', 'Breakdown between dividends, interest, REIT income, foreign amounts, and withholding tax'],
+      evidence,
+    })
+  }
+
+  if (investTax.capitalGains !== 0 && !incomeRecords.some((r) => r.income_type === 'capital_gains')) {
+    worksheets.push({
+      id: 'worksheet-finscope-capital-gains',
+      kind: 'capital_gain',
+      title: 'FINscope closed-position worksheet',
+      section: 'Capital gains',
+      amount: investTax.capitalGains,
+      treatment: 'Pulled from closed non-TFSA Invest holdings. Klippa applies the annual exclusion and 40% inclusion rate in the estimate.',
+      known: [
+        `${investTax.capitalGainRows} closed position${investTax.capitalGainRows === 1 ? '' : 's'} captured in FINscope Invest`,
+        `Net gain captured: ${formatRand(investTax.capitalGains)}`,
+      ],
+      needed: ['Date bought', 'Amount paid', 'Date sold', 'Amount received', 'Platform fees', 'Statement proving each transaction'],
+      evidence,
+      annualExclusion: getCapitalGainsAnnualExclusion(taxYear),
+      inclusionRate: 0.4,
+    })
+  }
 
   return worksheets
 }

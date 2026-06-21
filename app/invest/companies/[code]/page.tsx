@@ -93,16 +93,16 @@ export default function CompanyDetailPage() {
   }
 
   async function toggleWatchlist() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    const method = onWatchlist ? 'DELETE' : 'POST'
+    const res = await fetch('/api/invest/watchlist', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ company_code: code, sens_alerts_enabled: true }),
+    })
+    if (!res.ok) return
     if (onWatchlist) {
-      await supabase.from('klippa_invest_watchlist').delete().eq('user_id', user.id).eq('company_code', code)
       setOnWatchlist(false)
     } else {
-      await supabase.from('klippa_invest_watchlist').upsert(
-        { user_id: user.id, company_code: code, sens_alerts_enabled: true },
-        { onConflict: 'user_id,company_code' }
-      )
       setOnWatchlist(true)
     }
   }
