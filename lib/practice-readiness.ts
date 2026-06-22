@@ -1,6 +1,7 @@
 import type {
   FilingStatus,
   KlippaPracticeClient,
+  KlippaPracticeReturn,
   KlippaPracticeClientDocument,
   PracticeReadinessItem,
   PracticeReadinessScore,
@@ -46,12 +47,18 @@ export function calculatePracticeReadiness(
   client: KlippaPracticeClient,
   documents: KlippaPracticeClientDocument[] = [],
   linkedReturn: LinkedReturnSnapshot = null,
+  practiceReturn?: KlippaPracticeReturn | null,
 ): PracticeReadinessScore {
   const blockers: PracticeReadinessItem[] = []
   const warnings: PracticeReadinessItem[] = []
   const next_actions: PracticeReadinessItem[] = []
 
-  const checklist = Array.isArray(client.doc_checklist) ? client.doc_checklist : []
+  const filingStatus = practiceReturn?.filing_status ?? client.filing_status
+  const checklist = Array.isArray(practiceReturn?.doc_checklist)
+    ? practiceReturn.doc_checklist
+    : Array.isArray(client.doc_checklist)
+      ? client.doc_checklist
+      : []
   const received = checklist.filter(d => d.received).length
   const docRatio = checklist.length > 0 ? received / checklist.length : 0
   const unmatchedUploads = documents.filter(d => !d.checklist_item_id).length
@@ -69,11 +76,11 @@ export function calculatePracticeReadiness(
     warnings.push(item('documents.unmatched', 'Review unmatched uploads', 'warn', `${unmatchedUploads} upload${unmatchedUploads === 1 ? '' : 's'} not tied to a checklist item.`))
   }
 
-  const dl = daysUntil(client.deadline)
+  const dl = daysUntil(practiceReturn?.deadline ?? client.deadline)
   let deadlineScore = 0
-  if (FINAL_STATUSES.includes(client.filing_status)) {
+  if (FINAL_STATUSES.includes(filingStatus)) {
     deadlineScore = 15
-  } else if (!client.deadline) {
+  } else if (!(practiceReturn?.deadline ?? client.deadline)) {
     deadlineScore = 4
     warnings.push(item('deadline.missing', 'Set a filing deadline', 'warn'))
     next_actions.push(item('deadline.set', 'Add the SARS/client deadline', 'warn'))
@@ -100,25 +107,30 @@ export function calculatePracticeReadiness(
   if (client.portal_enabled && client.portal_token) identityScore += 2
   else warnings.push(item('identity.portal', 'Enable the client upload portal', 'warn'))
 
-  const workflowScore = statusPoints(client.filing_status)
-  if (client.filing_status === 'not_started') {
+  const workflowScore = statusPoints(filingStatus)
+  if (filingStatus === 'not_started') {
     next_actions.push(item('workflow.start', 'Move the return into document collection', 'warn'))
   }
 
   let reviewScore = 0
-  if (FINAL_STATUSES.includes(client.filing_status)) {
+  if (FINAL_STATUSES.includes(filingStatus)) {
     reviewScore = 15
-  } else if (client.filing_status === 'review') {
+  } else if (filingStatus === 'review') {
     reviewScore = 11
-    next_actions.push(item('review.approval', 'Get client approval before filing', 'warn'))
-  } else if (client.filing_status === 'in_progress' && received === checklist.length && checklist.length > 0) {
+    if (!practiceReturn?.client_signoff_at) {
+      next_actions.push(item('review.approval', 'Get client approval before filing', 'warn'))
+    }
+  } else if (filingStatus === 'in_progress' && received === checklist.length && checklist.length > 0) {
     reviewScore = 8
     next_actions.push(item('review.prepare', 'Prepare review pack from received documents', 'warn'))
   } else if (linkedReturn) {
     reviewScore = 6
   }
-  if (!linkedReturn && !FINAL_STATUSES.includes(client.filing_status)) {
+  if (!linkedReturn && !FINAL_STATUSES.includes(filingStatus)) {
     warnings.push(item('review.no_snapshot', 'No linked Klippa return snapshot yet', 'warn'))
+  }
+  if (filingStatus === 'review' && practiceReturn?.client_signoff_at) {
+    reviewScore = 15
   }
 
   const checks = {

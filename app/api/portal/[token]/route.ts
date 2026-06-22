@@ -19,7 +19,15 @@ async function resolveByToken(token: string) {
   if (!client || client.status !== 'active' || !client.portal_enabled)
     return { error: 'This portal link is no longer active. Please contact your accountant.', status: 404 as const }
 
-  return { admin, client }
+  const { data: practiceReturn } = await admin
+    .from('klippa_practice_returns')
+    .select('id, return_type, tax_year, filing_status, doc_checklist')
+    .eq('client_id', client.id)
+    .order('tax_year', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return { admin, client, practiceReturn }
 }
 
 const FILING_STEPS = ['not_started', 'collecting', 'in_progress', 'review', 'filed', 'assessed'] as const
@@ -28,7 +36,7 @@ const FILING_STEPS = ['not_started', 'collecting', 'in_progress', 'review', 'fil
 export async function GET(_req: Request, { params }: { params: { token: string } }) {
   const ctx = await resolveByToken(params.token)
   if ('error' in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
-  const { admin, client } = ctx
+  const { admin, client, practiceReturn } = ctx
 
   const { data: org } = await admin
     .from('klippa_organisations')
@@ -36,19 +44,22 @@ export async function GET(_req: Request, { params }: { params: { token: string }
     .eq('id', client.organisation_id)
     .single()
 
-  const { data: docRows } = await admin
+  const docsQuery = admin
     .from('klippa_practice_client_documents')
     .select('id, file_name, checklist_item_id, created_at')
-    .eq('client_id', client.id)
     .order('created_at', { ascending: false })
+
+  const { data: docRows } = practiceReturn?.id
+    ? await docsQuery.eq('return_id', practiceReturn.id)
+    : await docsQuery.eq('client_id', client.id)
 
   return NextResponse.json({
     client: {
       full_name:     client.full_name,
-      return_type:   client.return_type,
-      tax_year:      client.tax_year,
-      filing_status: client.filing_status,
-      checklist:     Array.isArray(client.doc_checklist) ? client.doc_checklist : [],
+      return_type:   practiceReturn?.return_type ?? client.return_type,
+      tax_year:      practiceReturn?.tax_year ?? client.tax_year,
+      filing_status: practiceReturn?.filing_status ?? client.filing_status,
+      checklist:     Array.isArray(practiceReturn?.doc_checklist) ? practiceReturn.doc_checklist : Array.isArray(client.doc_checklist) ? client.doc_checklist : [],
     },
     org: {
       name:        org?.name        ?? 'Your accountant',

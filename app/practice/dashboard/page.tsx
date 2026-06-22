@@ -2,383 +2,422 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
-  ShieldCheck, ArrowLeft, Loader2, AlertTriangle, Plus, X,
-  Users, CalendarClock, CheckCircle2, Wallet, Search,
-  FileText, Trash2, Check,
+  AlertTriangle, ArrowLeft, CheckCircle2, Clock3, FileSpreadsheet,
+  Filter, Loader2, Mail, Plus, ShieldCheck, Users, Wallet,
 } from 'lucide-react'
-import {
-  FILING_STATUS_FLOW, FILING_STATUS_LABELS, ENTITY_TYPE_LABELS,
-} from '@/lib/types'
 import type {
-  KlippaPracticeClient, PracticeStats, FilingStatus,
-  ClientEntityType, ClientReturnType,
+  ClientEntityType,
+  ClientReturnType,
+  FilingStatus,
+  PracticeDashboardRow,
+  PracticeQueueName,
+  PracticeStats,
+  PracticeTeamMember,
 } from '@/lib/types'
 
 const CURRENT_YEAR = new Date().getFullYear()
+const QUEUES: Array<PracticeQueueName | 'All'> = ['All', 'Needs triage', 'Waiting on client', 'Ready to prepare', 'Ready for review', 'Ready to file', 'Filed', 'SARS follow-up']
 
 const zar = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
-const dayLabel = (s: string) => new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s))
+const dayLabel = (s: string | null) => s ? new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s)) : 'No deadline'
 
-const STATUS_STYLE: Record<FilingStatus, string> = {
-  not_started: 'bg-edge text-ink-2',
-  collecting:  'bg-blue-500/15 text-blue-600 dark:text-blue-300',
-  in_progress: 'bg-amber-500/15 text-amber-600 dark:text-amber-300',
-  review:      'bg-violet-500/15 text-violet-600 dark:text-violet-300',
-  filed:       'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  assessed:    'bg-emerald-600/20 text-emerald-700 dark:text-emerald-200',
+const STATUS_LABELS: Record<FilingStatus, string> = {
+  not_started: 'Not started',
+  collecting: 'Collecting docs',
+  in_progress: 'In progress',
+  review: 'Review',
+  filed: 'Filed',
+  assessed: 'Assessed',
 }
 
-function StatCard({ icon: Icon, label, value, sub, color = 'emerald' }: {
-  icon: React.ElementType; label: string; value: string | number; sub?: string
-  color?: 'emerald' | 'amber' | 'blue' | 'red'
+function StatCard({ icon: Icon, label, value, sub }: {
+  icon: React.ElementType
+  label: string
+  value: string | number
+  sub?: string
 }) {
-  const c = {
-    emerald: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
-    amber:   'text-amber-600 dark:text-amber-400 bg-amber-500/10',
-    blue:    'text-blue-600 dark:text-blue-400 bg-blue-500/10',
-    red:     'text-red-500 dark:text-red-400 bg-red-500/10',
-  }[color]
   return (
     <div className="rounded-2xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-ink-2 uppercase tracking-wider">{label}</span>
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${c}`}><Icon className="w-4 h-4" /></div>
+        <span className="text-xs font-medium uppercase tracking-wider text-ink-2">{label}</span>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
+          <Icon className="h-4 w-4" />
+        </div>
       </div>
       <div>
-        <p className="text-2xl font-bold text-ink-1 tabular-nums">{value}</p>
-        {sub && <p className="text-xs text-ink-2 mt-0.5">{sub}</p>}
+        <p className="text-2xl font-bold text-ink-1">{value}</p>
+        {sub && <p className="mt-0.5 text-xs text-ink-2">{sub}</p>}
       </div>
     </div>
   )
 }
 
 const EMPTY_FORM = {
-  full_name: '', email: '', entity_type: 'individual' as ClientEntityType,
-  return_type: 'ITR12' as ClientReturnType, tax_number: '',
-  tax_year: CURRENT_YEAR, deadline: '', fee: '',
+  full_name: '',
+  email: '',
+  entity_type: 'individual' as ClientEntityType,
+  return_type: 'ITR12' as ClientReturnType,
+  tax_number: '',
+  tax_year: CURRENT_YEAR,
+  deadline: '',
+  fee: '',
 }
 
-export default function PracticeDashboard() {
+export default function PracticeDashboardPage() {
   const router = useRouter()
-  const [orgName, setOrgName] = useState('')
-  const [clients, setClients] = useState<KlippaPracticeClient[]>([])
-  const [stats,   setStats]   = useState<PracticeStats | null>(null)
+  const [rows, setRows] = useState<PracticeDashboardRow[]>([])
+  const [stats, setStats] = useState<PracticeStats | null>(null)
+  const [team, setTeam] = useState<PracticeTeamMember[]>([])
+  const [orgName, setOrgName] = useState('Practice')
   const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState<string | null>(null)
-  const [search,  setSearch]  = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [queue, setQueue] = useState<PracticeQueueName | 'All'>('All')
   const [showAdd, setShowAdd] = useState(false)
-  const [form,    setForm]    = useState(EMPTY_FORM)
-  const [saving,  setSaving]  = useState(false)
-  const [busyId,  setBusyId]  = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [busyReturnId, setBusyReturnId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkAction, setBulkAction] = useState<'assign_owner' | 'update_status' | 'send_reminder'>('send_reminder')
+  const [bulkOwnerId, setBulkOwnerId] = useState('')
+  const [bulkStatus, setBulkStatus] = useState<FilingStatus>('collecting')
+  const [form, setForm] = useState(EMPTY_FORM)
 
-  const loadClients = useCallback(async () => {
-    const res  = await fetch('/api/practice/clients')
-    const json = await res.json()
-    if (json.error) { setError(json.error); setLoading(false); return }
-    setClients(json.clients ?? [])
-    setStats(json.stats ?? null)
-    setLoading(false)
-  }, [])
-
-  const init = useCallback(async () => {
+  const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.replace('/login'); return }
+
     const { data: profile } = await supabase
       .from('klippa_profiles')
       .select('organisation_id, user_type')
       .eq('id', user.id)
       .single()
+
     if (!profile?.organisation_id) { router.replace('/dashboard'); return }
     if (profile.user_type !== 'practitioner') { router.replace('/org/dashboard'); return }
-    const { data: org } = await supabase
-      .from('klippa_organisations').select('name').eq('id', profile.organisation_id).single()
-    setOrgName(org?.name ?? 'Practice')
-    await loadClients()
-  }, [router, loadClients])
 
-  useEffect(() => { init() }, [init])
+    const [{ data: org }, dashRes] = await Promise.all([
+      supabase.from('klippa_organisations').select('name').eq('id', profile.organisation_id).single(),
+      fetch('/api/practice/dashboard'),
+    ])
+
+    setOrgName(org?.name ?? 'Practice')
+    const dashJson = await dashRes.json()
+    if (dashJson.error) { setError(dashJson.error); setLoading(false); return }
+
+    setRows(dashJson.rows ?? [])
+    setStats(dashJson.stats ?? null)
+    setTeam(dashJson.team ?? [])
+    setLoading(false)
+  }, [router])
+
+  useEffect(() => { load() }, [load])
+
+  const filtered = useMemo(() => rows.filter(row => {
+    const q = search.trim().toLowerCase()
+    const matchesSearch = !q
+      || row.client.full_name.toLowerCase().includes(q)
+      || (row.client.email ?? '').toLowerCase().includes(q)
+      || (row.client.tax_number ?? '').toLowerCase().includes(q)
+    const matchesQueue = queue === 'All' || row.queue === queue
+    return matchesSearch && matchesQueue
+  }), [queue, rows, search])
+
+  useEffect(() => {
+    setSelectedIds(prev => prev.filter(id => filtered.some(row => row.return.id === id)))
+  }, [filtered])
 
   const addClient = async () => {
     if (!form.full_name.trim()) { setError('Client name is required'); return }
-    setSaving(true); setError(null)
+    setSaving(true)
+    setError(null)
     try {
       const res = await fetch('/api/practice/clients', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           ...form,
           tax_year: Number(form.tax_year),
-          fee:      Number(form.fee) || 0,
+          fee: Number(form.fee) || 0,
           deadline: form.deadline || null,
         }),
       })
       const json = await res.json()
       if (res.status === 402 && json.checkoutUrl) { router.push(json.checkoutUrl); return }
       if (json.error) throw new Error(json.error)
-      setShowAdd(false); setForm(EMPTY_FORM)
-      await loadClients()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed to add client') }
-    finally { setSaving(false) }
+      setForm(EMPTY_FORM)
+      setShowAdd(false)
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to add client')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const patchClient = async (id: string, patch: Record<string, unknown>) => {
-    setBusyId(id)
+  const patchReturn = async (id: string, patch: Record<string, unknown>) => {
+    setBusyReturnId(id)
+    setError(null)
     try {
-      const res = await fetch(`/api/practice/clients/${id}`, {
-        method:  'PATCH',
+      const res = await fetch(`/api/practice/returns/${id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(patch),
+        body: JSON.stringify(patch),
       })
       const json = await res.json()
       if (json.error) throw new Error(json.error)
-      await loadClients()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Update failed') }
-    finally { setBusyId(null) }
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setBusyReturnId(null)
+    }
   }
 
-  const advanceStatus = (c: KlippaPracticeClient) => {
-    const idx  = FILING_STATUS_FLOW.indexOf(c.filing_status)
-    const next = FILING_STATUS_FLOW[Math.min(idx + 1, FILING_STATUS_FLOW.length - 1)]
-    if (next !== c.filing_status) patchClient(c.id, { filing_status: next })
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
   }
 
-  const archiveClient = async (id: string) => {
-    setBusyId(id)
+  const allVisibleSelected = filtered.length > 0 && filtered.every(row => selectedIds.includes(row.return.id))
+
+  const runBulkAction = async () => {
+    if (selectedIds.length === 0) { setError('Select at least one return'); return }
+    setBulkBusy(true)
+    setError(null)
     try {
-      const res = await fetch(`/api/practice/clients/${id}`, { method: 'DELETE' })
+      const payload: Record<string, unknown> = { ids: selectedIds, action: bulkAction }
+      if (bulkAction === 'assign_owner') payload.owner_user_id = bulkOwnerId || null
+      if (bulkAction === 'update_status') payload.filing_status = bulkStatus
+
+      const res = await fetch('/api/practice/returns/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
       const json = await res.json()
       if (json.error) throw new Error(json.error)
-      await loadClients()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Failed') }
-    finally { setBusyId(null) }
+      setSelectedIds([])
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Bulk action failed')
+    } finally {
+      setBulkBusy(false)
+    }
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-base flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-ink-3" /></div>
+    return <div className="flex min-h-screen items-center justify-center bg-base"><Loader2 className="h-5 w-5 animate-spin text-ink-3" /></div>
   }
-
-  const filtered = clients.filter(c => {
-    const q = search.trim().toLowerCase()
-    if (!q) return true
-    return c.full_name.toLowerCase().includes(q)
-      || (c.email ?? '').toLowerCase().includes(q)
-      || (c.tax_number ?? '').toLowerCase().includes(q)
-  })
-
-  const daysTo = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000)
 
   return (
     <div className="min-h-screen bg-base text-ink-1">
-      {/* Header */}
-      <header className="border-b border-edge/60 bg-surface/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-20 border-b border-edge/60 bg-surface/80 backdrop-blur-sm">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-700 flex items-center justify-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-white" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-700">
+                <ShieldCheck className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="font-semibold text-sm tracking-tight">Klippa</span>
+              <span className="text-sm font-semibold tracking-tight">Klippa</span>
             </Link>
-            <span className="text-edge hidden sm:inline">·</span>
-            <span className="text-sm font-medium text-ink-2 hidden sm:inline truncate max-w-[32vw]">{orgName}</span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400">PRACTICE</span>
+            <span className="hidden text-edge sm:inline">·</span>
+            <span className="hidden max-w-[34vw] truncate text-sm text-ink-2 sm:inline">{orgName}</span>
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">PRACTICE</span>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors">
-              <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Add client</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-500">
+              <Plus className="h-3.5 w-3.5" />
+              Add client
             </button>
-            <Link href="/org/settings" className="p-2 rounded-lg text-ink-2 hover:text-ink-1 hover:bg-raised border border-edge transition-colors">
-              <FileText className="w-3.5 h-3.5" />
-            </Link>
-            <Link href="/dashboard" className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">My profile</span>
+            <Link href="/dashboard" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-ink-2 transition-colors hover:bg-raised hover:text-ink-1">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              My profile
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
         {error && (
-          <div className="flex items-start gap-2.5 text-sm text-red-400 bg-red-900/20 border border-red-900/30 rounded-xl px-4 py-3">
-            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />{error}
+          <div className="flex items-start gap-2.5 rounded-xl border border-red-900/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            {error}
           </div>
         )}
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Users}        label="Clients"      value={stats?.total_clients ?? 0} color="blue" sub={`${stats?.in_progress ?? 0} in progress`} />
-          <StatCard icon={CalendarClock} label="Due soon"    value={stats?.due_soon ?? 0} color={(stats?.due_soon ?? 0) > 0 ? 'amber' : 'emerald'} sub="within 14 days" />
-          <StatCard icon={CheckCircle2} label="Filed"        value={stats?.filed_count ?? 0} color="emerald" sub="this season" />
-          <StatCard icon={Wallet}       label="Outstanding"  value={zar(stats?.outstanding_fees ?? 0)} color={(stats?.outstanding_fees ?? 0) > 0 ? 'amber' : 'emerald'} sub="unpaid fees" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <StatCard icon={Users} label="Clients" value={stats?.total_clients ?? 0} sub={`${stats?.total_returns ?? 0} active returns`} />
+          <StatCard icon={Clock3} label="Waiting" value={stats?.waiting_on_client ?? 0} sub="document chase queue" />
+          <StatCard icon={CheckCircle2} label="Review" value={stats?.ready_for_review ?? 0} sub="ready for reviewer" />
+          <StatCard icon={FileSpreadsheet} label="File Now" value={stats?.ready_to_file ?? 0} sub="sign-off or SARS submit" />
+          <StatCard icon={Wallet} label="Fees Open" value={zar(stats?.outstanding_fees ?? 0)} sub={`${stats?.filed_count ?? 0} filed or assessed`} />
         </div>
 
-        {/* Search */}
-        <div className="flex items-center gap-2 rounded-xl border border-edge bg-surface px-3.5 py-2.5 max-w-sm">
-          <Search className="w-4 h-4 text-ink-3" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…"
-            className="bg-transparent text-sm flex-1 outline-none placeholder:text-ink-3" />
+        <div className="rounded-2xl border border-edge bg-surface p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex max-w-md items-center gap-2 rounded-xl border border-edge bg-base px-3.5 py-2.5">
+              <Filter className="h-4 w-4 text-ink-3" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search returns, names, tax numbers..." className="flex-1 bg-transparent text-sm outline-none placeholder:text-ink-3" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {QUEUES.map(label => (
+                <button key={label} onClick={() => setQueue(label)} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${queue === label ? 'bg-amber-600 text-white' : 'bg-base text-ink-2 hover:bg-raised hover:text-ink-1'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-edge bg-base px-3 py-3 lg:flex-row lg:items-center">
+            <p className="text-xs font-medium text-ink-2">{selectedIds.length} selected</p>
+            <select value={bulkAction} onChange={e => setBulkAction(e.target.value as typeof bulkAction)} className="rounded-lg border border-edge bg-surface px-3 py-2 text-xs outline-none">
+              <option value="send_reminder">Send reminders</option>
+              <option value="assign_owner">Assign owner</option>
+              <option value="update_status">Update status</option>
+            </select>
+            {bulkAction === 'assign_owner' && (
+              <select value={bulkOwnerId} onChange={e => setBulkOwnerId(e.target.value)} className="rounded-lg border border-edge bg-surface px-3 py-2 text-xs outline-none">
+                <option value="">Unassigned</option>
+                {team.map(member => <option key={member.id} value={member.id}>{member.full_name ?? member.email}</option>)}
+              </select>
+            )}
+            {bulkAction === 'update_status' && (
+              <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as FilingStatus)} className="rounded-lg border border-edge bg-surface px-3 py-2 text-xs outline-none">
+                {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            )}
+            <button onClick={runBulkAction} disabled={bulkBusy || selectedIds.length === 0} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-60">
+              {bulkBusy ? 'Running...' : bulkAction === 'send_reminder' ? 'Run reminders' : 'Apply to selected'}
+            </button>
+          </div>
         </div>
 
-        {/* Client book */}
-        <div className="rounded-2xl border border-edge overflow-hidden">
-          <div className="px-5 py-4 border-b border-edge bg-surface/60">
-            <p className="text-sm font-semibold">Client book</p>
-            <p className="text-xs text-ink-2 mt-0.5">{filtered.length} of {clients.length} client{clients.length !== 1 ? 's' : ''}</p>
+        <div className="overflow-hidden rounded-2xl border border-edge">
+          <div className="border-b border-edge bg-surface/60 px-5 py-4">
+            <p className="text-sm font-semibold">Return workbench</p>
+            <p className="mt-0.5 text-xs text-ink-2">{filtered.length} of {rows.length} returns</p>
           </div>
 
           {filtered.length === 0 ? (
-            <div className="px-5 py-14 text-center space-y-3">
-              <Users className="w-8 h-8 text-edge mx-auto" />
-              <p className="text-sm text-ink-2">{clients.length === 0 ? 'No clients yet' : 'No matches'}</p>
-              {clients.length === 0 && (
-                <button onClick={() => setShowAdd(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-xs font-semibold text-white transition-colors">
-                  <Plus className="w-3.5 h-3.5" /> Add your first client
-                </button>
-              )}
+            <div className="space-y-3 px-5 py-14 text-center">
+              <Users className="mx-auto h-8 w-8 text-edge" />
+              <p className="text-sm text-ink-2">No returns match this view.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
+              <table className="min-w-[1160px] w-full text-sm">
                 <thead>
-                  <tr className="border-b border-edge/50 bg-surface/40">
-                    {['Client', 'Return', 'Status', 'Deadline', 'Fee', ''].map(h => (
-                      <th key={h} className="text-left px-5 py-3 text-xs font-medium text-ink-2">{h}</th>
+                  <tr className="border-b border-edge/60 bg-surface/40">
+                    {['', 'Client', 'Queue', 'Return', 'Readiness', 'Documents', 'Owner', 'Status', 'Deadline'].map(header => (
+                      <th key={header} className="px-5 py-3 text-left text-xs font-medium text-ink-2">{header}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(c => {
-                    const dl = c.deadline ? daysTo(c.deadline) : null
-                    const overdue = dl != null && dl < 0 && c.filing_status !== 'filed' && c.filing_status !== 'assessed'
-                    return (
-                      <tr key={c.id} className="border-b border-edge/40 last:border-0 hover:bg-surface/60 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <Link href={`/practice/clients/${c.id}`} className="group block">
-                            <p className="font-medium text-ink-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{c.full_name}</p>
-                            <p className="text-xs text-ink-3">{ENTITY_TYPE_LABELS[c.entity_type]}{c.email ? ` · ${c.email}` : ''}</p>
-                          </Link>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className="text-xs text-ink-2">{c.return_type}</span>
-                          <span className="text-xs text-ink-3"> · {c.tax_year}</span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <select
-                            value={c.filing_status}
-                            onChange={e => patchClient(c.id, { filing_status: e.target.value })}
-                            disabled={busyId === c.id}
-                            className={`text-xs font-medium rounded-full px-2.5 py-1 border-0 outline-none cursor-pointer ${STATUS_STYLE[c.filing_status]}`}
-                          >
-                            {FILING_STATUS_FLOW.map(s => (
-                              <option key={s} value={s}>{FILING_STATUS_LABELS[s]}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {c.deadline ? (
-                            <span className={`text-xs ${overdue ? 'text-red-400 font-medium' : dl != null && dl <= 14 ? 'text-amber-500' : 'text-ink-2'}`}>
-                              {dayLabel(c.deadline)}{overdue ? ' · overdue' : dl != null && dl <= 14 ? ` · ${dl}d` : ''}
-                            </span>
-                          ) : <span className="text-xs text-ink-3">—</span>}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <button
-                            onClick={() => patchClient(c.id, { fee_paid: !c.fee_paid })}
-                            disabled={busyId === c.id || c.fee === 0}
-                            className={`text-xs px-2 py-0.5 rounded-full transition-colors disabled:cursor-default ${
-                              c.fee === 0 ? 'text-ink-3'
-                              : c.fee_paid ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                              : 'bg-amber-500/15 text-amber-600 dark:text-amber-300 hover:bg-amber-500/25'
-                            }`}
-                            title={c.fee === 0 ? '' : c.fee_paid ? 'Paid, click to mark unpaid' : 'Unpaid, click to mark paid'}
-                          >
-                            {c.fee === 0 ? '—' : `${zar(c.fee)}${c.fee_paid ? ' ✓' : ''}`}
-                          </button>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-1">
-                            {c.filing_status !== 'assessed' && (
-                              <button onClick={() => advanceStatus(c)} disabled={busyId === c.id}
-                                className="px-2 py-1 rounded-md text-xs bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors"
-                                title="Advance to next stage">
-                                {busyId === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                              </button>
-                            )}
-                            <button onClick={() => archiveClient(c.id)} disabled={busyId === c.id}
-                              className="p-1.5 text-ink-3 hover:text-red-400 transition-colors" title="Archive client">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {filtered.map(row => (
+                    <tr key={row.return.id} className="border-b border-edge/40 align-top last:border-b-0">
+                      <td className="px-5 py-4">
+                        <input type="checkbox" checked={selectedIds.includes(row.return.id)} onChange={() => toggleSelected(row.return.id)} className="h-4 w-4 rounded border-edge bg-surface" />
+                      </td>
+                      <td className="px-5 py-4">
+                        <Link href={`/practice/returns/${row.return.id}`} className="font-medium text-ink-1 hover:text-amber-500">{row.client.full_name}</Link>
+                        <p className="mt-1 text-xs text-ink-2">{row.client.email ?? 'No email'}{row.client.tax_number ? ` · ${row.client.tax_number}` : ''}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="rounded-full bg-edge px-2.5 py-1 text-[11px] font-medium text-ink-2">{row.queue}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="font-medium text-ink-1">{row.return.return_type} · {row.return.tax_year}</p>
+                        <p className="mt-1 text-xs text-ink-2">{row.assignees.preparer?.full_name ?? 'No preparer'} / {row.assignees.reviewer?.full_name ?? 'No reviewer'}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className={`font-semibold ${row.readiness.label === 'Ready' ? 'text-emerald-500' : row.readiness.label === 'Nearly ready' ? 'text-blue-500' : row.readiness.label === 'At risk' ? 'text-amber-500' : 'text-red-400'}`}>
+                          {row.readiness.score}% {row.readiness.label}
+                        </p>
+                        <p className="mt-1 text-xs text-ink-2">{row.readiness.blockers.length} blockers</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="font-medium text-ink-1">{row.received_documents}/{row.total_documents || 0}</p>
+                        <p className="mt-1 text-xs text-ink-2">requested items in</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <select value={row.return.owner_user_id ?? ''} onChange={e => patchReturn(row.return.id, { owner_user_id: e.target.value || null })} disabled={busyReturnId === row.return.id} className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-xs text-ink-1 outline-none">
+                          <option value="">Unassigned</option>
+                          {team.map(member => <option key={member.id} value={member.id}>{member.full_name ?? member.email}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-5 py-4">
+                        <select value={row.return.filing_status} onChange={e => patchReturn(row.return.id, { filing_status: e.target.value })} disabled={busyReturnId === row.return.id} className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-xs text-ink-1 outline-none">
+                          {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                        <button onClick={() => setSelectedIds([row.return.id])} className="mt-2 text-[11px] text-amber-500 hover:underline">
+                          Select only this
+                        </button>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="font-medium text-ink-1">{dayLabel(row.return.deadline)}</p>
+                        <p className="mt-1 text-xs text-ink-2">{row.return.fee_paid ? 'Fee paid' : `${zar(row.return.fee)} open`}</p>
+                        <button onClick={() => router.push(`/practice/returns/${row.return.id}`)} className="mt-2 flex items-center gap-1 text-[11px] text-ink-2 hover:text-ink-1">
+                          <Mail className="h-3 w-3" />
+                          Open detail
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {filtered.length > 0 && (
+            <div className="border-t border-edge bg-surface/40 px-5 py-3">
+              <button onClick={() => setSelectedIds(allVisibleSelected ? [] : filtered.map(row => row.return.id))} className="text-xs text-ink-2 hover:text-ink-1">
+                {allVisibleSelected ? 'Clear visible selection' : 'Select all visible'}
+              </button>
             </div>
           )}
         </div>
       </main>
 
-      {/* Add client modal */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => !saving && setShowAdd(false)}>
-          <div className="w-full max-w-md rounded-2xl border border-edge bg-surface p-6 space-y-5" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Add a client</h2>
-              <button onClick={() => setShowAdd(false)} className="text-ink-3 hover:text-ink-1"><X className="w-4 h-4" /></button>
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/45 px-4">
+          <div className="w-full max-w-xl rounded-2xl border border-edge bg-surface p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">Add client and first return</p>
+                <p className="mt-0.5 text-xs text-ink-2">Creates the client master and its initial tax-year return.</p>
+              </div>
+              <button onClick={() => setShowAdd(false)} className="text-xs text-ink-2 hover:text-ink-1">Close</button>
             </div>
-
-            <div className="space-y-3">
-              <input autoFocus value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })}
-                placeholder="Client name *" className="input w-full" />
-              <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
-                placeholder="Email (optional)" className="input w-full" />
-
-              <div className="grid grid-cols-2 gap-3">
-                <select value={form.entity_type} onChange={e => setForm({ ...form, entity_type: e.target.value as ClientEntityType })} className="input">
-                  {Object.entries(ENTITY_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <select value={form.return_type} onChange={e => setForm({ ...form, return_type: e.target.value as ClientReturnType })} className="input">
-                  {['ITR12', 'IRP6', 'ITR14', 'IT12TR'].map(v => <option key={v} value={v}>{v}</option>)}
-                </select>
-              </div>
-
-              <input value={form.tax_number} onChange={e => setForm({ ...form, tax_number: e.target.value })}
-                placeholder="Tax number (optional)" className="input w-full" />
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-ink-3">Tax year</label>
-                  <input type="number" value={form.tax_year} onChange={e => setForm({ ...form, tax_year: Number(e.target.value) })} className="input w-full" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-ink-3">Fee (R)</label>
-                  <input type="number" value={form.fee} onChange={e => setForm({ ...form, fee: e.target.value })} placeholder="0" className="input w-full" />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs text-ink-3">Filing deadline (optional)</label>
-                <input type="date" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} className="input w-full" />
-              </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input value={form.full_name} onChange={e => setForm(s => ({ ...s, full_name: e.target.value }))} placeholder="Client name" className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none" />
+              <input value={form.email} onChange={e => setForm(s => ({ ...s, email: e.target.value }))} placeholder="Email" className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none" />
+              <select value={form.entity_type} onChange={e => setForm(s => ({ ...s, entity_type: e.target.value as ClientEntityType }))} className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none">
+                <option value="individual">Individual</option>
+                <option value="sole_prop">Sole proprietor</option>
+                <option value="company">Company</option>
+                <option value="trust">Trust</option>
+              </select>
+              <select value={form.return_type} onChange={e => setForm(s => ({ ...s, return_type: e.target.value as ClientReturnType }))} className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none">
+                <option value="ITR12">ITR12</option>
+                <option value="IRP6">IRP6</option>
+                <option value="ITR14">ITR14</option>
+                <option value="IT12TR">IT12TR</option>
+              </select>
+              <input value={form.tax_number} onChange={e => setForm(s => ({ ...s, tax_number: e.target.value }))} placeholder="Tax number" className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none" />
+              <input value={String(form.tax_year)} onChange={e => setForm(s => ({ ...s, tax_year: Number(e.target.value) || CURRENT_YEAR }))} placeholder="Tax year" className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none" />
+              <input type="date" value={form.deadline} onChange={e => setForm(s => ({ ...s, deadline: e.target.value }))} className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none" />
+              <input value={form.fee} onChange={e => setForm(s => ({ ...s, fee: e.target.value }))} placeholder="Fee (ZAR)" className="rounded-xl border border-edge bg-base px-3 py-2.5 text-sm outline-none" />
             </div>
-
-            {error && <p className="text-xs text-red-400">{error}</p>}
-
-            <div className="flex gap-2">
-              <button onClick={() => setShowAdd(false)} disabled={saving}
-                className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">Cancel</button>
-              <button onClick={addClient} disabled={saving || !form.full_name.trim()}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 transition-colors">
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add client
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setShowAdd(false)} className="rounded-lg border border-edge px-3 py-2 text-xs text-ink-2">Cancel</button>
+              <button onClick={addClient} disabled={saving} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-60">
+                {saving ? 'Saving...' : 'Create'}
               </button>
             </div>
           </div>

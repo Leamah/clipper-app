@@ -513,10 +513,37 @@ export interface KlippaPracticeClient {
   updated_at:      string
 }
 
+export interface KlippaPracticeReturn {
+  id:                 string
+  client_id:          string
+  organisation_id:    string
+  tax_year:           number
+  return_type:        ClientReturnType
+  filing_status:      FilingStatus
+  deadline:           string | null
+  review_due_at:      string | null
+  owner_user_id:      string | null
+  preparer_user_id:   string | null
+  reviewer_user_id:   string | null
+  fee:                number
+  fee_paid:           boolean
+  notes:              string | null
+  blocked_reason_codes: string[]
+  doc_checklist:      ChecklistItem[]
+  last_chased_at:     string | null
+  client_signoff_at:  string | null
+  filed_at:           string | null
+  assessed_at:        string | null
+  sars_reference:     string | null
+  created_at:         string
+  updated_at:         string
+}
+
 export interface KlippaPracticeClientDocument {
   id:                string
   client_id:         string
   organisation_id:   string
+  return_id:         string | null
   checklist_item_id: string | null
   file_name:         string
   storage_path:      string
@@ -551,10 +578,85 @@ export interface PracticeReadinessScore {
 
 export interface PracticeStats {
   total_clients:    number
+  total_returns:    number
   due_soon:         number   // deadline within 14 days, not yet filed
   filed_count:      number   // filed or assessed this tax year
   in_progress:      number   // collecting | in_progress | review
+  blocked_returns:  number
+  waiting_on_client: number
+  ready_for_review: number
+  ready_to_file:    number
   outstanding_fees: number   // sum of unpaid fees
+}
+
+export type PracticeQueueName =
+  | 'Needs triage'
+  | 'Waiting on client'
+  | 'Ready to prepare'
+  | 'Ready for review'
+  | 'Ready to file'
+  | 'Filed'
+  | 'SARS follow-up'
+
+export interface PracticeTeamMember {
+  id:         string
+  full_name:  string | null
+  email:      string
+  org_role:   string | null
+}
+
+export interface PracticeDashboardRow {
+  client: Pick<KlippaPracticeClient, 'id' | 'full_name' | 'email' | 'tax_number' | 'entity_type' | 'client_user_id'>
+  return: KlippaPracticeReturn
+  queue: PracticeQueueName
+  readiness: PracticeReadinessScore
+  received_documents: number
+  total_documents:    number
+  assignees: {
+    owner:    PracticeTeamMember | null
+    preparer: PracticeTeamMember | null
+    reviewer: PracticeTeamMember | null
+  }
+}
+
+export interface KlippaPracticeActivityEvent {
+  id:             string
+  organisation_id: string
+  client_id:      string
+  return_id:      string | null
+  actor_user_id:  string | null
+  event_type:     string
+  event_label:    string
+  detail:         string | null
+  metadata:       Record<string, unknown> | null
+  created_at:     string
+  actor_name?:    string | null
+}
+
+export interface KlippaPracticeChecklistTemplate {
+  id:              string
+  organisation_id: string | null
+  name:            string
+  return_type:     ClientReturnType
+  entity_type:     ClientEntityType | null
+  description:     string | null
+  checklist:       ChecklistItem[]
+  reminder_cadence_days: number | null
+  created_by:      string | null
+  created_at:      string
+  updated_at:      string
+}
+
+export interface KlippaPracticeReminderEvent {
+  id:              string
+  organisation_id: string
+  client_id:       string
+  return_id:       string
+  channel:         'email'
+  recipient_email: string | null
+  template_name:   string | null
+  sent_by:         string | null
+  sent_at:         string
 }
 
 // ── Tier Feature Config ────────────────────────────────────

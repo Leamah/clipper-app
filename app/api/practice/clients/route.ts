@@ -4,6 +4,7 @@ import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 import { getOrgEntitlement }  from '@/lib/billing'
 import { PRACTICE_CLIENT_CAP } from '@/lib/ozow'
+import { logPracticeEvent } from '@/lib/practice-server'
 
 // Resolve caller → admin client + practice org. Practitioners only.
 async function resolvePracticeContext() {
@@ -48,22 +49,34 @@ export async function GET() {
     .order('deadline', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
 
+  const { data: returns, error: returnsError } = await admin
+    .from('klippa_practice_returns')
+    .select('id, filing_status, deadline, fee, fee_paid')
+    .eq('organisation_id', orgId)
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (returnsError) return NextResponse.json({ error: returnsError.message }, { status: 500 })
 
   const list  = clients ?? []
+  const returnList = returns ?? []
   const today = new Date()
   const in14  = new Date(today); in14.setDate(today.getDate() + 14)
 
   const stats = {
     total_clients:    list.length,
-    due_soon: list.filter(c =>
-      c.deadline &&
-      new Date(c.deadline) <= in14 &&
-      c.filing_status !== 'filed' &&
-      c.filing_status !== 'assessed').length,
-    filed_count:  list.filter(c => c.filing_status === 'filed' || c.filing_status === 'assessed').length,
-    in_progress:  list.filter(c => ['collecting', 'in_progress', 'review'].includes(c.filing_status)).length,
-    outstanding_fees: list.reduce((s, c) => s + (c.fee_paid ? 0 : Number(c.fee ?? 0)), 0),
+    total_returns: returnList.length,
+    due_soon: returnList.filter(r =>
+      r.deadline &&
+      new Date(r.deadline) <= in14 &&
+      r.filing_status !== 'filed' &&
+      r.filing_status !== 'assessed').length,
+    filed_count:  returnList.filter(r => r.filing_status === 'filed' || r.filing_status === 'assessed').length,
+    in_progress:  returnList.filter(r => ['collecting', 'in_progress', 'review'].includes(r.filing_status)).length,
+    blocked_returns: returnList.filter(r => r.filing_status === 'not_started').length,
+    waiting_on_client: returnList.filter(r => r.filing_status === 'collecting').length,
+    ready_for_review: returnList.filter(r => r.filing_status === 'in_progress').length,
+    ready_to_file: returnList.filter(r => r.filing_status === 'review').length,
+    outstanding_fees: returnList.reduce((s, r) => s + (r.fee_paid ? 0 : Number(r.fee ?? 0)), 0),
   }
 
   return NextResponse.json({ clients: list, stats })
@@ -73,7 +86,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const ctx = await resolvePracticeContext()
   if ('error' in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
-  const { admin, orgId } = ctx
+  const { user, admin, orgId } = ctx
 
   const body = await request.json().catch(() => ({}))
   if (!body.full_name?.trim())
@@ -127,5 +140,35 @@ export async function POST(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ client })
+
+  const { data: practiceReturn, error: returnError } = await admin
+    .from('klippa_practice_returns')
+    .insert({
+      client_id:       client.id,
+      organisation_id: orgId,
+      tax_year:        insert.tax_year,
+      return_type:     insert.return_type,
+      filing_status:   'not_started',
+      deadline:        insert.deadline,
+      fee:             insert.fee,
+      fee_paid:        false,
+      notes:           insert.notes,
+      doc_checklist:   [],
+    })
+    .select()
+    .single()
+
+  if (returnError) return NextResponse.json({ error: returnError.message }, { status: 500 })
+
+  await logPracticeEvent(admin, {
+    organisation_id: orgId,
+    client_id: client.id,
+    return_id: practiceReturn.id,
+    actor_user_id: user.id,
+    event_type: 'client_created',
+    event_label: 'Client and return created',
+    detail: `${client.full_name} · ${practiceReturn.tax_year} ${practiceReturn.return_type}`,
+  })
+
+  return NextResponse.json({ client, practiceReturn })
 }
