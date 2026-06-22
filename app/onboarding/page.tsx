@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { EmploymentType, WorkLocation, UserType } from '@/lib/types'
 import { SEAT_PRICE_ANNUAL } from '@/lib/ozow'
+import { readAttributionCookie } from '@/lib/attribution'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -98,6 +99,7 @@ export default function OnboardingPage() {
       //  • Provisional tax  → non-PAYE earners (freelance / mixed) file IRP6
       const drivesForWork  = state.has_vehicle ?? false
       const invoicesClients = state.employment_type === 'freelance' || state.employment_type === 'mixed'
+      const attribution = readAttributionCookie()
 
       const { error: profileErr } = await supabase
         .from('klippa_profiles')
@@ -120,6 +122,11 @@ export default function OnboardingPage() {
           tax_year:             state.tax_year,
           invest_enabled:       state.invest_enabled,
           onboarding_complete:  true,
+          utm_source:           attribution?.utm_source   ?? null,
+          utm_medium:           attribution?.utm_medium   ?? null,
+          utm_campaign:         attribution?.utm_campaign ?? null,
+          gclid:                attribution?.gclid        ?? null,
+          landing_page:         attribution?.landing_page ?? null,
         }, { onConflict: 'id' })
 
       if (profileErr) throw profileErr
@@ -150,6 +157,7 @@ export default function OnboardingPage() {
       if (!user) throw new Error('Not authenticated')
 
       // Upsert profile as company_owner / practitioner
+      const attribution = readAttributionCookie()
       const { error: profileErr } = await supabase
         .from('klippa_profiles')
         .upsert({
@@ -160,6 +168,11 @@ export default function OnboardingPage() {
           work_location:       'office_only',
           works_from_home:     false,
           tax_year:            CURRENT_YEAR,
+          utm_source:          attribution?.utm_source   ?? null,
+          utm_medium:          attribution?.utm_medium   ?? null,
+          utm_campaign:        attribution?.utm_campaign ?? null,
+          gclid:               attribution?.gclid        ?? null,
+          landing_page:        attribution?.landing_page ?? null,
         }, { onConflict: 'id' })
 
       if (profileErr) throw profileErr

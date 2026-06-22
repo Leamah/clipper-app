@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import PageTransition  from '@/components/PageTransition'
-import IdleGuard       from '@/components/IdleGuard'
+import PageTransition     from '@/components/PageTransition'
+import IdleGuard          from '@/components/IdleGuard'
+import AttributionCapture from '@/components/AttributionCapture'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
 
@@ -34,13 +35,13 @@ export const metadata: Metadata = {
     title:       'Klippa | SARS-Ready Tax & Expense Tracking for SA Freelancers',
     description:
       'Auto-categorise expenses, calculate mixed-use deductions, build a SARS-compliant logbook and file your ITR12 in minutes. Built for South African freelancers, consultants and accountants.',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Klippa — SARS-ready tax for South African freelancers' }],
+    images: [{ url: '/banner.png', width: 2033, height: 774, alt: 'Klippa — SARS-ready tax for South African freelancers' }],
   },
   twitter: {
     card:        'summary_large_image',
     title:       'Klippa | SARS-Ready Tax for SA Freelancers',
     description: 'Know your tax position in real time. Auto deductions, SARS logbook, 20-minute ITR12 filing.',
-    images:      ['/og.png'],
+    images:      ['/banner.png'],
   },
   robots: {
     index: true, follow: true,
@@ -102,6 +103,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-base text-ink-1 antialiased">
+        <AttributionCapture />
         <IdleGuard />
         <PageTransition>{children}</PageTransition>
       </body>

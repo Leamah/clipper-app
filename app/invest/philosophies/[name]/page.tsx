@@ -83,8 +83,8 @@ export default function PhilosophyPage() {
     </div>
   )
 
-  const isFull        = profile?.feature_invest_full ?? false
-  const isBasicLocked = name !== 'buffett' && !isFull
+  const isPro         = profile?.subscription_tier === 'professional' || profile?.subscription_tier === 'admin'
+  const isBasicLocked = name !== 'buffett' && !isPro
 
   return (
     <div className="app-shell">
@@ -105,7 +105,7 @@ export default function PhilosophyPage() {
         {/* Philosophy switcher */}
         <div className="flex flex-wrap gap-2">
           {ALL_PHILOSOPHIES.map((p) => {
-            const locked = p !== 'buffett' && !isFull
+            const locked = p !== 'buffett' && !isPro
             return (
               <Link key={p} href={`/invest/philosophies/${p}`}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors border ${
@@ -123,9 +123,9 @@ export default function PhilosophyPage() {
         {isBasicLocked ? (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 text-center space-y-3">
             <Lock className="w-8 h-8 text-amber-400 mx-auto" />
-            <p className="text-sm font-medium text-ink-1">This philosophy requires Full Invest</p>
-            <p className="text-xs text-ink-2">Buffett is available on Basic. Lynch, Pabrai, Graham, and Greenblatt are unlocked on Starter and above.</p>
-            <Link href="/subscription" className="inline-block mt-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold">Upgrade to Starter</Link>
+            <p className="text-sm font-medium text-ink-1">Professional plan required</p>
+            <p className="text-xs text-ink-2">The Buffett philosophy is available to all Invest subscribers. Lynch, Pabrai, Graham, and Greenblatt require a Professional subscription.</p>
+            <Link href="/subscription" className="inline-block mt-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold">Upgrade to Professional</Link>
           </div>
         ) : (
           <div className="space-y-4">

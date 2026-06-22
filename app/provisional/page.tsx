@@ -17,6 +17,7 @@ import {
 } from '@/lib/tax-engine'
 import { PiggyBank } from 'lucide-react'
 import { isProfessionalOrAbove } from '@/lib/tier'
+import { PLANS } from '@/lib/ozow'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -232,7 +233,7 @@ export default function ProvisionalPage() {
               <h2 className="text-lg font-bold text-ink-1">Provisional Tax Planner</h2>
               <p className="text-sm text-ink-2 max-w-sm leading-relaxed">
                 Track your IRP6 deadlines, estimate your payments and stay penalty-free.
-                Available on the <strong className="text-ink-1">Premium</strong> plan.
+                Available on the <strong className="text-ink-1">{PLANS.professional.name}</strong> plan.
               </p>
             </div>
             <div className="flex items-center gap-3 pt-1">
@@ -240,7 +241,7 @@ export default function ProvisionalPage() {
                 href="/pricing"
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
               >
-                Upgrade to Premium
+                Upgrade to {PLANS.professional.name}
               </Link>
               <Link
                 href="/dashboard"

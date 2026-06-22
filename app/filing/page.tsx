@@ -16,6 +16,7 @@ import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseR
 import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline, getCapitalGainsAnnualExclusion } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { isProfessionalOrAbove } from '@/lib/tier'
+import { PLANS } from '@/lib/ozow'
 import { getIncomeTypeCopy, isIncludedInTaxEstimate, needsHumanReview } from '@/lib/sars-return-map'
 
 function formatRand(n: number) {
@@ -150,7 +151,7 @@ export default function FilingPage() {
               <h2 className="text-lg font-bold text-ink-1">ITR12 Filing Wizard</h2>
               <p className="text-sm text-ink-2 max-w-sm leading-relaxed">
                 Your personalised eFiling cheat sheet, deduction summary and step-by-step filing guide.
-                Available on the <strong className="text-ink-1">Premium</strong> plan.
+                Available on the <strong className="text-ink-1">{PLANS.professional.name}</strong> plan.
               </p>
             </div>
             <div className="flex items-center gap-3 pt-1">
@@ -158,7 +159,7 @@ export default function FilingPage() {
                 href="/pricing"
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all"
               >
-                Upgrade to Premium
+                Upgrade to {PLANS.professional.name}
               </Link>
               <Link
                 href="/dashboard"

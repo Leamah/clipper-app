@@ -166,7 +166,7 @@ export default function TaxChatbot() {
                 <Lock className="w-5 h-5 text-emerald-400" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-ink-1">Premium feature</p>
+                <p className="text-sm font-semibold text-ink-1">Paid feature</p>
                 <p className="text-xs text-ink-2 mt-1 leading-relaxed">
                   Get instant answers about Klippa and SA tax — included with every paid plan.
                 </p>

@@ -157,7 +157,7 @@ export async function POST(
 
   const { data: prof } = await supabase
     .from('klippa_profiles')
-    .select('feature_invest_basic, feature_invest_full, invest_enabled')
+    .select('feature_invest_basic, invest_enabled, subscription_tier')
     .eq('id', user.id)
     .single()
 
@@ -165,8 +165,9 @@ export async function POST(
     return NextResponse.json({ error: 'INVEST_TIER_REQUIRED' }, { status: 403 })
   }
 
-  if (!prof.feature_invest_full && !BASIC_PHILOSOPHIES.includes(name)) {
-    return NextResponse.json({ error: 'INVEST_TIER_REQUIRED', message: 'This philosophy requires Full Invest (Starter or above).' }, { status: 403 })
+  const isPro = prof.subscription_tier === 'professional' || prof.subscription_tier === 'admin'
+  if (!isPro && !BASIC_PHILOSOPHIES.includes(name)) {
+    return NextResponse.json({ error: 'INVEST_TIER_REQUIRED', message: 'This philosophy requires a Professional subscription.' }, { status: 403 })
   }
 
   const body = await request.json().catch(() => ({}))

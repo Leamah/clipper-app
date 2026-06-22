@@ -6,6 +6,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Check, ArrowRight, ShieldCheck, Zap, Users, Building2 } from 'lucide-react'
 import { PLANS, SEAT_PRICE_ANNUAL, PRACTICE_CLIENT_CAP, type PlanKey, type BillingCycle } from '@/lib/ozow'
+import { FREE_EXPENSE_LIMIT, FREE_INCOME_LIMIT } from '@/lib/tier'
 
 export default function PricingPage() {
   const [cycle, setCycle] = useState<BillingCycle>('monthly')
@@ -75,7 +76,7 @@ export default function PricingPage() {
               Get started, explore the platform, and track your first expenses.
             </p>
             <ul className="space-y-2">
-              {['Up to 20 expenses per tax year', 'Basic AI classification', 'Dashboard & tax meter'].map((f) => (
+              {[`Up to ${FREE_EXPENSE_LIMIT} expenses & ${FREE_INCOME_LIMIT} income records per month`, 'Basic AI classification', 'Dashboard & tax meter'].map((f) => (
                 <li key={f} className="flex items-start gap-2 text-xs text-ink-2">
                   <Check className="w-3.5 h-3.5 text-ink-2 mt-0.5 flex-shrink-0" />
                   {f}

@@ -58,6 +58,8 @@ export async function middleware(request: NextRequest) {
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/pricing' ||
+    pathname === '/deductions' ||          // paid-acquisition landing page (Google Ads)
+    pathname === '/provisional-tax' ||     // paid-acquisition landing page (Google Ads)
     pathname.startsWith('/payments/')      // success / cancel pages
   )
   const isOnboarding    = pathname.startsWith('/onboarding')

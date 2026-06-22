@@ -32,7 +32,7 @@ export const PLANS = {
     ],
   },
   professional: {
-    name:         'Premium',
+    name:         'Professional',
     monthlyPrice: 149,
     annualPrice:  1490,   // 2 months free
     description:  'For contractors and consultants who want to file and plan with confidence.',
