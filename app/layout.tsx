@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 import PageTransition     from '@/components/PageTransition'
 import IdleGuard          from '@/components/IdleGuard'
@@ -103,6 +104,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-base text-ink-1 antialiased">
+        {/* Google Ads base tag — required sitewide for conversion detection.
+            Config only; no conversion data flows until fireSignupConversion() fires. */}
+        <Script src="https://www.googletagmanager.com/gtag/js?id=AW-16982139445" strategy="afterInteractive" />
+        <Script id="google-ads-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'AW-16982139445');
+        `}</Script>
         <AttributionCapture />
         <IdleGuard />
         <PageTransition>{children}</PageTransition>
