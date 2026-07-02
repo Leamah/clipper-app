@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ShieldCheck, Mail, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { fireSignupConversion } from '@/lib/gtag'
 
 const ERROR_MESSAGES: Record<string, string> = {
   auth_callback_failed: 'Sign-in link failed. Please request a new one.',
@@ -89,6 +90,7 @@ function LoginForm() {
         } catch { /* response was HTML — keep the default message */ }
         throw new Error(errMsg)
       }
+      fireSignupConversion()
       setSent(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')

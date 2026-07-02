@@ -13,7 +13,6 @@ import {
 import type { EmploymentType, WorkLocation, UserType } from '@/lib/types'
 import { SEAT_PRICE_ANNUAL } from '@/lib/ozow'
 import { readAttributionCookie } from '@/lib/attribution'
-import { fireSignupConversion } from '@/lib/gtag'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -142,7 +141,6 @@ export default function OnboardingPage() {
         }, { onConflict: 'user_id,tax_year,return_type' })
 
       if (returnErr) throw returnErr
-      fireSignupConversion()
       router.replace('/dashboard')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
@@ -195,7 +193,6 @@ export default function OnboardingPage() {
       if (json.error) throw new Error(json.error)
       if (!res.ok) throw new Error('Failed to create organisation')
 
-      fireSignupConversion()
       router.replace(state.user_type === 'practitioner' ? '/practice/dashboard' : '/org/dashboard')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
