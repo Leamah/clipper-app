@@ -6,6 +6,7 @@ import {
   ShieldCheck, LayoutDashboard, TrendingUp, Receipt, FileText,
   Clock, Car, CalendarDays, ClipboardCheck, Settings, Users,
   Menu, X, PanelLeftClose, PanelLeftOpen, MessageCircle, BarChart2,
+  FileSpreadsheet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import UserNav        from '@/components/UserNav'
@@ -18,6 +19,7 @@ import type { FeatureFlags as SharedFeatureFlags } from '@/lib/types'
 export type ActivePage =
   | 'dashboard'
   | 'income'
+  | 'invoices'
   | 'expenses'
   | 'documents'
   | 'provisional'
@@ -119,8 +121,10 @@ export default function AppNav({
     { page: 'dashboard', href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { page: 'income',    href: '/income',    icon: TrendingUp,      label: 'Income' },
     { page: 'expenses',  href: '/expenses',  icon: Receipt,         label: 'Expenses' },
-    { page: 'documents', href: '/documents', icon: FileText,        label: 'Documents' },
   ]
+  // Freelancer invoicing — org owners/practices bill through their own modules
+  if (!flags.is_org_user) items.push({ page: 'invoices', href: '/invoices', icon: FileSpreadsheet, label: 'Invoices' })
+  items.push({ page: 'documents', href: '/documents', icon: FileText, label: 'Documents' })
   if (flags.timesheets)  items.push({ page: 'timesheets', href: '/timesheets', icon: Clock, label: 'Timesheets',
     badge: rejectedTimesheet ? 1 : undefined })
   if (flags.logbook)     items.push({ page: 'mileage',    href: '/mileage',    icon: Car,          label: 'Mileage', badge: logbookPending })

@@ -127,6 +127,8 @@ export interface KlippaProfile {
   org_role:             OrgRole | null
   // Persisted signature PNG (base64 data-URL) — reused across timesheets
   saved_signature:      string | null
+  // Free-text banking/payment details printed on invoices
+  invoice_banking_details: string | null
   created_at:           string
   updated_at:           string
 }
@@ -921,4 +923,91 @@ export const CATEGORY_DEFAULT_DEDUCTIBLE_PCT: Record<ExpenseCategory, number> = 
   insurance:              100,
   stationery:             100,
   other:                  100,
+}
+
+// ============================================================
+// Freelancer invoicing (migration 021)
+// ============================================================
+
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+
+export interface KlippaFreelancerClient {
+  id:             string
+  user_id:        string
+  name:           string
+  contact_person: string | null
+  email:          string | null
+  phone:          string | null
+  vat_number:     string | null
+  address:        string | null
+  notes:          string | null
+  status:         'active' | 'archived'
+  created_at:     string
+  updated_at:     string
+}
+
+export interface KlippaInvoiceItem {
+  id:          string
+  invoice_id:  string
+  user_id:     string
+  description: string
+  quantity:    number
+  unit_price:  number
+  amount:      number
+  sort_order:  number
+}
+
+export interface KlippaInvoice {
+  id:                string
+  user_id:           string
+  client_id:         string
+  invoice_number:    number
+  status:            InvoiceStatus
+  issue_date:        string
+  due_date:          string | null
+  currency:          string
+  vat_enabled:       boolean
+  vat_rate:          number
+  subtotal:          number
+  vat_amount:        number
+  total:             number
+  notes:             string | null
+  payment_reference: string | null
+  sent_at:           string | null
+  paid_at:           string | null
+  income_record_id:  string | null
+  created_at:        string
+  updated_at:        string
+  // Joined
+  client?:           KlippaFreelancerClient
+  items?:            KlippaInvoiceItem[]
+}
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft:     'Draft',
+  sent:      'Sent',
+  paid:      'Paid',
+  overdue:   'Overdue',
+  cancelled: 'Cancelled',
+}
+
+// ============================================================
+// Recurring income/expense templates (migration 021)
+// ============================================================
+
+export interface KlippaRecurringTemplate {
+  id:                    string
+  user_id:               string
+  kind:                  'income' | 'expense'
+  source_name:           string | null
+  income_type:           IncomeType | null
+  category:              ExpenseCategory | null
+  amount:                number
+  description:           string | null
+  deductible_percentage: number
+  day_of_month:          number
+  active:                boolean
+  next_run:              string
+  last_run:              string | null
+  created_at:            string
 }

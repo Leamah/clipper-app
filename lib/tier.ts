@@ -34,3 +34,4 @@ export function isFreeUser(p: TierProfile | null | undefined): boolean {
 // ── Monthly record caps for free tier ────────────────────
 export const FREE_EXPENSE_LIMIT = 15
 export const FREE_INCOME_LIMIT  = 3
+export const FREE_INVOICE_LIMIT = 3

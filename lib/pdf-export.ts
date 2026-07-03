@@ -943,3 +943,165 @@ export async function exportAuditPackPDF(
   const apPrefix = (branding?.orgName ?? 'Klippa').replace(/[^a-zA-Z0-9]/g, '_')
   doc.save(`${apPrefix}_SARS_Audit_Pack_${taxYear}.pdf`)
 }
+
+// ── Freelancer Invoice PDF ────────────────────────────────
+
+import type { KlippaInvoice, KlippaInvoiceItem, KlippaFreelancerClient } from '@/lib/types'
+
+/**
+ * Branded invoice PDF. Returns a Blob when options.blob is true
+ * (used to attach to the send email), otherwise triggers download.
+ */
+export async function exportInvoicePDF(
+  invoice: KlippaInvoice,
+  items:   KlippaInvoiceItem[],
+  client:  KlippaFreelancerClient,
+  profile: Pick<KlippaProfile, 'full_name' | 'tax_number' | 'invoice_banking_details'>,
+  options?: { blob?: boolean },
+): Promise<void | Blob> {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const invoiceRef = `INV-${String(invoice.invoice_number).padStart(4, '0')}`
+
+  // ── Header ────────────────────────────────────────────────
+  doc.setFillColor(...ZINC900)
+  doc.rect(0, 0, 210, 42, 'F')
+  doc.setFillColor(...EMERALD)
+  doc.rect(0, 0, 6, 42, 'F')
+
+  doc.setTextColor(...EMERALD)
+  doc.setFontSize(20)
+  doc.setFont('helvetica', 'bold')
+  doc.text('INVOICE', 14, 16)
+
+  doc.setTextColor(...WHITE)
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text(invoiceRef, 14, 24)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(`Issue date: ${invoice.issue_date}`, 14, 31)
+  if (invoice.due_date) doc.text(`Due date: ${invoice.due_date}`, 14, 37)
+
+  // From (top right)
+  doc.setFontSize(9)
+  doc.text('From:', 130, 16)
+  doc.setFont('helvetica', 'bold')
+  doc.text(profile.full_name ?? '', 130, 22)
+  doc.setFont('helvetica', 'normal')
+  if (profile.tax_number) doc.text(`Tax ref: ${profile.tax_number}`, 130, 28)
+
+  // ── Bill To ───────────────────────────────────────────────
+  let y = 52
+  doc.setTextColor(...ZINC700)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.text('BILL TO', 14, y)
+  doc.setFontSize(10)
+  doc.setTextColor(20, 20, 20)
+  y += 6
+  doc.text(client.name, 14, y)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  if (client.contact_person) { y += 5; doc.text(client.contact_person, 14, y) }
+  if (client.email)          { y += 5; doc.text(client.email, 14, y) }
+  if (client.vat_number)     { y += 5; doc.text(`VAT no: ${client.vat_number}`, 14, y) }
+  if (client.address) {
+    const lines = doc.splitTextToSize(client.address, 90)
+    y += 5
+    doc.text(lines, 14, y)
+    y += (lines.length - 1) * 4.5
+  }
+
+  // ── Line items ────────────────────────────────────────────
+  const rows = items.map((it) => [
+    it.description,
+    String(it.quantity),
+    fmtRand(it.unit_price),
+    fmtRand(it.amount),
+  ])
+
+  autoTable(doc, {
+    startY: Math.max(y + 8, 76),
+    head: [['Description', 'Qty', 'Unit price', 'Amount']],
+    body: rows,
+    theme: 'grid',
+    styles:     { fontSize: 9, cellPadding: 3, textColor: [30, 30, 30] },
+    headStyles: { fillColor: EMERALD, textColor: WHITE, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { cellWidth: 18, halign: 'center' },
+      2: { cellWidth: 34, halign: 'right' },
+      3: { cellWidth: 34, halign: 'right' },
+    },
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let ty = (doc as any).lastAutoTable.finalY + 8
+
+  // ── Totals ────────────────────────────────────────────────
+  const totalsX = 130
+  doc.setFontSize(9)
+  doc.setTextColor(...ZINC700)
+  doc.text('Subtotal', totalsX, ty)
+  doc.setTextColor(20, 20, 20)
+  doc.text(fmtRand(invoice.subtotal), 196, ty, { align: 'right' })
+
+  if (invoice.vat_enabled) {
+    ty += 6
+    doc.setTextColor(...ZINC700)
+    doc.text(`VAT (${invoice.vat_rate}%)`, totalsX, ty)
+    doc.setTextColor(20, 20, 20)
+    doc.text(fmtRand(invoice.vat_amount), 196, ty, { align: 'right' })
+  }
+
+  ty += 8
+  doc.setDrawColor(...EMERALD)
+  doc.setLineWidth(0.5)
+  doc.line(totalsX, ty - 4, 196, ty - 4)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text('Total due', totalsX, ty + 1)
+  doc.text(fmtRand(invoice.total), 196, ty + 1, { align: 'right' })
+
+  // ── Payment details ───────────────────────────────────────
+  let py = ty + 14
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+
+  if (invoice.payment_reference) {
+    doc.setTextColor(...ZINC700)
+    doc.text(`Payment reference: ${invoice.payment_reference}`, 14, py)
+    py += 6
+  }
+  if (profile.invoice_banking_details) {
+    doc.setTextColor(...ZINC700)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.text('PAYMENT DETAILS', 14, py)
+    py += 5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(20, 20, 20)
+    const bankLines = doc.splitTextToSize(profile.invoice_banking_details, 120)
+    doc.text(bankLines, 14, py)
+    py += bankLines.length * 4.5 + 2
+  }
+  if (invoice.notes) {
+    doc.setTextColor(...ZINC700)
+    const noteLines = doc.splitTextToSize(invoice.notes, 180)
+    doc.text(noteLines, 14, py + 2)
+    py += noteLines.length * 4.5 + 4
+  }
+
+  // ── Footer ────────────────────────────────────────────────
+  doc.setFontSize(7.5)
+  doc.setTextColor(150, 150, 150)
+  const footer = invoice.vat_enabled
+    ? 'Tax invoice · Generated with Klippa (klippa.co.za)'
+    : 'This is not a VAT invoice — issuer is not VAT registered. Generated with Klippa (klippa.co.za)'
+  doc.text(footer, 14, 288)
+
+  if (options?.blob) return doc.output('blob')
+  doc.save(`${invoiceRef}.pdf`)
+}

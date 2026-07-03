@@ -10,6 +10,7 @@ export async function sendBrevoEmail({
   replyTo,
   apiKey,
   senderName = 'Klippa',
+  attachments,
 }: {
   to:          string | string[]
   subject:     string
@@ -17,6 +18,8 @@ export async function sendBrevoEmail({
   replyTo?:    string
   apiKey?:     string
   senderName?: string
+  /** base64 content (no data-URI prefix) + filename */
+  attachments?: { name: string; content: string }[]
 }): Promise<void> {
   const key = (apiKey ?? process.env.BREVO_API_KEY ?? '').trim()
   if (!key) throw new Error('BREVO_API_KEY not configured')
@@ -36,6 +39,7 @@ export async function sendBrevoEmail({
       replyTo:     replyTo ? { email: replyTo } : undefined,
       subject,
       htmlContent: html,
+      attachment:  attachments?.length ? attachments : undefined,
     }),
   })
 
