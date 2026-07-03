@@ -15,7 +15,8 @@ import {
 import type { KlippaProfile, KlippaTaxReturn, KlippaIncomeRecord, KlippaExpenseRecord, KlippaMileageTrip, KlippaDocument, DocumentType } from '@/lib/types'
 import { calculateTax, ageFromDob, SARS_INCOME_CODES, SARS_DEDUCTION_CODES, getITR12Deadline, getCapitalGainsAnnualExclusion } from '@/lib/tax-engine'
 import { INCOME_TYPE_LABELS, EXPENSE_CATEGORY_LABELS } from '@/lib/types'
-import { isProfessionalOrAbove } from '@/lib/tier'
+import { isProfessionalOrAbove, isStarterOrAbove } from '@/lib/tier'
+import { exportTaxPackPDF, exportTaxPackCSV } from '@/lib/tax-pack-export'
 import { PLANS } from '@/lib/ozow'
 import { getIncomeTypeCopy, isIncludedInTaxEstimate, needsHumanReview } from '@/lib/sars-return-map'
 
@@ -254,9 +255,37 @@ export default function FilingPage() {
         {/* ── Step 0: Review ──────────────────────────────────── */}
         {step === 0 && (
           <div className="space-y-6">
-            <div>
-              <h1 className="text-xl font-bold text-ink-1">Review your return</h1>
-              <p className="text-sm text-ink-2 mt-1">Tax year {taxReturn.tax_year} · ITR12 · Filing deadline {deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-bold text-ink-1">Review your return</h1>
+                <p className="text-sm text-ink-2 mt-1">Tax year {taxReturn.tax_year} · ITR12 · Filing deadline {deadline.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {isStarterOrAbove(profile) ? (
+                  <button
+                    onClick={() => exportTaxPackPDF({ profile, taxYear: taxReturn.tax_year, incomeRecords, expenseRecords, taxResult, businessKm, totalKm })}
+                    title="Branded PDF: income, deductions and full tax calculation"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Tax pack PDF
+                  </button>
+                ) : (
+                  <Link
+                    href="/pricing"
+                    title="Tax pack PDF is available on Starter"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-3 hover:bg-raised transition-colors"
+                  >
+                    <Lock className="w-3.5 h-3.5" /> Tax pack PDF
+                  </Link>
+                )}
+                <button
+                  onClick={() => exportTaxPackCSV({ taxYear: taxReturn.tax_year, incomeRecords, expenseRecords })}
+                  title="CSV of every income and expense record"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> CSV
+                </button>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-edge bg-surface/40 divide-y divide-edge">
