@@ -15,6 +15,7 @@ import { PLAIN_INCOME_OPTIONS, getIncomeTypeCopy, needsHumanReview } from '@/lib
 import { isStarterOrAbove, FREE_INCOME_LIMIT } from '@/lib/tier'
 import Papa from 'papaparse'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
+import RecurringManager from '@/components/RecurringManager'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 2 }).format(n)
@@ -498,6 +499,9 @@ function IncomePage() {
             onSaved={(amount) => setTaxReturn((prev) => prev ? { ...prev, employees_tax_paid: amount } : prev)}
           />
         )}
+
+        {/* Recurring income templates (retainers etc.) */}
+        {!loading && <RecurringManager kind="income" isStarter={isStarter} />}
 
         {/* Records table */}
         {loading ? (

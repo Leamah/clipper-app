@@ -14,6 +14,7 @@ import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCatego
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
 import { isStarterOrAbove, isProfessionalOrAbove, FREE_EXPENSE_LIMIT } from '@/lib/tier'
+import RecurringManager from '@/components/RecurringManager'
 // pdf-export lazy-loaded on demand — jsPDF (~300 kB) only needed when user clicks "Export Audit Pack"
 
 function formatRand(n: number) {
@@ -836,6 +837,9 @@ function ExpensesPage() {
             Capture failed: {captureError}
           </p>
         )}
+
+        {/* Recurring expense templates (subscriptions, rent etc.) */}
+        {!loading && <RecurringManager kind="expense" isStarter={isStarter} />}
 
         {/* Pending review banner */}
         {pending.length > 0 && (
