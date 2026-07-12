@@ -512,8 +512,8 @@ function IncomePage() {
           <div className="rounded-2xl border border-dashed border-edge p-16 text-center space-y-4">
             <Upload className="w-8 h-8 text-ink-3 mx-auto" />
             <div>
-              <p className="text-sm font-medium text-ink-2">No income yet</p>
-              <p className="text-xs text-ink-3 mt-1">Add your freelance income manually or import from your bank statement.</p>
+              <p className="text-sm font-semibold text-ink-1">Log what you&apos;ve earned</p>
+              <p className="text-xs text-ink-2 mt-1">Klippa works out what SARS owes you — and what&apos;s safe to spend today.</p>
             </div>
             <div className="flex items-center justify-center gap-3">
               <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">

@@ -12,6 +12,10 @@ import { calculateTax, ageFromDob, getITR12Deadline, daysUntilDeadline, nextProv
 import { isIncludedInTaxEstimate } from '@/lib/sars-return-map'
 import { countPendingLogbookWeeks, formatRand, calcProfileCompletion, computeAuditReadiness } from '@/lib/dashboard-utils'
 import HeroTaxPosition from '@/components/dashboard/HeroTaxPosition'
+import QuestBoard from '@/components/dashboard/QuestBoard'
+import RefundMeter from '@/components/gamification/RefundMeter'
+import CelebrationLayer from '@/components/gamification/CelebrationLayer'
+import { useGamification, activeQuests, type QuestCtx } from '@/lib/gamification'
 import QuickActions from '@/components/dashboard/QuickActions'
 import AttentionList, { type AttentionItem } from '@/components/dashboard/AttentionList'
 import OrgCard from '@/components/dashboard/OrgCard'
@@ -221,6 +225,44 @@ export default function Dashboard() {
 
   const hasIncome   = incomeRecords.length > 0
   const hasExpenses = expenseRecords.length > 0
+
+  // ── Gamification: XP/badges state + refund meter inputs ──
+  // Baseline = the same calculation with every deduction input zeroed;
+  // the gap between the two taxPayable figures is the honest "tax saved".
+  const baselineResult = profile
+    ? calculateTax({
+        grossIncome:          taxEstimateIncome,
+        raContributions:      0,
+        pensionContributions: 0,
+        homeofficePct:        0,
+        homeExpenses:         0,
+        businessKm:           0,
+        totalKm:              0,
+        vehicleValue:         0,
+        medicalAidMembers:    0,
+        interestIncome:       dashInterest,
+        otherDeductions:      0,
+        age:                  ageFromDob(profile.date_of_birth ?? null),
+        employeesTaxPaid:     taxReturn?.employees_tax_paid ?? 0,
+        taxYear:              taxReturn?.tax_year,
+      })
+    : null
+  const taxSaved        = Math.max(0, (baselineResult?.taxPayable ?? 0) - (taxResult?.taxPayable ?? 0))
+  const deductionsTotal = taxResult?.totalDeductions ?? 0
+
+  const gamification = useGamification({
+    userId,
+    profile,
+    hasIncome,
+    hasExpenses,
+    deductionsTotal,
+    ready: phase2Done,
+  })
+  const xp = gamification.progress?.xp ?? 0
+  const questCtx: QuestCtx | null = profile
+    ? { profile, events: gamification.events, hasIncome, hasExpenses }
+    : null
+  const questsActive = questCtx ? activeQuests(questCtx, xp).length > 0 : false
   const completionPct = (hasIncome ? 50 : 0) + (hasExpenses ? 30 : 0) + (taxReturn?.status === 'submitted' ? 20 : 0)
 
   const nextAction = !hasIncome
@@ -299,9 +341,31 @@ export default function Dashboard() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-600/[0.06] blur-[120px] rounded-full" />
       </div>
 
-      <AppNav activePage="dashboard" featureFlags={phase1Done ? featureFlags : undefined} logbookPending={logbookPending} pendingApprovals={pendingApprovalCount} />
+      <AppNav
+        activePage="dashboard"
+        featureFlags={phase1Done ? featureFlags : undefined}
+        progress={gamification.loaded
+          ? { has_income: (gamification.progress?.has_income ?? false) || hasIncome, has_expense: (gamification.progress?.has_expense ?? false) || hasExpenses }
+          : null}
+        logbookPending={logbookPending}
+        pendingApprovals={pendingApprovalCount}
+      />
 
       <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-6">
+
+        {/* Quest board: what to do next, why it's worth XP, and the refund
+            meter as the score. Renders nothing once all quests are done. */}
+        {phase2Done && questCtx && userId && (
+          <QuestBoard
+            ctx={questCtx}
+            xp={xp}
+            taxSaved={taxSaved}
+            deductionsTotal={deductionsTotal}
+            userId={userId}
+            onProfilePatch={(patch) => setProfile((prev) => prev ? { ...prev, ...patch } : prev)}
+            onAwarded={() => gamification.refresh()}
+          />
+        )}
 
         {/* Hero: the one answer */}
         {phase2Done ? (
@@ -318,11 +382,17 @@ export default function Dashboard() {
           <HeroSkeleton />
         )}
 
+        {/* Once the quest board retires, the score stays visible here */}
+        {phase2Done && !questsActive && (
+          <RefundMeter taxSaved={taxSaved} deductionsTotal={deductionsTotal} compact />
+        )}
+
         {/* Everyday actions — render instantly */}
         <QuickActions showInvoices={!profile?.organisation_id || !phase1Done} />
 
-        {/* Contextual attention items */}
-        {phase2Done ? <AttentionList items={attentionItems} /> : <RowSkeleton />}
+        {/* Contextual attention items — skip the "up to date" reassurance
+            before there's any income; GetStarted already tells them what's next. */}
+        {phase2Done ? (hasIncome ? <AttentionList items={attentionItems} /> : null) : <RowSkeleton />}
 
         {/* Org membership — org consultants only */}
         {profile?.organisation_id && (
@@ -352,6 +422,14 @@ export default function Dashboard() {
         )}
 
       </main>
+
+      {/* Confetti + toasts for new levels/badges; dedupe is persisted */}
+      <CelebrationLayer
+        progress={gamification.progress}
+        badges={gamification.badges}
+        onBadgeCelebrated={gamification.markBadgeCelebrated}
+        onLevelCelebrated={gamification.markLevelCelebrated}
+      />
     </div>
   )
 }

@@ -8,12 +8,13 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   Plus, FileSpreadsheet, Trash2, Loader2,
-  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera, Zap,
+  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera, Zap, Receipt,
 } from 'lucide-react'
 import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCategory } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
-import { isStarterOrAbove, isProfessionalOrAbove, FREE_EXPENSE_LIMIT } from '@/lib/tier'
+import { isStarterOrAbove, isProfessionalOrAbove, FREE_EXPENSE_LIMIT, FREE_AI_TASTE_LIMIT } from '@/lib/tier'
+import { awardXp } from '@/lib/gamification'
 import RecurringManager from '@/components/RecurringManager'
 // pdf-export lazy-loaded on demand — jsPDF (~300 kB) only needed when user clicks "Export Audit Pack"
 
@@ -199,13 +200,15 @@ function AiResultCard({ record, onAccept, onReject, loading }: {
 
 // ── Add Expense Modal ─────────────────────────────────────
 
-function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, onClose, onSaved }: {
+function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, freeAiRemaining, onClose, onSaved }: {
   taxReturnId:     string | null
   prefilled?:      CapturePreFill
   merchantHistory: string[]
   allowAI:         boolean
+  /** null = Starter+ (unlimited); a number = free-taste credits left */
+  freeAiRemaining: number | null
   onClose:         () => void
-  onSaved:         (r: KlippaExpenseRecord, classify: boolean) => void
+  onSaved:         (r: KlippaExpenseRecord, classify: boolean, freeAiRemaining: number | null) => void
 }) {
   const [form, setForm] = useState({
     merchant_name: prefilled?.merchant_name ?? '',
@@ -248,7 +251,7 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, onC
         return
       }
       if (!res.ok) throw new Error(data.error ?? 'Failed to save')
-      onSaved(data.record, doClassify)
+      onSaved(data.record, doClassify, data.free_ai_remaining ?? null)
       onClose()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
@@ -360,12 +363,20 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, onC
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              {doClassify ? 'AI will classify this expense' : 'Classify manually'}
+              <span className="flex-1 text-left">{doClassify ? 'AI will classify this expense' : 'Classify manually'}</span>
+              {freeAiRemaining !== null && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400">
+                  {freeAiRemaining} free left
+                </span>
+              )}
             </button>
           ) : (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-edge text-xs text-ink-3">
-              <Sparkles className="w-3.5 h-3.5" />
-              AI classification · <a href="/pricing" className="underline text-emerald-400">Starter plan</a>
+              <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>
+                Your {FREE_AI_TASTE_LIMIT} free AI classifications are used up —{' '}
+                <a href="/pricing" className="underline text-emerald-400">upgrade to Starter</a> and never guess a deduction again.
+              </span>
             </div>
           )}
 
@@ -624,6 +635,7 @@ function ExpensesPage() {
   const [capturing,    setCapturing]    = useState(false)
   const [capturePreFill, setCapturePreFill] = useState<CapturePreFill | undefined>(undefined)
   const [captureError,   setCaptureError]   = useState<string | null>(null)
+  const [freeAiUsed,     setFreeAiUsed]     = useState(0)
   const captureRef = useRef<HTMLInputElement>(null)
 
   const loadRecords = useCallback(async () => {
@@ -635,6 +647,8 @@ function ExpensesPage() {
     setProfile(prof as KlippaProfile | null)
     const { data } = await supabase.from('klippa_expense_records').select('*').eq('user_id', user.id).order('expense_date', { ascending: false })
     setRecords((data ?? []) as KlippaExpenseRecord[])
+    const { data: prog } = await supabase.from('klippa_user_progress').select('free_ai_used').eq('user_id', user.id).maybeSingle()
+    setFreeAiUsed(prog?.free_ai_used ?? 0)
     setLoading(false)
   }, [])
 
@@ -699,7 +713,11 @@ function ExpensesPage() {
     setClassifying(id)
     const res = await fetch('/api/expenses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, classification_status: 'confirmed' }) })
     const data = await res.json()
-    if (data.record) setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
+    if (data.record) {
+      setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
+      // First confirmed AI classification earns XP (idempotent, best-effort)
+      if (profile && data.record.ai_confidence != null) awardXp(profile.id, 'first_ai_confirmed')
+    }
     setClassifying(null)
   }
 
@@ -749,6 +767,10 @@ function ExpensesPage() {
   // Tier flags
   const isStarter = isStarterOrAbove(profile)
   const isPro     = isProfessionalOrAbove(profile)
+
+  // Free AI taste: first FREE_AI_TASTE_LIMIT classifications are free
+  const freeAiRemaining = isStarter ? null : Math.max(0, FREE_AI_TASTE_LIMIT - freeAiUsed)
+  const allowAI         = isStarter || (freeAiRemaining ?? 0) > 0
 
   // Monthly usage counter for free users
   const thisMonthCount = !isStarter && !loading ? (() => {
@@ -878,11 +900,19 @@ function ExpensesPage() {
           </div>
         ) : displayed.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-edge p-16 text-center space-y-4">
-            <p className="text-sm text-ink-2">No expenses in this tab.</p>
-            {activeTab === 'pending' && records.length === 0 && (
-              <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Add expense
-              </button>
+            {records.length === 0 ? (
+              <>
+                <Receipt className="w-8 h-8 text-ink-3 mx-auto" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-ink-1">Every expense you log shrinks your tax bill</p>
+                  <p className="text-sm text-ink-2">Coffee with a client? Data? Software? It counts — add your first one.</p>
+                </div>
+                <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> Add expense
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-ink-2">No expenses in this tab.</p>
             )}
           </div>
         ) : activeTab === 'pending' ? (
@@ -952,9 +982,14 @@ function ExpensesPage() {
           taxReturnId={taxReturn?.id ?? null}
           prefilled={capturePreFill}
           merchantHistory={merchantHistory}
-          allowAI={isStarter}
+          allowAI={allowAI}
+          freeAiRemaining={freeAiRemaining}
           onClose={closeAdd}
-          onSaved={(r) => { setRecords((prev) => [r, ...prev]); setActiveTab('pending') }}
+          onSaved={(r, _classified, remaining) => {
+            setRecords((prev) => [r, ...prev])
+            setActiveTab('pending')
+            if (remaining !== null) setFreeAiUsed(FREE_AI_TASTE_LIMIT - remaining)
+          }}
         />
       )}
 

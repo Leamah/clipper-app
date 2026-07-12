@@ -35,3 +35,7 @@ export function isFreeUser(p: TierProfile | null | undefined): boolean {
 export const FREE_EXPENSE_LIMIT = 15
 export const FREE_INCOME_LIMIT  = 3
 export const FREE_INVOICE_LIMIT = 3
+
+/** Free users get a taste of AI expense classification before the
+    Starter gate — lifetime count, tracked on klippa_user_progress. */
+export const FREE_AI_TASTE_LIMIT = 3

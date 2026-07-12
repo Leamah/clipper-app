@@ -6,7 +6,7 @@ import {
   ShieldCheck, LayoutDashboard, TrendingUp, Receipt, FileText,
   Clock, Car, CalendarDays, ClipboardCheck, Settings, Users,
   Menu, X, PanelLeftClose, PanelLeftOpen, MessageCircle, BarChart2,
-  FileSpreadsheet,
+  FileSpreadsheet, Lock,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import UserNav        from '@/components/UserNav'
@@ -35,9 +35,18 @@ export type ActivePage =
 export type { FeatureFlags } from '@/lib/types'
 type FeatureFlags = SharedFeatureFlags
 
+/** Progressive-nav unlock state, from klippa_user_progress. */
+export interface NavProgress {
+  has_income:  boolean
+  has_expense: boolean
+}
+
 interface AppNavProps {
   activePage:          ActivePage
   featureFlags?:       FeatureFlags
+  /** Pass from pages that already fetched the progress row (dashboard).
+      undefined = AppNav self-fetches; null = loading → fail open (unlocked). */
+  progress?:           NavProgress | null
   logbookPending?:     number
   pendingApprovals?:   number   // org-admin: count of submitted-but-not-approved timesheets
   rejectedTimesheet?:  boolean  // member: their own TS was returned for revision
@@ -50,6 +59,8 @@ interface NavItem {
   label:   string
   badge?:  number
   divider?: boolean
+  locked?:  boolean
+  lockHint?: string
 }
 
 const NAV_BASE   = 'flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors'
@@ -66,11 +77,13 @@ const DEFAULT_FLAGS: FeatureFlags = { timesheets: false, logbook: true, provisio
 export default function AppNav({
   activePage,
   featureFlags: propFlags,
+  progress: propProgress,
   logbookPending    = 0,
   pendingApprovals  = 0,
   rejectedTimesheet = false,
 }: AppNavProps) {
   const [flags, setFlags]         = useState<FeatureFlags>(propFlags ?? DEFAULT_FLAGS)
+  const [prog,  setProg]          = useState<NavProgress | null>(propProgress ?? null)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -98,6 +111,22 @@ export default function AppNav({
     })
   }, [propFlags])
 
+  // Progressive-nav unlock state: prop wins; otherwise one parallel
+  // self-fetch of the progress row. Missing row / still loading = fail
+  // open (fully unlocked) — established users must never see a lock flash.
+  useEffect(() => {
+    if (propProgress !== undefined) { setProg(propProgress); return }
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('klippa_user_progress')
+        .select('has_income, has_expense')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => { if (data) setProg(data as NavProgress) })
+    })
+  }, [propProgress])
+
   // Restore collapsed preference (desktop only)
   useEffect(() => {
     if (localStorage.getItem('klippa_nav_collapsed') === '1') setCollapsed(true)
@@ -116,6 +145,13 @@ export default function AppNav({
     })
   }
 
+  // Progressive reveal (freelancers only; org users keep the full nav):
+  // Invoices / Documents / File Return show as visible-but-locked until
+  // the matching first record exists — the "more to earn" signal. Rules
+  // collapse to the classic nav for anyone with data; null prog = unlocked.
+  const unlocks   = prog ?? { has_income: true, has_expense: true }
+  const canLock   = !flags.is_org_user
+
   // Build the link set from active feature flags
   const items: NavItem[] = [
     { page: 'dashboard', href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -123,13 +159,16 @@ export default function AppNav({
     { page: 'expenses',  href: '/expenses',  icon: Receipt,         label: 'Expenses' },
   ]
   // Freelancer invoicing — org owners/practices bill through their own modules
-  if (!flags.is_org_user) items.push({ page: 'invoices', href: '/invoices', icon: FileSpreadsheet, label: 'Invoices' })
-  items.push({ page: 'documents', href: '/documents', icon: FileText, label: 'Documents' })
+  if (!flags.is_org_user) items.push({ page: 'invoices', href: '/invoices', icon: FileSpreadsheet, label: 'Invoices',
+    locked: canLock && !unlocks.has_income, lockHint: 'Add your first income to unlock' })
+  items.push({ page: 'documents', href: '/documents', icon: FileText, label: 'Documents',
+    locked: canLock && !unlocks.has_expense, lockHint: 'Capture an expense to unlock' })
   if (flags.timesheets)  items.push({ page: 'timesheets', href: '/timesheets', icon: Clock, label: 'Timesheets',
     badge: rejectedTimesheet ? 1 : undefined })
   if (flags.logbook)     items.push({ page: 'mileage',    href: '/mileage',    icon: Car,          label: 'Mileage', badge: logbookPending })
   if (flags.provisional) items.push({ page: 'provisional', href: '/provisional', icon: CalendarDays, label: 'Provisional' })
-  items.push({ page: 'filing', href: '/filing', icon: ClipboardCheck, label: 'File Return', divider: true })
+  items.push({ page: 'filing', href: '/filing', icon: ClipboardCheck, label: 'File Return', divider: true,
+    locked: canLock && !unlocks.has_income, lockHint: 'Add income to see your return' })
   if (flags.is_org_user) items.push({ page: 'org' as ActivePage, href: '/org/dashboard', icon: Users, label: 'My Team', divider: true,
     badge: pendingApprovals > 0 ? pendingApprovals : undefined })
   if (flags.invest_enabled && flags.invest_basic) items.push({ page: 'invest' as ActivePage, href: '/invest/dashboard', icon: BarChart2, label: 'Invest', divider: !flags.is_org_user })
@@ -137,22 +176,37 @@ export default function AppNav({
   function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
     return (
       <>
-        {items.map(({ page, href, icon: Icon, label, badge, divider }) => (
+        {items.map(({ page, href, icon: Icon, label, badge, divider, locked, lockHint }) => (
           <div key={page} className={divider ? 'pt-2 mt-1 border-t border-edge/40' : ''}>
-            <Link
-              href={href}
-              onClick={onNavigate}
-              title={collapsed ? label : undefined}
-              className={navCls(page, activePage, collapsed)}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              {!collapsed && <span className="flex-1">{label}</span>}
-              {!collapsed && badge ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-300 font-semibold tabular-nums">
-                  {badge}
-                </span>
-              ) : null}
-            </Link>
+            {locked ? (
+              // Visible-but-locked: greyed, routes to the dashboard where
+              // the quest board explains how to unlock it.
+              <Link
+                href="/dashboard"
+                onClick={onNavigate}
+                title={lockHint ?? label}
+                className={`${NAV_IDLE} opacity-50 ${collapsed ? 'justify-center px-0' : ''}`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {!collapsed && <span className="flex-1">{label}</span>}
+                {!collapsed && <Lock className="w-3 h-3 shrink-0 text-ink-3" />}
+              </Link>
+            ) : (
+              <Link
+                href={href}
+                onClick={onNavigate}
+                title={collapsed ? label : undefined}
+                className={navCls(page, activePage, collapsed)}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {!collapsed && <span className="flex-1">{label}</span>}
+                {!collapsed && badge ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-300 font-semibold tabular-nums">
+                    {badge}
+                  </span>
+                ) : null}
+              </Link>
+            )}
           </div>
         ))}
       </>

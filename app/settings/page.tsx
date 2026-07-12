@@ -283,6 +283,8 @@ export default function SettingsPage() {
       .update({
         full_name:             profile.full_name,
         date_of_birth:         profile.date_of_birth || null,
+        tax_number:            profile.tax_number || null,
+        id_number:             profile.id_number || null,
         employment_type:       profile.employment_type,
         work_location:         profile.work_location,
         works_from_home,
@@ -359,6 +361,16 @@ export default function SettingsPage() {
 
           <Field label="Date of birth" hint="Used to apply the correct SARS rebate (only matters if you are 65 or older).">
             <DobPicker value={profile.date_of_birth} onChange={(v) => update('date_of_birth', v as KlippaProfile['date_of_birth'])} />
+          </Field>
+
+          <Field label="SARS tax number" hint="On your IRP5, eFiling profile, or any SARS letter.">
+            <input type="text" inputMode="numeric" value={profile.tax_number ?? ''} onChange={(e) => update('tax_number', e.target.value)}
+              placeholder="e.g. 0123456789" className="input w-full" />
+          </Field>
+
+          <Field label="ID number" hint="Your 13-digit South African ID number — needed for your ITR12.">
+            <input type="text" inputMode="numeric" value={profile.id_number ?? ''} onChange={(e) => update('id_number', e.target.value)}
+              placeholder="e.g. 9001015009087" className="input w-full" />
           </Field>
         </Section>
 

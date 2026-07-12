@@ -19,6 +19,7 @@ import { isProfessionalOrAbove, isStarterOrAbove } from '@/lib/tier'
 import { exportTaxPackPDF, exportTaxPackCSV } from '@/lib/tax-pack-export'
 import { PLANS } from '@/lib/ozow'
 import { getIncomeTypeCopy, isIncludedInTaxEstimate, needsHumanReview } from '@/lib/sars-return-map'
+import { awardXp } from '@/lib/gamification'
 
 function formatRand(n: number) {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n)
@@ -123,6 +124,7 @@ export default function FilingPage() {
       .from('klippa_tax_returns')
       .update({ status: 'submitted', sars_reference: sarsRef.trim(), submitted_at: new Date().toISOString() })
       .eq('id', data.taxReturn.id)
+    awardXp(data.profile.id, 'return_filed') // idempotent, best-effort
     setSubmitted(true)
     setSubmitting(false)
   }

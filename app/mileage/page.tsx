@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { KlippaMileageTrip, KlippaProfile, KlippaLogbookReview, OrgBranding } from '@/lib/types'
 import { calcTravelDeduction } from '@/lib/tax-engine'
+import { awardXp } from '@/lib/gamification'
 import {
   format, addDays, startOfWeek, endOfWeek, addWeeks,
   isAfter, isBefore, getISOWeek, getISOWeekYear, parseISO,
@@ -116,19 +117,25 @@ export default function MileagePage() {
   const [showAddTrip,  setShowAddTrip]  = useState(false)
   const [confirming,   setConfirming]   = useState(false)
   const [orgBranding,  setOrgBranding]  = useState<OrgBranding | null>(null)
+  // null = loading; false = the deferred onboarding question is still open
+  const [vehicleAnswered, setVehicleAnswered] = useState<boolean | null>(null)
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const [profileRes, returnRes, tripsRes, reviewsRes] = await Promise.all([
+    const [profileRes, returnRes, tripsRes, reviewsRes, vehicleEvRes] = await Promise.all([
       supabase.from('klippa_profiles').select('*').eq('id', user.id).single(),
       supabase.from('klippa_tax_returns').select('id, tax_year').eq('user_id', user.id).order('tax_year', { ascending: false }).limit(1).single(),
       supabase.from('klippa_mileage_trips').select('*').eq('user_id', user.id).order('trip_date', { ascending: false }),
       supabase.from('klippa_logbook_reviews').select('*').eq('user_id', user.id),
+      supabase.from('klippa_xp_events').select('event_key').eq('user_id', user.id).eq('event_key', 'answered_vehicle').maybeSingle(),
     ])
 
     const prof = profileRes.data as KlippaProfile | null
+    // Answered if the quest event exists, or the (pre-quest) profile already
+    // says they drive — only genuinely-unasked users see the interstitial.
+    setVehicleAnswered(!!vehicleEvRes.data || !!prof?.has_vehicle)
     setProfile(prof)
     setTaxReturnId(returnRes.data?.id ?? null)
     setTrips((tripsRes.data ?? []) as KlippaMileageTrip[])
@@ -150,6 +157,17 @@ export default function MileagePage() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Deferred onboarding question, asked here at the moment it matters
+  async function answerVehicle(drives: boolean) {
+    if (!profile) return
+    await supabase.from('klippa_profiles')
+      .update({ has_vehicle: drives, feature_logbook: drives })
+      .eq('id', profile.id)
+    awardXp(profile.id, 'answered_vehicle')
+    setProfile((p) => p ? { ...p, has_vehicle: drives, feature_logbook: drives } : p)
+    setVehicleAnswered(true)
+  }
 
   const isConfigured = !!(
     profile?.commute_km &&
@@ -286,8 +304,42 @@ export default function MileagePage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
+        {/* ── Vehicle question (deferred from onboarding) ─── */}
+        {vehicleAnswered === false && !profile?.has_vehicle && (
+          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.04] p-8 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center mx-auto">
+              <Car className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-base font-semibold text-ink-1">Do you drive for work?</p>
+              <p className="text-sm text-ink-2 mt-1 max-w-md mx-auto">
+                Client visits and site trips are one of the biggest freelancer deductions.
+                Klippa keeps the SARS logbook for you.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={() => answerVehicle(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-all">
+                Yes, I drive for work
+              </button>
+              <button onClick={() => answerVehicle(false)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-edge text-ink-2 hover:text-ink-1 text-sm font-medium transition-all">
+                No, I don&apos;t
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Answered no: nothing to do here ─────────────── */}
+        {vehicleAnswered === true && !profile?.has_vehicle && (
+          <div className="rounded-2xl border border-edge bg-surface/30 p-8 text-center space-y-2">
+            <p className="text-sm font-semibold text-ink-1">No logbook needed</p>
+            <p className="text-sm text-ink-2">You told us you don&apos;t drive for work, so there&apos;s nothing to track here. Changed jobs or started driving? Flip it on in Settings.</p>
+          </div>
+        )}
+
         {/* ── Not configured ──────────────────────────────── */}
-        {!isConfigured && (
+        {vehicleAnswered !== false && profile?.has_vehicle && !isConfigured && (
           <div className="rounded-2xl border border-amber-600/30 bg-amber-950/20 p-8 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center mx-auto">
               <Car className="w-6 h-6 text-amber-400" />

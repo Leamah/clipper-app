@@ -1011,3 +1011,33 @@ export interface KlippaRecurringTemplate {
   last_run:              string | null
   created_at:            string
 }
+
+// ============================================================
+// Gamification (migration 023)
+// ============================================================
+
+export interface KlippaUserProgress {
+  user_id:               string
+  xp:                    number
+  free_ai_used:          number
+  last_level_celebrated: number
+  has_income:            boolean
+  has_expense:           boolean
+  has_document:          boolean
+  created_at:            string
+  updated_at:            string
+}
+
+export interface KlippaXpEvent {
+  user_id:    string
+  event_key:  string
+  xp:         number
+  created_at: string
+}
+
+export interface KlippaUserBadge {
+  user_id:    string
+  badge_id:   string
+  earned_at:  string
+  celebrated: boolean
+}

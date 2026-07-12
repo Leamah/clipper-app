@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { classifyExpense } from '@/lib/expense-classifier'
 import { analyzeMixedUse } from '@/lib/mixed-use-classifier'
-import { isFreeUser, isStarterOrAbove, FREE_EXPENSE_LIMIT } from '@/lib/tier'
+import { isFreeUser, isStarterOrAbove, FREE_EXPENSE_LIMIT, FREE_AI_TASTE_LIMIT } from '@/lib/tier'
 import type { KlippaProfile } from '@/lib/types'
 
 function createSupabaseServer() {
@@ -62,8 +62,25 @@ export async function POST(request: NextRequest) {
   let classification = null
   let mixedUse       = null
 
-  // AI classification is Starter+ only
-  if (classify && isStarterOrAbove(tierProfile)) {
+  // AI classification is Starter+ — but free users get a taste: the first
+  // FREE_AI_TASTE_LIMIT classifications are on the house (lifetime counter
+  // on klippa_user_progress) so the wow moment lands before the paywall.
+  const starter = isStarterOrAbove(tierProfile)
+  let freeTaste = false
+  let freeAiRemaining: number | null = null
+  if (classify && !starter) {
+    const { data: prog } = await supabase
+      .from('klippa_user_progress')
+      .select('free_ai_used')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    const used = prog?.free_ai_used ?? 0
+    freeTaste = used < FREE_AI_TASTE_LIMIT
+    freeAiRemaining = Math.max(0, FREE_AI_TASTE_LIMIT - used)
+  }
+  const aiAllowed = classify && (starter || freeTaste)
+
+  if (aiAllowed) {
     const { data: profile } = await supabase
       .from('klippa_profiles')
       .select('employment_type, works_from_home, work_location, has_vehicle, home_office_pct')
@@ -96,6 +113,12 @@ export async function POST(request: NextRequest) {
       classification = classResult
       mixedUse       = mixedResult
     }
+
+    // Burn one free-taste credit only when classification actually ran
+    if (freeTaste && (classification || mixedUse)) {
+      const { data: newCount } = await supabase.rpc('klippa_increment_free_ai', { uid: user.id })
+      if (typeof newCount === 'number') freeAiRemaining = Math.max(0, FREE_AI_TASTE_LIMIT - newCount)
+    }
   }
 
   // Use mixed-use percentage if available (more accurate), else fall back to basic classifier
@@ -113,7 +136,9 @@ export async function POST(request: NextRequest) {
       expense_date:          expense_date ?? null,
       description:           description ?? null,
       receipt_id:            receipt_id   ?? null,
-      classification_status: classify ? 'pending' : 'confirmed',
+      // Pending only when classification actually ran — a blocked/failed AI
+      // request must not strand the record in review with no AI data.
+      classification_status: (classification || mixedUse) ? 'pending' : 'confirmed',
       ai_confidence:         mixedUse?.confidence        ?? classification?.confidence ?? null,
       ai_reasoning:          mixedUse?.reasoning         ?? classification?.reasoning  ?? null,
       ai_audit_risk:         mixedUse?.audit_risk        ?? classification?.audit_risk ?? null,
@@ -131,7 +156,7 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ record: data, classification, mixedUse })
+  return NextResponse.json({ record: data, classification, mixedUse, free_ai_remaining: freeAiRemaining })
 }
 
 export async function PATCH(request: NextRequest) {

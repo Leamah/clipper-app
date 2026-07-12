@@ -2,30 +2,24 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
-  ShieldCheck, ArrowRight, Loader2, Check,
-  Car, Home, Building2, Shuffle,
+  ShieldCheck, ArrowRight, Loader2,
   UserRound, Users, BookOpen, Minus, Plus,
 } from 'lucide-react'
 import type { EmploymentType, WorkLocation, UserType } from '@/lib/types'
 import { SEAT_PRICE_ANNUAL } from '@/lib/ozow'
+import { currentRunningTaxYear } from '@/lib/tax-engine'
 import { readAttributionCookie } from '@/lib/attribution'
+import { ensureProgressRow, awardXp } from '@/lib/gamification'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
-const TAX_YEAR_OPTIONS = [
-  { value: CURRENT_YEAR,     label: `${CURRENT_YEAR}`,     sub: `1 Mar ${CURRENT_YEAR - 1} – 28 Feb ${CURRENT_YEAR}` },
-  { value: CURRENT_YEAR - 1, label: `${CURRENT_YEAR - 1}`, sub: `1 Mar ${CURRENT_YEAR - 2} – 28 Feb ${CURRENT_YEAR - 1}` },
-]
-
-type FinancialProduct = 'ra' | 'pension' | 'medical' | 'tfsa' | 'interest_savings'
-
 // ── Phase A: user-type selection ──────────────────────────────────────
-// ── Phase B: freelancer flow (existing steps 0-5) ─────────────────────
-// ── Phase C: B2B flow (one step: org name) ───────────────────────────
+// ── Phase B: freelancer flow (one question: employment type) ─────────
+// ── Phase C: B2B flow (org name + seats) ─────────────────────────────
 type Phase = 'pick' | 'freelancer' | 'b2b'
 
 interface OnboardingState {
@@ -35,92 +29,117 @@ interface OnboardingState {
   org_type:   'company' | 'practice'
   seat_count: number
   // Freelancer
-  employment_type:    EmploymentType
-  work_location:      WorkLocation
-  has_vehicle:        boolean | null
-  financial_products: Set<FinancialProduct>
-  medical_aid_members: number
-  tax_year:           number
-  invest_enabled:     boolean
+  employment_type: EmploymentType
+}
+
+const DEFAULT_STATE: OnboardingState = {
+  user_type:       'freelancer',
+  org_name:        '',
+  org_type:        'company',
+  seat_count:      1,
+  employment_type: 'freelance',
+}
+
+// Everything the old 6-7-step wizard asked is now defaulted here and
+// re-asked contextually later (dashboard quests, Mileage interstitial,
+// Settings). The one answer we keep — employment type — picks the best
+// guess for where they work; wrong guesses are harmless to the tax
+// estimate (home-office deduction needs pct + expenses, both 0) and are
+// corrected by the work-location quest.
+const WORK_LOCATION_DEFAULT: Record<EmploymentType, WorkLocation> = {
+  freelance: 'home_only',
+  mixed:     'hybrid',
+  employee:  'office_only',
+}
+
+// Resume where they left off instead of forcing a full restart if a user
+// closes the tab mid-wizard — a multi-step form with no save-as-you-go is
+// a common reason people never come back to finish it.
+const STORAGE_KEY = 'klippa_onboarding_progress'
+
+function loadSavedProgress(): { phase: Phase; step: number; state: OnboardingState } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const phase: Phase = parsed.phase === 'freelancer' || parsed.phase === 'b2b' ? parsed.phase : 'pick'
+    const step = typeof parsed.step === 'number' ? parsed.step : 0
+    return {
+      phase,
+      // The freelancer flow is now a single screen — progress saved mid-way
+      // through the old multi-step wizard resumes at its one question.
+      step: phase === 'freelancer' ? 0 : step,
+      state: {
+        user_type:       parsed.state?.user_type === 'company_owner' || parsed.state?.user_type === 'practitioner' ? parsed.state.user_type : 'freelancer',
+        org_name:        typeof parsed.state?.org_name === 'string' ? parsed.state.org_name : '',
+        org_type:        parsed.state?.org_type === 'practice' ? 'practice' : 'company',
+        seat_count:      typeof parsed.state?.seat_count === 'number' ? parsed.state.seat_count : 1,
+        employment_type: ['freelance', 'employee', 'mixed'].includes(parsed.state?.employment_type) ? parsed.state.employment_type : 'freelance',
+      },
+    }
+  } catch {
+    return null
+  }
 }
 
 export default function OnboardingPage() {
   const router   = useRouter()
-  const [phase,  setPhase]  = useState<Phase>('pick')
-  const [step,   setStep]   = useState(0)
+  const [phase,  setPhase]  = useState<Phase>(() => loadSavedProgress()?.phase ?? 'pick')
+  const [step,   setStep]   = useState(() => loadSavedProgress()?.step ?? 0)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
+  // Which employment option was tapped — shows the spinner on that card
+  const [savingType, setSavingType] = useState<EmploymentType | null>(null)
 
-  const [state, setState] = useState<OnboardingState>({
-    user_type:           'freelancer',
-    org_name:            '',
-    org_type:            'company',
-    seat_count:          1,
-    employment_type:     'freelance',
-    work_location:       'home_only',
-    has_vehicle:         null,
-    financial_products:  new Set(),
-    medical_aid_members: 1,
-    tax_year:            CURRENT_YEAR,
-    invest_enabled:      false,
-  })
+  const [state, setState] = useState<OnboardingState>(() => loadSavedProgress()?.state ?? DEFAULT_STATE)
 
-  const hasMedical  = state.financial_products.has('medical')
-  const totalSteps  = hasMedical ? 7 : 6
-
-  const toggleProduct = (p: FinancialProduct) => {
-    setState((s) => {
-      const next = new Set(s.financial_products)
-      next.has(p) ? next.delete(p) : next.add(p)
-      return { ...s, financial_products: next }
-    })
-  }
+  // Save progress after every change so a refresh or a later visit resumes
+  // here instead of back at the "how will you use Klippa?" screen.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ phase, step, state }))
+  }, [phase, step, state])
 
   function next() { setStep((s) => s + 1) }
-  function back() {
-    if (step === 0) { setPhase('pick'); setStep(0) }
-    else setStep((s) => Math.max(0, s - 1))
-  }
 
-  // ── Save: freelancer complete ─────────────────────────────────────
-  async function handleFreelancerComplete() {
-    setSaving(true); setError(null)
+  // ── Save: freelancer complete — fires on the employment-type tap ───
+  async function handleFreelancerComplete(empType: EmploymentType) {
+    if (saving) return
+    setSaving(true); setSavingType(empType); setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      const fp = state.financial_products
-      const works_from_home = state.work_location !== 'office_only'
-
-      // Auto-enable the optional modules from the answers we already have,
-      // so the user doesn't have to hunt for a separate opt-in in Settings:
-      //  • Logbook/Mileage  → only if they drive for work
-      //  • Timesheets       → independent consultants who invoice (freelance / mixed)
-      //  • Provisional tax  → non-PAYE earners (freelance / mixed) file IRP6
-      const drivesForWork  = state.has_vehicle ?? false
-      const invoicesClients = state.employment_type === 'freelance' || state.employment_type === 'mixed'
-      const attribution = readAttributionCookie()
+      const work_location   = WORK_LOCATION_DEFAULT[empType]
+      const works_from_home = work_location !== 'office_only'
+      // Independent consultants who invoice (freelance / mixed) get
+      // timesheets + provisional tax; the vehicle/logbook question is
+      // deferred to a dashboard quest, so Mileage starts hidden.
+      const invoicesClients = empType === 'freelance' || empType === 'mixed'
+      const tax_year        = currentRunningTaxYear()
+      const attribution     = readAttributionCookie()
 
       const { error: profileErr } = await supabase
         .from('klippa_profiles')
         .upsert({
           id:                   user.id,
           user_type:            'freelancer',
-          employment_type:      state.employment_type,
-          work_location:        state.work_location,
+          employment_type:      empType,
+          work_location,
           works_from_home,
-          has_vehicle:          state.has_vehicle ?? false,
-          feature_logbook:      drivesForWork,
+          has_vehicle:          false,
+          feature_logbook:      false,
           feature_timesheets:   invoicesClients,
           feature_provisional:  invoicesClients,
-          has_ra:               fp.has('ra'),
-          has_pension:          fp.has('pension'),
-          has_medical:          fp.has('medical'),
-          medical_aid_members:  fp.has('medical') ? state.medical_aid_members : 0,
-          has_tfsa:             fp.has('tfsa'),
-          has_interest_savings: fp.has('interest_savings'),
-          tax_year:             state.tax_year,
-          invest_enabled:       state.invest_enabled,
+          has_ra:               false,
+          has_pension:          false,
+          has_medical:          false,
+          medical_aid_members:  0,
+          has_tfsa:             false,
+          has_interest_savings: false,
+          tax_year,
+          invest_enabled:       false,
           onboarding_complete:  true,
           utm_source:           attribution?.utm_source   ?? null,
           utm_medium:           attribution?.utm_medium   ?? null,
@@ -135,16 +154,24 @@ export default function OnboardingPage() {
         .from('klippa_tax_returns')
         .upsert({
           user_id:     user.id,
-          tax_year:    state.tax_year,
+          tax_year,
           return_type: 'ITR12',
           status:      'draft',
         }, { onConflict: 'user_id,tax_year,return_type' })
 
       if (returnErr) throw returnErr
+
+      // Gamification: seed the progress row and award the first XP.
+      // Best-effort — a failure here must never block getting them in.
+      await ensureProgressRow(user.id)
+      await awardXp(user.id, 'onboarding_complete')
+
+      if (typeof window !== 'undefined') window.localStorage.removeItem(STORAGE_KEY)
       router.replace('/dashboard')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
       setSaving(false)
+      setSavingType(null)
     }
   }
 
@@ -193,6 +220,7 @@ export default function OnboardingPage() {
       if (json.error) throw new Error(json.error)
       if (!res.ok) throw new Error('Failed to create organisation')
 
+      if (typeof window !== 'undefined') window.localStorage.removeItem(STORAGE_KEY)
       router.replace(state.user_type === 'practitioner' ? '/practice/dashboard' : '/org/dashboard')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong')
@@ -200,7 +228,7 @@ export default function OnboardingPage() {
     }
   }
 
-  const progressPct = phase === 'b2b' ? 100 : ((step + 1) / totalSteps) * 100
+  const trackYear = currentRunningTaxYear()
 
   // ── Render ────────────────────────────────────────────────────────
   return (
@@ -221,6 +249,11 @@ export default function OnboardingPage() {
               </div>
               <span className="font-semibold text-sm tracking-tight">Klippa</span>
             </div>
+
+            {/* Why we're asking — sets expectations before the questions start */}
+            <p className="text-sm text-ink-2 leading-relaxed">
+              Welcome to Klippa. We&apos;ll work out what SARS owes you — or what you owe them — based on your income and expenses. First, two quick taps to set up your profile.
+            </p>
 
             <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-8">
               <div>
@@ -415,10 +448,10 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* ── Phase: freelancer (existing flow) ───────────────────── */}
+        {/* ── Phase: freelancer — one question, then straight in ───── */}
         {phase === 'freelancer' && (
           <div className="space-y-8">
-            {/* Logo + progress */}
+            {/* Logo + back */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -427,263 +460,50 @@ export default function OnboardingPage() {
                   </div>
                   <span className="font-semibold text-sm tracking-tight">Klippa</span>
                 </div>
-                <button onClick={back} className="text-xs text-ink-2 hover:text-ink-1 transition-colors">
+                <button
+                  onClick={() => { if (!saving) { setPhase('pick'); setError(null) } }}
+                  className="text-xs text-ink-2 hover:text-ink-1 transition-colors"
+                >
                   ← Back
                 </button>
               </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs text-ink-2">
-                  <span>Setting up your tax profile</span>
-                  <span>{step + 1} of {totalSteps}</span>
-                </div>
-                <div className="h-1 rounded-full bg-raised overflow-hidden">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
-                </div>
-              </div>
+              <p className="text-xs text-ink-2">One quick question</p>
             </div>
 
-            <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-8">
-
-              {/* Step 0: Employment type */}
-              {step === 0 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold">What do you do for work?</h2>
-                    <p className="text-sm text-ink-2 mt-1">This determines which deductions apply to you.</p>
-                  </div>
-                  <div className="space-y-3">
-                    {([
-                      { value: 'freelance' as EmploymentType, label: 'Freelance / Consulting',   sub: 'I work for myself and invoice clients' },
-                      { value: 'employee'  as EmploymentType, label: 'Employee',                  sub: 'I receive a salary and employer tax certificate (IRP5)' },
-                      { value: 'mixed'     as EmploymentType, label: 'Both (salary + freelance)', sub: 'I have a salary and also freelance income' },
-                    ]).map((opt) => (
-                      <button key={opt.value}
-                        onClick={() => { setState((s) => ({ ...s, employment_type: opt.value })); next() }}
-                        className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-edge hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${state.employment_type === opt.value ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
-                          {state.employment_type === opt.value && <Check className="w-3 h-3 text-white" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-ink-1">{opt.label}</p>
-                          <p className="text-xs text-ink-2 mt-0.5">{opt.sub}</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500 ml-auto" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 1: Work location */}
-              {step === 1 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold">Where do you work from?</h2>
-                    <p className="text-sm text-ink-2 mt-1">This affects your home office deduction eligibility.</p>
-                  </div>
-                  <div className="space-y-3">
-                    {([
-                      {
-                        value: 'home_only' as WorkLocation,
-                        icon: <Home className="w-5 h-5 text-emerald-400" />,
-                        label: 'Fully Remote',
-                        sub: 'I work exclusively from home, eligible for full home office deduction',
-                      },
-                      {
-                        value: 'hybrid' as WorkLocation,
-                        icon: <Shuffle className="w-5 h-5 text-amber-400" />,
-                        label: 'Hybrid',
-                        sub: 'Some days home, some days office. Partial home office deduction may apply.',
-                      },
-                      {
-                        value: 'office_only' as WorkLocation,
-                        icon: <Building2 className="w-5 h-5 text-ink-2" />,
-                        label: 'Office / On-site',
-                        sub: 'I work at a fixed employer or client premises, no home office deduction',
-                      },
-                    ]).map((opt) => (
-                      <button key={opt.value}
-                        onClick={() => { setState((s) => ({ ...s, work_location: opt.value })); next() }}
-                        className={`w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-all group ${state.work_location === opt.value ? 'border-emerald-500/60 bg-emerald-500/5' : 'border-edge hover:border-emerald-500/40 hover:bg-emerald-500/5'}`}>
-                        <div className="flex-shrink-0">{opt.icon}</div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-ink-1">{opt.label}</p>
-                          <p className="text-xs text-ink-2 mt-0.5">{opt.sub}</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Vehicle */}
-              {step === 2 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold">Do you drive for work?</h2>
-                    <p className="text-sm text-ink-2 mt-1 leading-relaxed">Client visits, site trips, and business travel qualify. You&apos;ll keep a logbook of business kilometres to claim this deduction.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {([
-                      { v: true,  icon: <Car className="w-6 h-6 text-emerald-400" />, label: 'Yes, I drive for work' },
-                      { v: false, icon: <span className="text-2xl">🚌</span>,         label: "No, I don't drive for work" },
-                    ]).map(({ v, icon, label }) => (
-                      <button key={String(v)}
-                        onClick={() => { setState((s) => ({ ...s, has_vehicle: v })); next() }}
-                        className={`flex flex-col items-center gap-3 p-5 rounded-xl border transition-all ${state.has_vehicle === v ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-edge hover:border-emerald-500/40'}`}>
-                        {icon}
-                        <span className="text-xs font-semibold text-ink-1 text-center leading-tight">{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Financial products */}
-              {step === 3 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold">What money products do you have?</h2>
-                    <p className="text-sm text-ink-2 mt-1">Select anything that sounds familiar. Klippa handles the SARS wording later.</p>
-                  </div>
-                  <div className="space-y-2.5">
-                    {([
-                      { key: 'ra'               as FinancialProduct, label: 'I pay into my own retirement plan', sub: 'Examples: Allan Gray RA, Sygnia RA, 10X RA, Old Mutual RA.', badge: 'Can reduce tax' },
-                      { key: 'pension'          as FinancialProduct, label: 'My employer takes retirement money off my payslip', sub: 'Examples: pension fund, provident fund, company retirement fund.', badge: 'Can reduce tax' },
-                      { key: 'medical'          as FinancialProduct, label: 'I pay for medical aid', sub: 'Examples: Discovery, Bonitas, Momentum, Medihelp, Bestmed.', badge: 'Tax credit' },
-                      { key: 'tfsa'             as FinancialProduct, label: 'I have a tax-free savings account', sub: 'Examples: EasyEquities TFSA, bank TFSA, Satrix TFSA.', badge: 'Tax-free' },
-                      { key: 'interest_savings' as FinancialProduct, label: 'A bank or savings account pays me interest', sub: 'Examples: savings account, fixed deposit, money market, notice account.', badge: 'May be partly tax-free' },
-                    ]).map(({ key, label, sub, badge }) => {
-                      const selected = state.financial_products.has(key)
-                      return (
-                        <button key={key} type="button" onClick={() => toggleProduct(key)}
-                          className={`w-full text-left flex items-start gap-3 p-4 rounded-xl border transition-all ${selected ? 'border-emerald-500/50 bg-emerald-500/8' : 'border-edge hover:border-edge'}`}>
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${selected ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
-                            {selected && <Check className="w-3 h-3 text-white" />}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-ink-1">{label}</p>
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400">{badge}</span>
-                            </div>
-                            <p className="text-xs text-ink-2 mt-0.5 leading-relaxed">{sub}</p>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <button onClick={next}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-all">
-                    Continue <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {/* Step 4b: Medical aid members (only if medical selected) */}
-              {step === 4 && hasMedical && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold">How many people are on your medical aid?</h2>
-                    <p className="text-sm text-ink-2 mt-1">Include yourself and all registered dependants.</p>
-                  </div>
-                  <div className="space-y-3">
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <button key={n}
-                        onClick={() => { setState((s) => ({ ...s, medical_aid_members: n })); next() }}
-                        className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${state.medical_aid_members === n ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-edge hover:border-edge'}`}>
-                        <div>
-                          <p className="text-sm font-medium text-ink-1">
-                            {n === 1 ? 'Just me (main member)' : `${n} members`}
-                            {n === 2 ? ' (you + 1 dependant)' : n > 2 ? ` (you + ${n - 1} dependants)` : ''}
-                          </p>
-                          <p className="text-xs text-ink-2 mt-0.5">
-                            Credit: R{(n <= 2 ? n * 364 : 2 * 364 + (n - 2) * 246) * 12} /year
-                          </p>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${state.medical_aid_members === n ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
-                          {state.medical_aid_members === n && <Check className="w-3 h-3 text-white" />}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step: FINscope Invest opt-in */}
-              {((step === 4 && !hasMedical) || step === 5) && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold">Also want to grow money on the JSE?</h2>
-                    <p className="text-sm text-ink-2 mt-1 leading-relaxed">
-                      FINscope Invest helps you put your Safe-to-Spend to work on the Johannesburg Stock Exchange — with plain-English explanations of every company. You can join now or later from Settings.
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => { setState((s) => ({ ...s, invest_enabled: true })); next() }}
-                      className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60 hover:bg-emerald-500/10 transition-all group"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xl">📈</span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-ink-1">Yes, set me up</p>
-                        <p className="text-xs text-ink-2 mt-0.5">Unlock the JSE screener, company analysis, and investment tools</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500" />
-                    </button>
-                    <button
-                      onClick={() => { setState((s) => ({ ...s, invest_enabled: false })); next() }}
-                      className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-edge hover:border-edge/80 hover:bg-raised/30 transition-all group"
-                    >
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-ink-1">Skip for now</p>
-                        <p className="text-xs text-ink-2 mt-0.5">You can always enable this later from Settings</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-ink-2" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Last step: Tax year */}
-              {((step === 5 && !hasMedical) || step === 6) && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-xl font-bold">Which tax year are we filing?</h2>
-                    <p className="text-sm text-ink-2 mt-1">South African tax years run 1 March to the last day of February.</p>
-                  </div>
-                  <div className="space-y-3">
-                    {TAX_YEAR_OPTIONS.map((opt) => (
-                      <button key={opt.value} onClick={() => setState((s) => ({ ...s, tax_year: opt.value }))}
-                        className={`w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-all ${state.tax_year === opt.value ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-edge hover:border-edge'}`}>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${state.tax_year === opt.value ? 'border-emerald-500 bg-emerald-500' : 'border-edge'}`}>
-                          {state.tax_year === opt.value && <Check className="w-3 h-3 text-white" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-ink-1">Tax year {opt.label}</p>
-                          <p className="text-xs text-ink-2 mt-0.5">{opt.sub}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {error && (
-                    <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>
-                  )}
-
-                  <button onClick={handleFreelancerComplete} disabled={saving}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 disabled:opacity-50 transition-all shadow-lg shadow-emerald-900/30">
-                    {saving
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Setting up your profile…</>
-                      : <>Let&apos;s go <ArrowRight className="w-4 h-4" /></>
+            <div className="rounded-2xl border border-edge bg-surface/60 backdrop-blur p-8 shadow-xl space-y-6">
+              <div>
+                <h2 className="text-xl font-bold">What do you do for work?</h2>
+                <p className="text-sm text-ink-2 mt-1">This decides which SARS deductions we chase for you. That&apos;s it — everything else we ask only when it matters.</p>
+              </div>
+              <div className="space-y-3">
+                {([
+                  { value: 'freelance' as EmploymentType, label: 'Freelance / Consulting',   sub: 'I work for myself and invoice clients' },
+                  { value: 'employee'  as EmploymentType, label: 'Employee',                  sub: 'I receive a salary and employer tax certificate (IRP5)' },
+                  { value: 'mixed'     as EmploymentType, label: 'Both (salary + freelance)', sub: 'I have a salary and also freelance income' },
+                ]).map((opt) => (
+                  <button key={opt.value}
+                    onClick={() => { setState((s) => ({ ...s, employment_type: opt.value })); handleFreelancerComplete(opt.value) }}
+                    disabled={saving}
+                    className="w-full text-left flex items-center gap-4 p-4 rounded-xl border border-edge hover:border-emerald-500/50 hover:bg-emerald-500/5 disabled:opacity-60 transition-all group">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-ink-1">{opt.label}</p>
+                      <p className="text-xs text-ink-2 mt-0.5">{opt.sub}</p>
+                    </div>
+                    {savingType === opt.value
+                      ? <Loader2 className="w-4 h-4 animate-spin text-emerald-500 ml-auto" />
+                      : <ArrowRight className="w-4 h-4 text-ink-3 group-hover:text-emerald-500 ml-auto" />
                     }
                   </button>
-                </div>
+                ))}
+              </div>
+
+              {error && (
+                <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>
               )}
 
+              <p className="text-xs text-ink-3">
+                We&apos;ll track tax year {trackYear} (1 Mar {trackYear - 1} – 28 Feb {trackYear}). Filing for last year? Switch anytime in Settings.
+              </p>
             </div>
           </div>
         )}
