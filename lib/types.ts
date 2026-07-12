@@ -129,6 +129,10 @@ export interface KlippaProfile {
   saved_signature:      string | null
   // Free-text banking/payment details printed on invoices
   invoice_banking_details: string | null
+  // Abandoned-signup nudge tracking (migration 024) — set once each stage
+  // is resolved (sent OR the user progressed on their own); null = pending
+  verify_nudge_sent_at:     string | null
+  onboarding_nudge_sent_at: string | null
   created_at:           string
   updated_at:           string
 }

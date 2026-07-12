@@ -928,8 +928,8 @@ function ExpensesPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-edge overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-2xl border border-edge overflow-hidden overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-edge bg-surface/60">
                   <th className="text-left px-4 py-3 text-xs font-medium text-ink-2">Merchant</th>
