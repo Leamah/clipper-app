@@ -35,13 +35,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'BREVO_API_KEY not configured' }, { status: 503 })
   }
 
+  const appUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
+
+  // ── Manual preview: ?test=<email> sends both templates immediately,
+  // bypassing the 24h gate. Auth-only (same secret as the real cron),
+  // never touches any profile row — pure "what does this look like" check.
+  const testEmail = new URL(request.url).searchParams.get('test')
+  if (testEmail) {
+    await sendBrevoEmail({
+      to: testEmail,
+      subject: `[TEST] You started signing up for Klippa — one step left`,
+      html: verifyNudgeHtml({ name: 'there', appUrl }),
+    })
+    await sendBrevoEmail({
+      to: testEmail,
+      subject: `[TEST] You're 2 taps from knowing what SARS owes you`,
+      html: onboardingNudgeHtml({ name: 'there', appUrl }),
+    })
+    return NextResponse.json({ ok: true, test: true, sent_to: testEmail })
+  }
+
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!serviceKey || !supabaseUrl) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   }
-  const admin  = createClient(supabaseUrl, serviceKey)
-  const appUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://klippa.co.za'
+  const admin = createClient(supabaseUrl, serviceKey)
 
   const { data: candidates, error: loadError } = await admin
     .from('klippa_profiles')

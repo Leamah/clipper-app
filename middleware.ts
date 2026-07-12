@@ -11,6 +11,11 @@ export async function middleware(request: NextRequest) {
   // Also skip the Ozow webhook — it's server-to-server and has no session.
   // The practice client portal (/portal/* page + /api/portal/* routes) is a
   // public, token-authenticated surface — clients have no Klippa session.
+  // /api/cron/* and the invest sync are Vercel Cron-invoked (or manually
+  // triggered) requests with no session cookie at all — they carry their
+  // own Bearer-secret auth, so gating them on supabase.auth.getUser() here
+  // meant the route handler's own auth check never ran; every cron
+  // invocation was silently 401'd by this middleware before reaching it.
   if (
     pathname.startsWith('/auth/') ||
     pathname === '/api/payments/ozow/notify' ||
@@ -18,7 +23,9 @@ export async function middleware(request: NextRequest) {
     pathname === '/api/auth/email-hook' ||  // Supabase calls this server-side — no user session, auth via webhook signature
     pathname === '/api/feedback' ||         // feedback can be sent by anyone (even logged-out landing page visitors)
     pathname.startsWith('/portal/') ||
-    pathname.startsWith('/api/portal/')
+    pathname.startsWith('/api/portal/') ||
+    pathname.startsWith('/api/cron/') ||
+    pathname === '/api/admin/invest/sync'
   ) {
     return NextResponse.next()
   }
