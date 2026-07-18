@@ -39,3 +39,8 @@ export const FREE_INVOICE_LIMIT = 3
 /** Free users get a taste of AI expense classification before the
     Starter gate — lifetime count, tracked on klippa_user_progress. */
 export const FREE_AI_TASTE_LIMIT = 3
+
+/** Free users get a taste of OCR receipt scanning before the Starter
+    gate — lifetime count, tracked on klippa_user_progress (migration 025).
+    The API fails closed (scans stay Starter-only) until 025 is applied. */
+export const FREE_SCAN_LIMIT = 5

@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { extractDocument } from '@/lib/mathpix'
-import { isStarterOrAbove } from '@/lib/tier'
+import { isStarterOrAbove, FREE_SCAN_LIMIT } from '@/lib/tier'
 import type { OcrExtractedReceipt } from '@/lib/types'
 
 function createSupabaseServer() {
@@ -32,14 +32,28 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // OCR receipt capture is Starter+ only
+  // OCR capture is Starter+ — but free users get a taste: the first
+  // FREE_SCAN_LIMIT scans are on the house (lifetime counter on
+  // klippa_user_progress, migration 025). If the counter column doesn't
+  // exist yet the read errors and we fail closed to the old Starter gate.
   const { data: tierProfile } = await supabase
     .from('klippa_profiles')
     .select('subscription_tier, organisation_id')
     .eq('id', user.id)
     .single()
-  if (!isStarterOrAbove(tierProfile)) {
-    return NextResponse.json({ error: 'premium_required' }, { status: 402 })
+  const starter = isStarterOrAbove(tierProfile)
+  let freeTaste = false
+  if (!starter) {
+    const { data: prog, error: progErr } = await supabase
+      .from('klippa_user_progress')
+      .select('free_scans_used')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    const used = progErr ? FREE_SCAN_LIMIT : (prog?.free_scans_used ?? 0)
+    freeTaste = used < FREE_SCAN_LIMIT
+    if (!freeTaste) {
+      return NextResponse.json({ error: 'premium_required' }, { status: 402 })
+    }
   }
 
   let formData: FormData
@@ -52,6 +66,9 @@ export async function POST(request: NextRequest) {
   const file         = formData.get('file') as File | null
   const taxYear      = formData.get('tax_year') ? parseInt(formData.get('tax_year') as string) : null
   const taxReturnId  = formData.get('tax_return_id') as string | null
+  // 'receipt' (default) or 'irp5' — IRP5 scans extract SARS source codes
+  // (4102 PAYE etc.) so the income page can autofill employees' tax.
+  const docType      = formData.get('doc_type') === 'irp5' ? 'irp5' as const : 'receipt' as const
 
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
@@ -87,7 +104,7 @@ export async function POST(request: NextRequest) {
     .insert({
       user_id:           user.id,
       tax_return_id:     taxReturnId ?? null,
-      document_type:     'receipt',
+      document_type:     docType,
       original_filename: file.name,
       storage_path:      storagePath,
       file_size_bytes:   buffer.length,
@@ -112,17 +129,24 @@ export async function POST(request: NextRequest) {
     confidence:    0,
   }
 
+  let irp5Fields: Record<string, string | number | null> | null = null
+  let freeScansRemaining: number | null = null
+
   try {
-    const result = await extractDocument(base64, mimeType, { document_type: 'receipt' })
+    const result = await extractDocument(base64, mimeType, { document_type: docType })
     const f      = result.extracted_fields
 
-    extracted = {
-      merchant_name: (f['merchant_name'] as string | null) ?? null,
-      amount:        typeof f['amount'] === 'number' ? f['amount'] : null,
-      expense_date:  normaliseDate(f['date'] as string | null),
-      description:   null,
-      vat_amount:    typeof f['vat_amount'] === 'number' ? f['vat_amount'] : null,
-      confidence:    result.confidence,
+    if (docType === 'irp5') {
+      irp5Fields = f
+    } else {
+      extracted = {
+        merchant_name: (f['merchant_name'] as string | null) ?? null,
+        amount:        typeof f['amount'] === 'number' ? f['amount'] : null,
+        expense_date:  normaliseDate(f['date'] as string | null),
+        description:   null,
+        vat_amount:    typeof f['vat_amount'] === 'number' ? f['vat_amount'] : null,
+        confidence:    result.confidence,
+      }
     }
 
     // Update document record with OCR results
@@ -134,6 +158,12 @@ export async function POST(request: NextRequest) {
         extracted_data: result.extracted_fields,
       })
       .eq('id', documentId)
+
+    // Burn one free-taste scan only after OCR actually ran
+    if (freeTaste) {
+      const { data: newCount } = await supabase.rpc('klippa_increment_free_scans', { uid: user.id })
+      if (typeof newCount === 'number') freeScansRemaining = Math.max(0, FREE_SCAN_LIMIT - newCount)
+    }
 
   } catch (ocrErr) {
     await supabase
@@ -150,7 +180,12 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  return NextResponse.json({ document_id: documentId, extracted })
+  return NextResponse.json({
+    document_id:          documentId,
+    extracted,
+    irp5_fields:          irp5Fields,
+    free_scans_remaining: freeScansRemaining,
+  })
 }
 
 // ── Helpers ───────────────────────────────────────────────

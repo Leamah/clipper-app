@@ -8,12 +8,13 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   Plus, FileSpreadsheet, Trash2, Loader2,
-  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera, Zap, Receipt, Pencil, CheckCheck,
+  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera, Zap, Receipt, Pencil, CheckCheck, Paperclip,
 } from 'lucide-react'
 import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCategory } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
-import { isStarterOrAbove, isProfessionalOrAbove, FREE_EXPENSE_LIMIT, FREE_AI_TASTE_LIMIT } from '@/lib/tier'
+import { compressImage } from '@/lib/image'
+import { isStarterOrAbove, isProfessionalOrAbove, FREE_EXPENSE_LIMIT, FREE_AI_TASTE_LIMIT, FREE_SCAN_LIMIT } from '@/lib/tier'
 import { awardXp } from '@/lib/gamification'
 import RecurringManager from '@/components/RecurringManager'
 // pdf-export lazy-loaded on demand — jsPDF (~300 kB) only needed when user clicks "Export Audit Pack"
@@ -440,12 +441,46 @@ function EditExpenseModal({ record, onClose, onSaved }: {
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
+  // Attach evidence after the fact — receipts shouldn't only be attachable
+  // at capture time.
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const receiptRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
+      // Upload the new receipt first (storage + document row), then link it
+      let receiptId: string | undefined
+      if (receiptFile) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+        const fileToUpload = receiptFile.type.startsWith('image/') ? await compressImage(receiptFile) : receiptFile
+        const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'receipt'
+        const storagePath = `${user.id}/${Date.now()}-${safeName}`
+        const { error: upErr } = await supabase.storage
+          .from('klippa_documents')
+          .upload(storagePath, fileToUpload, { contentType: fileToUpload.type })
+        if (upErr) throw new Error(`Receipt upload failed: ${upErr.message}`)
+        const { data: docRow, error: docErr } = await supabase
+          .from('klippa_documents')
+          .insert({
+            user_id:           user.id,
+            tax_return_id:     record.tax_return_id ?? null,
+            document_type:     'receipt',
+            original_filename: receiptFile.name,
+            storage_path:      storagePath,
+            file_size_bytes:   fileToUpload.size,
+            ocr_status:        'complete',
+            upload_method:     'upload',
+          })
+          .select('id')
+          .single()
+        if (docErr) throw new Error(`Receipt record failed: ${docErr.message}`)
+        receiptId = docRow.id
+      }
+
       const res = await fetch('/api/expenses', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -457,6 +492,7 @@ function EditExpenseModal({ record, onClose, onSaved }: {
           description:           form.description,
           category:              form.category,
           deductible_percentage: Math.min(100, Math.max(0, parseFloat(form.deductible_percentage) || 0)),
+          ...(receiptId ? { receipt_id: receiptId } : {}),
         }),
       })
       const data = await res.json()
@@ -538,6 +574,42 @@ function EditExpenseModal({ record, onClose, onSaved }: {
             </Field>
           </div>
 
+          {/* Evidence: show existing attachment, or let the user add one */}
+          {record.receipt_id && !receiptFile ? (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/8 text-xs text-emerald-300">
+              <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
+              Receipt attached — audit evidence on file
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {receiptFile ? (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/8 text-xs text-emerald-300">
+                  <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="flex-1 truncate">{receiptFile.name}</span>
+                  <button type="button" onClick={() => setReceiptFile(null)} className="text-ink-2 hover:text-ink-1 flex-shrink-0">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => receiptRef.current?.click()}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-edge text-xs text-ink-2 hover:text-ink-1 hover:border-emerald-500/40 transition-colors"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                  Attach receipt photo or PDF
+                </button>
+              )}
+              <input
+                ref={receiptRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+          )}
+
           {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
 
           <div className="flex gap-2 pt-1">
@@ -568,7 +640,7 @@ function duplicateKey(date: string | null, amount: number) {
 
 function CsvExpenseImportModal({ taxReturnId, existing, onClose, onImported }: {
   taxReturnId: string | null
-  existing:    KlippaExpenseRecord[]
+  existing:    { expense_date: string | null; amount: number }[]
   onClose:     () => void
   onImported:  (records: KlippaExpenseRecord[]) => void
 }) {
@@ -749,46 +821,28 @@ function CsvExpenseImportModal({ taxReturnId, existing, onClose, onImported }: {
   )
 }
 
-// ── Image compression helper ──────────────────────────────
-// Resizes phone photos to max 1600 px and re-encodes as JPEG 85%.
-// Keeps the payload well under Vercel's 4.5 MB serverless body limit.
-// PDFs are passed through unchanged.
-function compressImage(file: File): Promise<File> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      const MAX = 1600
-      let { width, height } = img
-      if (width > MAX || height > MAX) {
-        if (width >= height) { height = Math.round(height * MAX / width); width = MAX }
-        else                 { width  = Math.round(width  * MAX / height); height = MAX }
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width; canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) { resolve(file); return }
-      ctx.drawImage(img, 0, 0, width, height)
-      canvas.toBlob(
-        (blob) => resolve(blob
-          ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
-          : file
-        ),
-        'image/jpeg',
-        0.85,
-      )
-    }
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
-    img.src = url
-  })
-}
-
 // ── Main page ─────────────────────────────────────────────
+
+// Rows fetched per page — full rows (with their heavy ai_* text fields) are
+// paginated, while a slim column fetch covers totals/counts/dedupe across
+// the entire history.
+const PAGE_SIZE = 300
+
+interface SlimExpenseRow {
+  id: string
+  amount: number
+  deductible_amount: number
+  classification_status: string
+  created_at: string | null
+  expense_date: string | null
+}
 
 function ExpensesPage() {
   const searchParams = useSearchParams()
   const [records,      setRecords]      = useState<KlippaExpenseRecord[]>([])
+  const [slimRows,     setSlimRows]     = useState<SlimExpenseRow[]>([])
+  const [totalCount,   setTotalCount]   = useState(0)
+  const [loadingMore,  setLoadingMore]  = useState(false)
   const [taxReturn,    setTaxReturn]    = useState<KlippaTaxReturn | null>(null)
   const [profile,      setProfile]      = useState<KlippaProfile | null>(null)
   const [exportingPack, setExportingPack] = useState(false)
@@ -801,6 +855,8 @@ function ExpensesPage() {
   const [capturePreFill, setCapturePreFill] = useState<CapturePreFill | undefined>(undefined)
   const [captureError,   setCaptureError]   = useState<string | null>(null)
   const [freeAiUsed,     setFreeAiUsed]     = useState(0)
+  // null = column not readable yet (migration 025 not applied) → fail closed
+  const [freeScansLeft,  setFreeScansLeft]  = useState<number | null>(null)
   const [editRecord,     setEditRecord]     = useState<KlippaExpenseRecord | null>(null)
   const [bulkConfirming, setBulkConfirming] = useState(false)
   // Two-tap delete: first tap arms the row, second tap within 3s deletes
@@ -822,14 +878,73 @@ function ExpensesPage() {
     setTaxReturn(ret as KlippaTaxReturn | null)
     const { data: prof } = await supabase.from('klippa_profiles').select('*').eq('id', user.id).single()
     setProfile(prof as KlippaProfile | null)
-    const { data } = await supabase.from('klippa_expense_records').select('*').eq('user_id', user.id).order('expense_date', { ascending: false })
-    setRecords((data ?? []) as KlippaExpenseRecord[])
-    const { data: prog } = await supabase.from('klippa_user_progress').select('free_ai_used').eq('user_id', user.id).maybeSingle()
-    setFreeAiUsed(prog?.free_ai_used ?? 0)
+    // Slim fetch across the whole history for totals/tab counts/dedupe;
+    // full rows (heavy ai_* text) load in pages.
+    const [slimRes, fullRes] = await Promise.all([
+      supabase
+        .from('klippa_expense_records')
+        .select('id, amount, deductible_amount, classification_status, created_at, expense_date')
+        .eq('user_id', user.id),
+      supabase
+        .from('klippa_expense_records')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .order('expense_date', { ascending: false })
+        .range(0, PAGE_SIZE - 1),
+    ])
+    setSlimRows((slimRes.data ?? []) as SlimExpenseRow[])
+    setRecords((fullRes.data ?? []) as KlippaExpenseRecord[])
+    setTotalCount(fullRes.count ?? (fullRes.data?.length ?? 0))
+    // free_scans_used only exists once migration 025 is applied — a read
+    // error leaves freeScansLeft null and the capture taste stays hidden.
+    const { data: prog, error: progErr } = await supabase
+      .from('klippa_user_progress')
+      .select('free_ai_used, free_scans_used')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!progErr) {
+      setFreeAiUsed(prog?.free_ai_used ?? 0)
+      setFreeScansLeft(Math.max(0, FREE_SCAN_LIMIT - ((prog as { free_scans_used?: number } | null)?.free_scans_used ?? 0)))
+    } else {
+      const { data: aiOnly } = await supabase.from('klippa_user_progress').select('free_ai_used').eq('user_id', user.id).maybeSingle()
+      setFreeAiUsed(aiOnly?.free_ai_used ?? 0)
+    }
     setLoading(false)
   }, [])
 
   useEffect(() => { loadRecords() }, [loadRecords])
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('klippa_expense_records')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('expense_date', { ascending: false })
+        .range(records.length, records.length + PAGE_SIZE - 1)
+      setRecords((prev) => [...prev, ...((data ?? []) as KlippaExpenseRecord[])])
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  // Keep the slim (whole-history) set in sync with mutations
+  const toSlim = (r: KlippaExpenseRecord): SlimExpenseRow => ({
+    id: r.id, amount: r.amount, deductible_amount: r.deductible_amount,
+    classification_status: r.classification_status, created_at: r.created_at, expense_date: r.expense_date,
+  })
+  const addRecordLocal = (r: KlippaExpenseRecord) => {
+    setRecords((prev) => [r, ...prev])
+    setSlimRows((prev) => [toSlim(r), ...prev])
+    setTotalCount((n) => n + 1)
+  }
+  const patchRecordLocal = (r: KlippaExpenseRecord) => {
+    setRecords((prev) => prev.map((x) => x.id === r.id ? r : x))
+    setSlimRows((prev) => prev.map((x) => x.id === r.id ? toSlim(r) : x))
+  }
 
   // Deep link from the dashboard "Snap receipt" quick action: try to open the
   // camera as soon as the page knows the user has capture access. Browsers may
@@ -838,10 +953,10 @@ function ExpensesPage() {
   const wantsCapture = searchParams.get('capture') === '1'
   useEffect(() => {
     if (!wantsCapture || loading || autoCaptureFired.current) return
-    if (!isStarterOrAbove(profile)) return
+    if (!isStarterOrAbove(profile) && (freeScansLeft ?? 0) <= 0) return
     autoCaptureFired.current = true
     captureRef.current?.click()
-  }, [wantsCapture, loading, profile])
+  }, [wantsCapture, loading, profile, freeScansLeft])
 
   // Unique merchants from history for the datalist
   const merchantHistory = useMemo(() =>
@@ -872,9 +987,11 @@ function ExpensesPage() {
       try { data = await res.json() } catch { /* non-JSON body */ }
       if (!res.ok) throw new Error(
         data.error === 'premium_required'
-          ? 'Receipt scanning requires a Starter plan or above'
+          ? 'Your free receipt scans are used up — upgrade to Starter for unlimited scanning.'
           : (data.error as string) ?? 'OCR failed. Please try again.'
       )
+
+      if (typeof data.free_scans_remaining === 'number') setFreeScansLeft(data.free_scans_remaining)
 
       const ext = data.extracted as Record<string, unknown> | null ?? {}
 
@@ -903,7 +1020,7 @@ function ExpensesPage() {
     const res = await fetch('/api/expenses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, classification_status: 'confirmed' }) })
     const data = await res.json()
     if (data.record) {
-      setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
+      patchRecordLocal(data.record)
       // First confirmed AI classification earns XP (idempotent, best-effort)
       if (profile && data.record.ai_confidence != null) awardXp(profile.id, 'first_ai_confirmed')
     }
@@ -914,7 +1031,7 @@ function ExpensesPage() {
     setClassifying(id)
     const res = await fetch('/api/expenses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, classification_status: 'rejected' }) })
     const data = await res.json()
-    if (data.record) setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
+    if (data.record) patchRecordLocal(data.record)
     setClassifying(null)
   }
 
@@ -922,6 +1039,8 @@ function ExpensesPage() {
     setConfirmDelete(null)
     await fetch('/api/expenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setRecords((r) => r.filter((x) => x.id !== id))
+    setSlimRows((r) => r.filter((x) => x.id !== id))
+    setTotalCount((n) => Math.max(0, n - 1))
   }
 
   // Bulk-confirm every pending record the AI is highly confident about —
@@ -932,7 +1051,7 @@ function ExpensesPage() {
       for (const id of ids) {
         const res = await fetch('/api/expenses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, classification_status: 'confirmed' }) })
         const data = await res.json()
-        if (data.record) setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
+        if (data.record) patchRecordLocal(data.record)
       }
       if (profile) awardXp(profile.id, 'first_ai_confirmed')
     } finally {
@@ -945,11 +1064,41 @@ function ExpensesPage() {
     setCapturePreFill(undefined)
   }
 
+  // Open the receipt evidence behind an expense in a new tab (signed URL)
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null)
+  const handleViewReceipt = async (receiptId: string) => {
+    setViewingReceipt(receiptId)
+    try {
+      const { data: doc } = await supabase
+        .from('klippa_documents')
+        .select('storage_path')
+        .eq('id', receiptId)
+        .maybeSingle()
+      if (!doc?.storage_path) { setCaptureError('The receipt file for this expense could not be found.'); return }
+      const { data } = await supabase.storage
+        .from('klippa_documents')
+        .createSignedUrl(doc.storage_path, 120)
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } finally {
+      setViewingReceipt(null)
+    }
+  }
+
   const handleAuditPack = async () => {
-    const confirmedRecs = records.filter((r) => r.classification_status === 'confirmed')
-    if (confirmedRecs.length === 0) return
     setExportingPack(true)
     try {
+      // Fetch every confirmed record directly — the page list may be
+      // paginated and the audit pack must always be complete.
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: allConfirmed } = await supabase
+        .from('klippa_expense_records')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('classification_status', 'confirmed')
+        .order('expense_date', { ascending: false })
+      const confirmedRecs = (allConfirmed ?? []) as KlippaExpenseRecord[]
+      if (confirmedRecs.length === 0) return
       const taxYear = taxReturn?.tax_year ?? new Date().getFullYear()
       const { exportAuditPackPDF } = await import('@/lib/pdf-export')
       await exportAuditPackPDF(
@@ -964,12 +1113,16 @@ function ExpensesPage() {
     }
   }
 
+  // Loaded rows drive the lists; slim rows drive counts and totals so
+  // they stay correct even before every page is loaded.
   const pending   = records.filter((r) => r.classification_status === 'pending')
   const highConfidencePending = pending.filter((r) => r.ai_confidence === 'high')
   const confirmed = records.filter((r) => r.classification_status === 'confirmed')
   const displayed = activeTab === 'pending' ? pending : activeTab === 'confirmed' ? confirmed : records
 
-  const totalDeductible = confirmed.reduce((s, r) => s + r.deductible_amount, 0)
+  const pendingCount   = slimRows.filter((r) => r.classification_status === 'pending').length
+  const confirmedCount = slimRows.filter((r) => r.classification_status === 'confirmed').length
+  const totalDeductible = slimRows.filter((r) => r.classification_status === 'confirmed').reduce((s, r) => s + r.deductible_amount, 0)
 
   // Tier flags
   const isStarter = isStarterOrAbove(profile)
@@ -979,11 +1132,15 @@ function ExpensesPage() {
   const freeAiRemaining = isStarter ? null : Math.max(0, FREE_AI_TASTE_LIMIT - freeAiUsed)
   const allowAI         = isStarter || (freeAiRemaining ?? 0) > 0
 
+  // Free scan taste: capture stays visible for free users while they have
+  // scans left (null = counter not available yet → Starter-only as before)
+  const canCapture = isStarter || (freeScansLeft ?? 0) > 0
+
   // Monthly usage counter for free users
   const thisMonthCount = !isStarter && !loading ? (() => {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    return records.filter((r) => r.created_at && new Date(r.created_at) >= monthStart).length
+    return slimRows.filter((r) => r.created_at && new Date(r.created_at) >= monthStart).length
   })() : 0
 
   return (
@@ -1006,8 +1163,8 @@ function ExpensesPage() {
           <div>
             <h1 className="text-xl font-bold text-ink-1">Expenses</h1>
             <p className="text-sm text-ink-2 mt-1">
-              {confirmed.length > 0
-                ? `${confirmed.length} confirmed · ${formatRand(totalDeductible)} deductible`
+              {confirmedCount > 0
+                ? `${confirmedCount} confirmed · ${formatRand(totalDeductible)} deductible`
                 : 'No confirmed expenses yet'}
             </p>
             {/* Free-tier monthly usage counter */}
@@ -1023,7 +1180,7 @@ function ExpensesPage() {
 
           {/* Action bar: Capture (Starter+) | CSV (Starter+) | Audit Pack (Pro+) | Add */}
           <div className="flex items-center flex-wrap gap-1.5">
-            {isStarter && (
+            {canCapture && (
               <button
                 onClick={() => captureRef.current?.click()}
                 disabled={capturing}
@@ -1031,6 +1188,11 @@ function ExpensesPage() {
               >
                 {capturing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                 {capturing ? 'Scanning…' : 'Capture'}
+                {!isStarter && freeScansLeft !== null && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400">
+                    {freeScansLeft} free
+                  </span>
+                )}
               </button>
             )}
             {isStarter && (
@@ -1041,7 +1203,7 @@ function ExpensesPage() {
                 <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
               </button>
             )}
-            {isPro && confirmed.length > 0 && (
+            {isPro && confirmedCount > 0 && (
               <button
                 onClick={handleAuditPack}
                 disabled={exportingPack}
@@ -1071,11 +1233,11 @@ function ExpensesPage() {
         {!loading && <RecurringManager kind="expense" isStarter={isStarter} />}
 
         {/* Pending review banner */}
-        {pending.length > 0 && (
+        {pendingCount > 0 && (
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex-wrap">
             <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
             <p className="flex-1 text-sm text-amber-200 min-w-[200px]">
-              <span className="font-semibold">{pending.length} expense{pending.length !== 1 ? 's' : ''}</span> need{pending.length === 1 ? 's' : ''} your review. Accept or reject the AI classification.
+              <span className="font-semibold">{pendingCount} expense{pendingCount !== 1 ? 's' : ''}</span> need{pendingCount === 1 ? 's' : ''} your review. Accept or reject the AI classification.
             </p>
             {highConfidencePending.length > 1 && (
               <button
@@ -1093,9 +1255,9 @@ function ExpensesPage() {
         {/* Tabs */}
         <div className="flex gap-1 border-b border-edge">
           {([
-            { key: 'pending',   label: `Needs review (${pending.length})` },
-            { key: 'confirmed', label: `Confirmed (${confirmed.length})` },
-            { key: 'all',       label: `All (${records.length})` },
+            { key: 'pending',   label: `Needs review (${pendingCount})` },
+            { key: 'confirmed', label: `Confirmed (${confirmedCount})` },
+            { key: 'all',       label: `All (${totalCount})` },
           ] as const).map((t) => (
             <button
               key={t.key}
@@ -1117,7 +1279,7 @@ function ExpensesPage() {
           </div>
         ) : displayed.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-edge p-16 text-center space-y-4">
-            {records.length === 0 ? (
+            {totalCount === 0 ? (
               <>
                 <Receipt className="w-8 h-8 text-ink-3 mx-auto" />
                 <div className="space-y-1">
@@ -1161,7 +1323,21 @@ function ExpensesPage() {
                 {displayed.map((r) => (
                   <tr key={r.id} className="border-b border-edge/60 hover:bg-surface/30 transition-colors">
                     <td className="px-4 py-3">
-                      <p className="text-ink-1">{r.merchant_name || '—'}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-ink-1">{r.merchant_name || '—'}</p>
+                        {r.receipt_id && (
+                          <button
+                            onClick={() => handleViewReceipt(r.receipt_id!)}
+                            disabled={viewingReceipt === r.receipt_id}
+                            title="View attached receipt"
+                            className="text-emerald-500 hover:text-emerald-400 transition-colors disabled:opacity-50 flex-shrink-0"
+                          >
+                            {viewingReceipt === r.receipt_id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Paperclip className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
                       {r.ai_reasoning && (
                         <p className="text-xs text-ink-3 mt-0.5 italic truncate max-w-[200px]">{r.ai_reasoning}</p>
                       )}
@@ -1199,7 +1375,7 @@ function ExpensesPage() {
                     </td>
                   </tr>
                 ))}
-                {activeTab === 'confirmed' && confirmed.length > 0 && (
+                {activeTab === 'confirmed' && confirmedCount > 0 && (
                   <tr className="bg-surface/40">
                     <td colSpan={4} className="px-4 py-3 text-xs font-semibold text-ink-2">Total deductible</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-400 tabular-nums">{formatRand(totalDeductible)}</td>
@@ -1208,6 +1384,20 @@ function ExpensesPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination: full rows load in pages; totals above cover everything */}
+        {!loading && records.length < totalCount && (
+          <div className="flex justify-center">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 hover:bg-raised disabled:opacity-50 transition-colors"
+            >
+              {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {loadingMore ? 'Loading…' : `Load more (showing ${records.length} of ${totalCount})`}
+            </button>
           </div>
         )}
       </main>
@@ -1221,7 +1411,7 @@ function ExpensesPage() {
           freeAiRemaining={freeAiRemaining}
           onClose={closeAdd}
           onSaved={(r, _classified, remaining) => {
-            setRecords((prev) => [r, ...prev])
+            addRecordLocal(r)
             setActiveTab('pending')
             if (remaining !== null) setFreeAiUsed(FREE_AI_TASTE_LIMIT - remaining)
           }}
@@ -1232,16 +1422,16 @@ function ExpensesPage() {
         <EditExpenseModal
           record={editRecord}
           onClose={() => setEditRecord(null)}
-          onSaved={(r) => setRecords((prev) => prev.map((x) => x.id === r.id ? r : x))}
+          onSaved={patchRecordLocal}
         />
       )}
 
       {showCSV && (
         <CsvExpenseImportModal
           taxReturnId={taxReturn?.id ?? null}
-          existing={records}
+          existing={slimRows}
           onClose={() => setShowCSV(false)}
-          onImported={(recs) => { setRecords((prev) => [...recs, ...prev]); setActiveTab('pending') }}
+          onImported={(recs) => { recs.forEach(addRecordLocal); setActiveTab('pending') }}
         />
       )}
     </div>

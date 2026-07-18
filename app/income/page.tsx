@@ -8,13 +8,14 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
-import { Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase, Zap, Pencil, AlertTriangle } from 'lucide-react'
+import { Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase, Zap, Pencil, AlertTriangle, Camera } from 'lucide-react'
 import type { KlippaProfile, KlippaIncomeRecord, KlippaTaxReturn, IncomeType } from '@/lib/types'
 import { INCOME_TYPE_LABELS } from '@/lib/types'
 import { PLAIN_INCOME_OPTIONS, getIncomeTypeCopy, needsHumanReview } from '@/lib/sars-return-map'
 import { isStarterOrAbove, FREE_INCOME_LIMIT } from '@/lib/tier'
 import Papa from 'papaparse'
 import { parseBankCSV, type ParsedTransaction } from '@/lib/csv-parser'
+import { compressImage } from '@/lib/image'
 import RecurringManager from '@/components/RecurringManager'
 
 function formatRand(n: number) {
@@ -187,9 +188,21 @@ function duplicateKey(date: string | null, amount: number) {
   return `${date ?? ''}|${Math.abs(amount).toFixed(2)}`
 }
 
+// Cheap description-based income-type suggestion — saves a dropdown tap per
+// row for the obvious cases; everything else stays 'freelance' for review.
+function suggestIncomeType(description: string): IncomeType {
+  const d = description.toLowerCase()
+  if (/salar|wage|payroll|irp5/.test(d))        return 'salary'
+  if (/interest/.test(d))                        return 'interest'
+  if (/dividend|\bdiv\b/.test(d))                return 'dividends'
+  if (/\brent(al)?\b/.test(d))                   return 'rental'
+  if (/commission/.test(d))                      return 'commission'
+  return 'freelance'
+}
+
 function CsvImportModal({ taxReturnId, existing, onClose, onImported }: {
   taxReturnId: string | null
-  existing:    KlippaIncomeRecord[]
+  existing:    { received_date: string | null; amount: number }[]
   onClose:     () => void
   onImported:  (records: KlippaIncomeRecord[]) => void
 }) {
@@ -220,9 +233,9 @@ function CsvImportModal({ taxReturnId, existing, onClose, onImported }: {
       const dups = new Set(credits.flatMap((t, i) => existingKeys.has(duplicateKey(t.date, t.amount)) ? [i] : []))
       setDuplicates(dups)
       setSelected(new Set(credits.map((_, i) => i).filter((i) => !dups.has(i))))
-      // Default every row to 'freelance' — user can change per row before importing
+      // Pre-suggest a type from the description — user can change per row
       const types: Record<number, IncomeType> = {}
-      credits.forEach((_, i) => { types[i] = 'freelance' })
+      credits.forEach((t, i) => { types[i] = suggestIncomeType(t.description ?? '') })
       setRowTypes(types)
     }
     reader.readAsText(file)
@@ -293,7 +306,7 @@ function CsvImportModal({ taxReturnId, existing, onClose, onImported }: {
           <>
             <div className="flex-shrink-0 space-y-1">
               <p className="text-xs text-ink-2">{bankName && `Detected: ${bankName} · `}{transactions.length} credit transactions found</p>
-              <p className="text-xs text-ink-3">Check or uncheck rows to include. Set the income type for each row before importing.</p>
+              <p className="text-xs text-ink-3">Check or uncheck rows to include. Types are pre-suggested from descriptions — check each row before importing.</p>
               {duplicates.size > 0 && (
                 <p className="text-xs text-amber-400 flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -371,6 +384,54 @@ function PayeCard({ taxReturn, onSaved }: {
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanSummary, setScanSummary] = useState<string | null>(null)
+  const irp5Ref = useRef<HTMLInputElement>(null)
+
+  // Scan an IRP5 photo/PDF → OCR extracts SARS source codes → 4102 (PAYE)
+  // pre-fills the field. The user still reviews and taps Save.
+  const handleIrp5Scan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setScanning(true)
+    setError(null)
+    setScanSummary(null)
+    try {
+      const fileToUpload = file.type.startsWith('image/') ? await compressImage(file) : file
+      const fd = new FormData()
+      fd.append('file', fileToUpload)
+      fd.append('doc_type', 'irp5')
+      const res = await fetch('/api/documents/ocr', { method: 'POST', body: fd })
+      let data: Record<string, unknown> = {}
+      try { data = await res.json() } catch { /* non-JSON body */ }
+      if (!res.ok) throw new Error(
+        data.error === 'premium_required'
+          ? 'IRP5 scanning needs a Starter plan (or remaining free scans).'
+          : (data.error as string) ?? 'Scan failed. Please try again.'
+      )
+      const fields = (data.irp5_fields ?? {}) as Record<string, unknown>
+      const paye = typeof fields['sars_4102'] === 'number' ? fields['sars_4102'] as number : null
+      if (paye == null) {
+        throw new Error('Could not find PAYE (source code 4102) on the certificate — enter it manually from your IRP5.')
+      }
+      setRaw(String(paye))
+      setSaved(false)
+      const employer = typeof fields['employer_name'] === 'string' ? fields['employer_name'] as string : null
+      const gross    = typeof fields['sars_3601'] === 'number' ? fields['sars_3601'] as number
+                     : typeof fields['sars_3699'] === 'number' ? fields['sars_3699'] as number : null
+      setScanSummary(
+        `Found PAYE R${paye.toLocaleString('en-ZA')}` +
+        (employer ? ` · ${employer}` : '') +
+        (gross != null ? ` · income R${gross.toLocaleString('en-ZA')}` : '') +
+        ' — check against your certificate, then Save.'
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Scan failed')
+    } finally {
+      setScanning(false)
+      if (irp5Ref.current) irp5Ref.current.value = ''
+    }
+  }
 
   const handleSave = async () => {
     const amount = parseFloat(raw) || 0
@@ -389,14 +450,36 @@ function PayeCard({ taxReturn, onSaved }: {
 
   return (
     <div className="rounded-2xl border border-edge bg-surface/40 p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <Briefcase className="w-4 h-4 text-ink-2 flex-shrink-0" />
-        <p className="text-xs font-semibold text-ink-1 uppercase tracking-wider">PAYE deducted by employer</p>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Briefcase className="w-4 h-4 text-ink-2 flex-shrink-0" />
+          <p className="text-xs font-semibold text-ink-1 uppercase tracking-wider">PAYE deducted by employer</p>
+        </div>
+        <button
+          onClick={() => irp5Ref.current?.click()}
+          disabled={scanning}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-edge text-ink-1 hover:bg-raised disabled:opacity-50 transition-colors"
+        >
+          {scanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+          {scanning ? 'Reading IRP5…' : 'Scan IRP5'}
+        </button>
+        <input
+          ref={irp5Ref}
+          type="file"
+          accept="image/*,application/pdf"
+          capture="environment"
+          className="hidden"
+          onChange={handleIrp5Scan}
+        />
       </div>
       <p className="text-sm text-ink-2 leading-relaxed">
         If you also received a salary and your employer deducted PAYE (Employees&apos; Tax), enter the total
-        for the year here. This reduces your net tax payable on assessment (IRP5 source code 4102).
+        for the year here — or snap a photo of your IRP5 and we&apos;ll read it (source code 4102).
+        This reduces your net tax payable on assessment.
       </p>
+      {scanSummary && (
+        <p className="text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2">{scanSummary}</p>
+      )}
       <div className="flex items-end gap-3">
         <div className="flex-1 space-y-1.5">
           <label className="text-xs font-medium text-ink-2">Annual PAYE deducted (R)</label>
@@ -427,9 +510,18 @@ function PayeCard({ taxReturn, onSaved }: {
 
 // ── Main page ─────────────────────────────────────────────
 
+// Rows fetched per page — full rows are paginated, while a slim column
+// fetch covers totals/dedupe across the entire history.
+const PAGE_SIZE = 300
+
+interface SlimIncomeRow { id: string; amount: number; created_at: string | null; received_date: string | null }
+
 function IncomePage() {
   const searchParams = useSearchParams()
   const [records,      setRecords]      = useState<KlippaIncomeRecord[]>([])
+  const [slimRows,     setSlimRows]     = useState<SlimIncomeRow[]>([])
+  const [totalCount,   setTotalCount]   = useState(0)
+  const [loadingMore,  setLoadingMore]  = useState(false)
   const [taxReturn,    setTaxReturn]    = useState<KlippaTaxReturn | null>(null)
   const [profile,      setProfile]      = useState<KlippaProfile | null>(null)
   const [loading,      setLoading]      = useState(true)
@@ -459,27 +551,72 @@ function IncomePage() {
     setTaxReturn(retRes.data as KlippaTaxReturn | null)
     setProfile(profileRes.data as KlippaProfile | null)
 
-    const { data } = await supabase
-      .from('klippa_income_records')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('received_date', { ascending: false })
+    // Slim fetch across the whole history: keeps the header total, the
+    // free-tier month counter, and CSV dedupe accurate without shipping
+    // every full row to the client.
+    const [slimRes, fullRes] = await Promise.all([
+      supabase
+        .from('klippa_income_records')
+        .select('id, amount, created_at, received_date')
+        .eq('user_id', user.id),
+      supabase
+        .from('klippa_income_records')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .order('received_date', { ascending: false })
+        .range(0, PAGE_SIZE - 1),
+    ])
 
-    setRecords((data ?? []) as KlippaIncomeRecord[])
+    setSlimRows((slimRes.data ?? []) as SlimIncomeRow[])
+    setRecords((fullRes.data ?? []) as KlippaIncomeRecord[])
+    setTotalCount(fullRes.count ?? (fullRes.data?.length ?? 0))
     setLoading(false)
   }, [])
 
   useEffect(() => { loadRecords() }, [loadRecords])
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('klippa_income_records')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('received_date', { ascending: false })
+        .range(records.length, records.length + PAGE_SIZE - 1)
+      setRecords((prev) => [...prev, ...((data ?? []) as KlippaIncomeRecord[])])
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  // Keep the slim (whole-history) set in sync with mutations so totals,
+  // the month counter, and CSV dedupe stay accurate without a refetch.
+  const toSlim = (r: KlippaIncomeRecord): SlimIncomeRow =>
+    ({ id: r.id, amount: r.amount, created_at: r.created_at, received_date: r.received_date })
+  const addRecord = (r: KlippaIncomeRecord) => {
+    setRecords((prev) => [r, ...prev])
+    setSlimRows((prev) => [toSlim(r), ...prev])
+    setTotalCount((n) => n + 1)
+  }
+  const patchRecord = (r: KlippaIncomeRecord) => {
+    setRecords((prev) => prev.map((x) => x.id === r.id ? r : x))
+    setSlimRows((prev) => prev.map((x) => x.id === r.id ? toSlim(r) : x))
+  }
 
   const handleDelete = async (id: string) => {
     setConfirmDelete(null)
     setDeleting(id)
     await fetch('/api/income', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setRecords((r) => r.filter((x) => x.id !== id))
+    setSlimRows((r) => r.filter((x) => x.id !== id))
+    setTotalCount((n) => Math.max(0, n - 1))
     setDeleting(null)
   }
 
-  const totalIncome = records.reduce((s, r) => s + r.amount, 0)
+  const totalIncome = slimRows.reduce((s, r) => s + r.amount, 0)
 
   // Tier flags
   const isStarter = isStarterOrAbove(profile)
@@ -488,7 +625,7 @@ function IncomePage() {
   const thisMonthCount = !isStarter && !loading ? (() => {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    return records.filter((r) => r.created_at && new Date(r.created_at) >= monthStart).length
+    return slimRows.filter((r) => r.created_at && new Date(r.created_at) >= monthStart).length
   })() : 0
 
   return (
@@ -501,7 +638,7 @@ function IncomePage() {
           <div>
             <h1 className="text-xl font-bold text-ink-1">Income</h1>
             <p className="text-sm text-ink-2 mt-1">
-              {records.length > 0 ? `${records.length} records · Total ${formatRand(totalIncome)}` : 'No income records yet'}
+              {totalCount > 0 ? `${totalCount} records · Total ${formatRand(totalIncome)}` : 'No income records yet'}
             </p>
             {/* Free-tier monthly usage counter */}
             {!loading && !isStarter && (
@@ -633,13 +770,27 @@ function IncomePage() {
             </table>
           </div>
         )}
+
+        {/* Pagination: full rows load in pages; totals above cover everything */}
+        {!loading && records.length < totalCount && (
+          <div className="flex justify-center">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border border-edge text-ink-2 hover:text-ink-1 hover:bg-raised disabled:opacity-50 transition-colors"
+            >
+              {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {loadingMore ? 'Loading…' : `Load more (showing ${records.length} of ${totalCount})`}
+            </button>
+          </div>
+        )}
       </main>
 
       {showAdd && (
         <AddIncomeModal
           taxReturnId={taxReturn?.id ?? null}
           onClose={() => setShowAdd(false)}
-          onSaved={(r) => setRecords((prev) => [r, ...prev])}
+          onSaved={addRecord}
         />
       )}
 
@@ -648,16 +799,16 @@ function IncomePage() {
           taxReturnId={taxReturn?.id ?? null}
           editRecord={editRecord}
           onClose={() => setEditRecord(null)}
-          onSaved={(r) => setRecords((prev) => prev.map((x) => x.id === r.id ? r : x))}
+          onSaved={patchRecord}
         />
       )}
 
       {showCSV && (
         <CsvImportModal
           taxReturnId={taxReturn?.id ?? null}
-          existing={records}
+          existing={slimRows}
           onClose={() => setShowCSV(false)}
-          onImported={(recs) => setRecords((prev) => [...recs, ...prev])}
+          onImported={(recs) => recs.forEach(addRecord)}
         />
       )}
     </div>

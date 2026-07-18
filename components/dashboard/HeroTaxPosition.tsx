@@ -10,11 +10,12 @@ import type { ProvisionalRunway } from '@/lib/tax-engine'
  * what to set aside, and the next deadline that matters.
  */
 export default function HeroTaxPosition({
-  totalIncome, taxToSave, safeToSpend, hasTaxResult,
+  totalIncome, taxToSave, totalSpent, safeToSpend, hasTaxResult,
   taxYear, daysLeft, provisionalRunway,
 }: {
   totalIncome:       number
   taxToSave:         number
+  totalSpent:        number
   safeToSpend:       number
   hasTaxResult:      boolean
   taxYear:           number
@@ -69,6 +70,9 @@ export default function HeroTaxPosition({
       <div className="flex flex-wrap gap-x-8 gap-y-1 text-sm">
         <p className="text-ink-2">
           Earned <span className="text-ink-1 font-semibold tabular-nums">{formatRand(totalIncome)}</span>
+        </p>
+        <p className="text-ink-2">
+          Spent on business <span className="text-ink-1 font-semibold tabular-nums">{formatRand(totalSpent)}</span>
         </p>
         <p className="text-ink-2">
           Set aside for tax{' '}

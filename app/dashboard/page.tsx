@@ -173,6 +173,9 @@ export default function Dashboard() {
   const totalIncome        = incomeRecords.reduce((s, r) => s + r.amount, 0)
   const taxEstimateIncome  = incomeRecords.filter(r => isIncludedInTaxEstimate(r.income_type)).reduce((s, r) => s + r.amount, 0)
   const totalExpDeductible = expenseRecords.reduce((s, r) => s + r.deductible_amount, 0)
+  // Full amounts actually spent — a R10k laptop at 60% deductible still
+  // took R10k out of the bank. Safe-to-Spend must be a cash number.
+  const totalExpSpent      = expenseRecords.reduce((s, r) => s + r.amount, 0)
 
   const dashBusinessKm  = mileageTrips.filter(t => t.trip_type === 'business').reduce((s, t) => s + t.distance_km, 0)
   const dashTotalKm     = mileageTrips.reduce((s, t) => s + t.distance_km, 0)
@@ -198,7 +201,7 @@ export default function Dashboard() {
     : null
 
   const taxToSave   = taxResult?.netTaxPayable ?? 0
-  const safeToSpend = totalIncome - (taxToSave > 0 ? taxToSave : 0) - totalExpDeductible
+  const safeToSpend = totalIncome - (taxToSave > 0 ? taxToSave : 0) - totalExpSpent
 
   const taxYear  = taxReturn?.tax_year ?? new Date().getFullYear()
   const deadline = getITR12Deadline(taxYear)
@@ -320,6 +323,17 @@ export default function Dashboard() {
       href: 'https://www.sars.gov.za/businesses-and-employers/vat/how-to-register-for-vat/',
     })
   }
+  // Auto-assessment season (July–August): SARS SMSes land now — nudge users
+  // to check the assessment against their Klippa deductions before accepting.
+  const seasonMonth = new Date().getMonth() // 6 = July, 7 = August
+  if (seasonMonth === 6 || seasonMonth === 7) {
+    attentionItems.push({
+      key: 'auto-assessment', icon: FileSpreadsheet, tone: 'neutral',
+      label: 'SARS auto-assessment season',
+      detail: 'Got an SMS from SARS? Check the auto-assessment before accepting — deductions you tracked here may be missing from it.',
+      href: 'https://www.sars.gov.za/types-of-tax/personal-income-tax/how-does-auto-assessment-work/',
+    })
+  }
   if (drivesForWork && logbookPending > 0) {
     attentionItems.push({
       key: 'logbook', icon: Car, tone: 'neutral',
@@ -372,6 +386,7 @@ export default function Dashboard() {
           <HeroTaxPosition
             totalIncome={totalIncome}
             taxToSave={taxToSave}
+            totalSpent={totalExpSpent}
             safeToSpend={safeToSpend}
             hasTaxResult={!!taxResult}
             taxYear={taxYear}

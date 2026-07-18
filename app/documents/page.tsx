@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
-import { Plus, Upload, Loader2, X, FileText, CheckCircle2, AlertCircle, Clock, Download, Search } from 'lucide-react'
+import { Plus, Upload, Loader2, X, FileText, CheckCircle2, AlertCircle, Clock, Download, Search, Trash2, Eye } from 'lucide-react'
 import type { KlippaDocument, DocumentType, KlippaTaxReturn } from '@/lib/types'
 import { currentRunningTaxYear } from '@/lib/tax-engine'
 
@@ -264,6 +264,74 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
   )
 }
 
+// Inline preview: images render directly, PDFs in an iframe — retrieval
+// during a SARS query shouldn't force a download to disk.
+function PreviewModal({ doc, onClose }: { doc: KlippaDocument; onClose: () => void }) {
+  const [url,     setUrl]     = useState<string | null>(null)
+  const [error,   setError]   = useState<string | null>(null)
+
+  const name    = (doc.original_filename ?? '').toLowerCase()
+  const isPdf   = name.endsWith('.pdf')
+  const isImage = /\.(png|jpe?g|webp|heic|gif)$/.test(name)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (!doc.storage_path) { setError('No file stored for this document.'); return }
+      const { data, error: err } = await supabase.storage
+        .from('klippa_documents')
+        .createSignedUrl(doc.storage_path, 600)
+      if (cancelled) return
+      if (err || !data?.signedUrl) setError('Could not load the file. Please try again.')
+      else setUrl(data.signedUrl)
+    })()
+    return () => { cancelled = true }
+  }, [doc])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-3xl max-h-[90vh] rounded-2xl border border-edge bg-surface shadow-2xl flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-edge flex-shrink-0">
+          <p className="text-sm font-medium text-ink-1 truncate">{doc.original_filename ?? 'Document'}</p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {url && (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 rounded-lg text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors"
+                title="Open / download"
+              >
+                <Download className="w-4 h-4" />
+              </a>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg text-ink-2 hover:text-ink-1 hover:bg-raised transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-[300px] overflow-auto bg-black/20 flex items-center justify-center">
+          {error ? (
+            <p className="text-xs text-red-400 p-6">{error}</p>
+          ) : !url ? (
+            <Loader2 className="w-5 h-5 animate-spin text-ink-3" />
+          ) : isPdf ? (
+            <iframe src={url} title={doc.original_filename ?? 'Document preview'} className="w-full h-[75vh]" />
+          ) : isImage ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={url} alt={doc.original_filename ?? 'Document preview'} className="max-w-full max-h-[75vh] object-contain" />
+          ) : (
+            <p className="text-xs text-ink-2 p-6">No inline preview for this file type — use the download button above.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DocumentsPage() {
   const searchParams  = useSearchParams()
   const [docs,        setDocs]      = useState<KlippaDocument[]>([])
@@ -276,6 +344,37 @@ function DocumentsPage() {
   const [loadError,   setLoadError]  = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [previewDoc,  setPreviewDoc]  = useState<KlippaDocument | null>(null)
+  const [deleting,    setDeleting]    = useState<string | null>(null)
+  // Two-tap delete: first tap arms the card, second tap within 3s deletes
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const armDelete = (id: string) => {
+    setConfirmDelete(id)
+    if (confirmTimer.current) clearTimeout(confirmTimer.current)
+    confirmTimer.current = setTimeout(() => setConfirmDelete(null), 3000)
+  }
+
+  const handleDelete = async (doc: KlippaDocument) => {
+    setConfirmDelete(null)
+    setDeleting(doc.id)
+    setDownloadError(null)
+    try {
+      // Storage first, then the row; any expense receipt_id pointing here
+      // is set null by the FK (on delete set null).
+      if (doc.storage_path) {
+        await supabase.storage.from('klippa_documents').remove([doc.storage_path])
+      }
+      const { error } = await supabase.from('klippa_documents').delete().eq('id', doc.id)
+      if (error) throw error
+      setDocs((prev) => prev.filter((d) => d.id !== doc.id))
+    } catch (e: unknown) {
+      setDownloadError(e instanceof Error ? e.message : 'Delete failed. Please try again.')
+    } finally {
+      setDeleting(null)
+    }
+  }
 
   const handleDownload = async (doc: KlippaDocument) => {
     if (!doc.storage_path) return
@@ -427,18 +526,48 @@ function DocumentsPage() {
                     <p className="text-sm text-ink-1 truncate font-medium">{doc.original_filename ?? 'Untitled'}</p>
                     <p className="text-xs text-ink-3 mt-0.5">{doc.file_size_bytes ? `${(doc.file_size_bytes / 1024).toFixed(0)} KB` : ''}</p>
                   </div>
-                  {doc.storage_path && (
-                    <button
-                      onClick={() => handleDownload(doc)}
-                      disabled={downloading === doc.id}
-                      title="Download"
-                      className="flex-shrink-0 p-1.5 rounded-lg text-ink-3 hover:text-ink-1 hover:bg-raised transition-colors disabled:opacity-50"
-                    >
-                      {downloading === doc.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <Download className="w-3.5 h-3.5" />}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {doc.storage_path && (
+                      <>
+                        <button
+                          onClick={() => setPreviewDoc(doc)}
+                          title="Preview"
+                          className="p-1.5 rounded-lg text-ink-3 hover:text-ink-1 hover:bg-raised transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDownload(doc)}
+                          disabled={downloading === doc.id}
+                          title="Download"
+                          className="p-1.5 rounded-lg text-ink-3 hover:text-ink-1 hover:bg-raised transition-colors disabled:opacity-50"
+                        >
+                          {downloading === doc.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Download className="w-3.5 h-3.5" />}
+                        </button>
+                      </>
+                    )}
+                    {confirmDelete === doc.id ? (
+                      <button
+                        onClick={() => handleDelete(doc)}
+                        className="px-1.5 py-1 rounded text-[10px] font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors whitespace-nowrap"
+                      >
+                        Delete?
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => armDelete(doc.id)}
+                        disabled={deleting === doc.id}
+                        title="Delete"
+                        className="p-1.5 rounded-lg text-ink-3 hover:text-red-400 hover:bg-raised transition-colors disabled:opacity-50"
+                      >
+                        {deleting === doc.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
@@ -469,6 +598,10 @@ function DocumentsPage() {
           onClose={() => setShowUpload(false)}
           onUploaded={(doc) => setDocs((prev) => [doc, ...prev])}
         />
+      )}
+
+      {previewDoc && (
+        <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
       )}
     </div>
   )
