@@ -8,7 +8,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
-import { Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase, Zap } from 'lucide-react'
+import { Plus, Upload, FileSpreadsheet, Trash2, Loader2, X, Check, Briefcase, Zap, Pencil, AlertTriangle } from 'lucide-react'
 import type { KlippaProfile, KlippaIncomeRecord, KlippaTaxReturn, IncomeType } from '@/lib/types'
 import { INCOME_TYPE_LABELS } from '@/lib/types'
 import { PLAIN_INCOME_OPTIONS, getIncomeTypeCopy, needsHumanReview } from '@/lib/sars-return-map'
@@ -28,17 +28,20 @@ function formatDate(s: string | null) {
 
 // ── Add Income Modal ──────────────────────────────────────
 
-function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
+function AddIncomeModal({ taxReturnId, editRecord, onClose, onSaved }: {
   taxReturnId: string | null
+  editRecord?: KlippaIncomeRecord
   onClose:     () => void
   onSaved:     (record: KlippaIncomeRecord) => void
 }) {
+  const isEdit = !!editRecord
   const [form, setForm] = useState({
-    source_name:   '',
-    income_type:   'freelance' as IncomeType,
-    amount:        '',
-    received_date: '',
-    description:   '',
+    source_name:   editRecord?.source_name ?? '',
+    income_type:   (editRecord?.income_type ?? 'freelance') as IncomeType,
+    amount:        editRecord ? String(editRecord.amount) : '',
+    // Most captures happen same-day — default to today instead of blank
+    received_date: editRecord?.received_date ?? new Date().toISOString().slice(0, 10),
+    description:   editRecord?.description ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
@@ -50,9 +53,9 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
     setError(null)
     try {
       const res  = await fetch('/api/income', {
-        method:  'POST',
+        method:  isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ ...form, tax_return_id: taxReturnId }),
+        body:    JSON.stringify(isEdit ? { ...form, id: editRecord!.id } : { ...form, tax_return_id: taxReturnId }),
       })
       const data = await res.json()
       if (res.status === 402 && data.error === 'free_limit_reached') {
@@ -77,7 +80,7 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-ink-1">Add income</h3>
+          <h3 className="font-semibold text-ink-1">{isEdit ? 'Edit income' : 'Add income'}</h3>
           <button onClick={onClose} className="text-ink-2 hover:text-ink-1 transition-colors"><X className="w-4 h-4" /></button>
         </div>
 
@@ -166,7 +169,7 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">Cancel</button>
             <button type="submit" disabled={saving || error === 'limit_reached'} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              {saving ? 'Saving…' : 'Add income'}
+              {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add income'}
             </button>
           </div>
         </form>
@@ -177,13 +180,22 @@ function AddIncomeModal({ taxReturnId, onClose, onSaved }: {
 
 // ── CSV Import Modal ──────────────────────────────────────
 
-function CsvImportModal({ taxReturnId, onClose, onImported }: {
+// A row matching an existing record on date + amount is almost certainly the
+// same transaction re-imported — descriptions vary between bank exports, so
+// they're deliberately excluded from the key.
+function duplicateKey(date: string | null, amount: number) {
+  return `${date ?? ''}|${Math.abs(amount).toFixed(2)}`
+}
+
+function CsvImportModal({ taxReturnId, existing, onClose, onImported }: {
   taxReturnId: string | null
+  existing:    KlippaIncomeRecord[]
   onClose:     () => void
   onImported:  (records: KlippaIncomeRecord[]) => void
 }) {
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([])
   const [selected,     setSelected]     = useState<Set<number>>(new Set())
+  const [duplicates,   setDuplicates]   = useState<Set<number>>(new Set())
   const [rowTypes,     setRowTypes]     = useState<Record<number, IncomeType>>({})
   const [bankName,     setBankName]     = useState<string | null>(null)
   const [errors,       setErrors]       = useState<string[]>([])
@@ -202,7 +214,12 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
       setTransactions(credits)
       setBankName(result.bank)
       setErrors(result.errors)
-      setSelected(new Set(credits.map((_, i) => i)))
+      // Flag rows that look like already-imported records and leave them
+      // unselected — re-importing a statement must not double-count income.
+      const existingKeys = new Set(existing.map((r) => duplicateKey(r.received_date, r.amount)))
+      const dups = new Set(credits.flatMap((t, i) => existingKeys.has(duplicateKey(t.date, t.amount)) ? [i] : []))
+      setDuplicates(dups)
+      setSelected(new Set(credits.map((_, i) => i).filter((i) => !dups.has(i))))
       // Default every row to 'freelance' — user can change per row before importing
       const types: Record<number, IncomeType> = {}
       credits.forEach((_, i) => { types[i] = 'freelance' })
@@ -277,6 +294,12 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
             <div className="flex-shrink-0 space-y-1">
               <p className="text-xs text-ink-2">{bankName && `Detected: ${bankName} · `}{transactions.length} credit transactions found</p>
               <p className="text-xs text-ink-3">Check or uncheck rows to include. Set the income type for each row before importing.</p>
+              {duplicates.size > 0 && (
+                <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                  {duplicates.size} row{duplicates.size !== 1 ? 's' : ''} match existing records (same date and amount) and {duplicates.size !== 1 ? 'were' : 'was'} unselected to avoid double-counting.
+                </p>
+              )}
             </div>
 
             {/* Column headers */}
@@ -300,7 +323,12 @@ function CsvImportModal({ taxReturnId, onClose, onImported }: {
                     {selected.has(i) && <Check className="w-2.5 h-2.5 text-white" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-ink-1">{t.description}</p>
+                    <p className="truncate text-ink-1">
+                      {t.description}
+                      {duplicates.has(i) && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 uppercase">Duplicate?</span>
+                      )}
+                    </p>
                     <p className="text-xs text-ink-2">{formatDate(t.date)}</p>
                   </div>
                   {/* Per-row income type selector — stop click propagation so it doesn't toggle the row */}
@@ -408,6 +436,16 @@ function IncomePage() {
   const [showAdd,      setShowAdd]      = useState(searchParams.get('add') === '1')
   const [showCSV,      setShowCSV]      = useState(false)
   const [deleting,     setDeleting]     = useState<string | null>(null)
+  const [editRecord,   setEditRecord]   = useState<KlippaIncomeRecord | null>(null)
+  // Two-tap delete: first tap arms the row, second tap within 3s deletes
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const armDelete = (id: string) => {
+    setConfirmDelete(id)
+    if (confirmTimer.current) clearTimeout(confirmTimer.current)
+    confirmTimer.current = setTimeout(() => setConfirmDelete(null), 3000)
+  }
 
   const loadRecords = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -434,6 +472,7 @@ function IncomePage() {
   useEffect(() => { loadRecords() }, [loadRecords])
 
   const handleDelete = async (id: string) => {
+    setConfirmDelete(null)
     setDeleting(id)
     await fetch('/api/income', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setRecords((r) => r.filter((x) => x.id !== id))
@@ -556,13 +595,32 @@ function IncomePage() {
                     <td className="px-4 py-3 text-xs text-ink-2">{formatDate(r.received_date)}</td>
                     <td className="px-4 py-3 text-right font-medium text-ink-1 tabular-nums">{formatRand(r.amount)}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        disabled={deleting === r.id}
-                        className="text-ink-3 hover:text-red-400 transition-colors disabled:opacity-40"
-                      >
-                        {deleting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setEditRecord(r)}
+                          title="Edit"
+                          className="text-ink-3 hover:text-ink-1 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {confirmDelete === r.id ? (
+                          <button
+                            onClick={() => handleDelete(r.id)}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors whitespace-nowrap"
+                          >
+                            Delete?
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => armDelete(r.id)}
+                            disabled={deleting === r.id}
+                            title="Delete"
+                            className="text-ink-3 hover:text-red-400 transition-colors disabled:opacity-40"
+                          >
+                            {deleting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -585,9 +643,19 @@ function IncomePage() {
         />
       )}
 
+      {editRecord && (
+        <AddIncomeModal
+          taxReturnId={taxReturn?.id ?? null}
+          editRecord={editRecord}
+          onClose={() => setEditRecord(null)}
+          onSaved={(r) => setRecords((prev) => prev.map((x) => x.id === r.id ? r : x))}
+        />
+      )}
+
       {showCSV && (
         <CsvImportModal
           taxReturnId={taxReturn?.id ?? null}
+          existing={records}
           onClose={() => setShowCSV(false)}
           onImported={(recs) => setRecords((prev) => [...recs, ...prev])}
         />

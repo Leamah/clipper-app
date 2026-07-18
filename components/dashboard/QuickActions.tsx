@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Plus, Receipt, FileText, FileSpreadsheet } from 'lucide-react'
+import { Plus, Receipt, FileText, FileSpreadsheet, Camera } from 'lucide-react'
 
-/** The four everyday actions — renders instantly, no data needed. */
+/** The everyday actions — renders instantly, no data needed. */
 export default function QuickActions({ showInvoices }: { showInvoices: boolean }) {
   const actions = [
+    // Snap receipt first — capture is the habit the product lives or dies on
+    { label: 'Snap receipt', href: '/expenses?capture=1', icon: <Camera className="w-3.5 h-3.5" /> },
     { label: 'Add income',  href: '/income?add=1',   icon: <Plus            className="w-3.5 h-3.5" /> },
     { label: 'Add expense', href: '/expenses?add=1', icon: <Receipt         className="w-3.5 h-3.5" /> },
     ...(showInvoices ? [{ label: 'New invoice', href: '/invoices', icon: <FileSpreadsheet className="w-3.5 h-3.5" /> }] : []),

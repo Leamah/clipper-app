@@ -39,7 +39,9 @@ export default function QuestBoard({
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Quests · Level {level.level}</p>
-          <h2 className="text-lg font-bold text-ink-1 mt-1">Your refund is hiding in your paperwork</h2>
+          {/* "Refund" over-promises for provisional taxpayers who owe rather
+              than reclaim — "shrinks your tax bill" is true for everyone. */}
+          <h2 className="text-lg font-bold text-ink-1 mt-1">Every quest shrinks your tax bill</h2>
           <p className="text-sm text-ink-2 mt-1">Finish quests, watch your tax savings climb.</p>
         </div>
         <div className="flex flex-col items-end gap-2">

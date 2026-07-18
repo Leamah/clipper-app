@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import { Plus, Upload, Loader2, X, FileText, CheckCircle2, AlertCircle, Clock, Download, Search } from 'lucide-react'
 import type { KlippaDocument, DocumentType, KlippaTaxReturn } from '@/lib/types'
+import { currentRunningTaxYear } from '@/lib/tax-engine'
 
 const DOCUMENT_SELECT = 'id, user_id, tax_return_id, document_type, expense_category, original_filename, storage_path, file_size_bytes, file_hash, ocr_status, ocr_confidence, extracted_data, tax_year, upload_method, created_at'
 const TAX_RETURN_SELECT = 'id, user_id, tax_year, return_type, status, gross_income, total_deductions, taxable_income, tax_payable, rebates, net_tax_payable, sars_reference, submitted_at, assessed_at, refund_amount, employees_tax_paid, payment1_status, payment2_status, payment1_paid_at, payment2_paid_at, created_at, updated_at'
@@ -70,7 +71,9 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
   onUploaded:  (doc: KlippaDocument) => void
 }) {
   const [docType,    setDocType]    = useState<DocumentType>('receipt')
-  const [taxYear,    setTaxYear]    = useState(new Date().getFullYear())
+  // SARS tax years run 1 Mar – 28/29 Feb, so the running year — not the
+  // calendar year — is the correct default (e.g. July 2026 → tax year 2027).
+  const [taxYear,    setTaxYear]    = useState(currentRunningTaxYear())
   const [file,       setFile]       = useState<File | null>(null)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)
@@ -195,8 +198,8 @@ function UploadModal({ taxReturnId, onClose, onUploaded }: {
               onChange={(e) => setTaxYear(parseInt(e.target.value))}
               className="input w-full"
             >
-              {[new Date().getFullYear(), new Date().getFullYear() - 1].map((y) => (
-                <option key={y} value={y}>{y}</option>
+              {[currentRunningTaxYear(), currentRunningTaxYear() - 1].map((y) => (
+                <option key={y} value={y}>{y} (Mar {y - 1} – Feb {y})</option>
               ))}
             </select>
           </div>

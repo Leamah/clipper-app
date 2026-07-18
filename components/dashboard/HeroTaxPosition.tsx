@@ -55,9 +55,16 @@ export default function HeroTaxPosition({
         </Link>
       </div>
 
-      <p className="text-4xl font-bold text-ink-1 tabular-nums">
-        {formatRand(Math.max(0, safeToSpend))}
+      {/* Show a negative position honestly — clamping to R0 hides exactly
+          the situation the user most needs to see. */}
+      <p className={`text-4xl font-bold tabular-nums ${safeToSpend < 0 ? 'text-red-400' : 'text-ink-1'}`}>
+        {formatRand(safeToSpend)}
       </p>
+      {safeToSpend < 0 && (
+        <p className="text-xs text-red-400/80">
+          Your expenses plus the tax set-aside exceed what you&apos;ve earned this year — review your expenses and tax position.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-x-8 gap-y-1 text-sm">
         <p className="text-ink-2">

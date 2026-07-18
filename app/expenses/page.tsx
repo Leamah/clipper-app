@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import AppNav from '@/components/AppNav'
 import {
   Plus, FileSpreadsheet, Trash2, Loader2,
-  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera, Zap, Receipt,
+  X, Check, ChevronDown, Sparkles, AlertTriangle, ShieldAlert, ShieldCheck, Camera, Zap, Receipt, Pencil, CheckCheck,
 } from 'lucide-react'
 import type { KlippaExpenseRecord, KlippaTaxReturn, KlippaProfile, ExpenseCategory } from '@/lib/types'
 import { EXPENSE_CATEGORY_LABELS } from '@/lib/types'
@@ -213,7 +213,8 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, fre
   const [form, setForm] = useState({
     merchant_name: prefilled?.merchant_name ?? '',
     amount:        prefilled?.amount        ?? '',
-    expense_date:  prefilled?.expense_date  ?? '',
+    // Most captures happen same-day — default to today instead of blank
+    expense_date:  prefilled?.expense_date || new Date().toISOString().slice(0, 10),
     description:   '',
     category:      'other' as ExpenseCategory,
     receipt_id:    prefilled?.receipt_id    ?? null as string | null,
@@ -348,7 +349,7 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, fre
           {form.receipt_id && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/8 text-xs text-emerald-300">
               <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
-              Receipt photo attached, audit risk eliminated
+              Receipt photo attached — audit evidence on file
             </div>
           )}
 
@@ -419,15 +420,161 @@ function AddExpenseModal({ taxReturnId, prefilled, merchantHistory, allowAI, fre
   )
 }
 
+// ── Edit Expense Modal ────────────────────────────────────
+// Edits the facts of a record (merchant, amount, date, description,
+// category, deductible %) without touching its AI classification.
+// deductible_amount is a DB-generated column, so it stays consistent.
+
+function EditExpenseModal({ record, onClose, onSaved }: {
+  record:  KlippaExpenseRecord
+  onClose: () => void
+  onSaved: (r: KlippaExpenseRecord) => void
+}) {
+  const [form, setForm] = useState({
+    merchant_name:         record.merchant_name ?? '',
+    amount:                String(record.amount),
+    expense_date:          record.expense_date ?? '',
+    description:           record.description ?? '',
+    category:              record.category,
+    deductible_percentage: String(record.deductible_percentage),
+  })
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/expenses', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          id:                    record.id,
+          merchant_name:         form.merchant_name,
+          amount:                form.amount,
+          expense_date:          form.expense_date || null,
+          description:           form.description,
+          category:              form.category,
+          deductible_percentage: Math.min(100, Math.max(0, parseFloat(form.deductible_percentage) || 0)),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to save')
+      onSaved(data.record)
+      onClose()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-edge bg-surface shadow-2xl p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-ink-1">Edit expense</h3>
+          <button onClick={onClose} className="text-ink-2 hover:text-ink-1"><X className="w-4 h-4" /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Merchant">
+            <input
+              type="text"
+              value={form.merchant_name}
+              onChange={(e) => setForm((f) => ({ ...f, merchant_name: e.target.value }))}
+              className="input"
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Amount (R)">
+              <input
+                type="number" min="0" step="0.01" required
+                value={form.amount}
+                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                className="input"
+              />
+            </Field>
+            <Field label="Date">
+              <input
+                type="date"
+                value={form.expense_date}
+                onChange={(e) => setForm((f) => ({ ...f, expense_date: e.target.value }))}
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <Field label="Description">
+            <input
+              type="text"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              className="input"
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Category">
+              <select
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}
+                className="input"
+              >
+                {(Object.entries(EXPENSE_CATEGORY_LABELS) as [ExpenseCategory, string][]).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Deductible %">
+              <input
+                type="number" min="0" max="100" step="1"
+                value={form.deductible_percentage}
+                onChange={(e) => setForm((f) => ({ ...f, deductible_percentage: e.target.value }))}
+                className="input"
+              />
+            </Field>
+          </div>
+
+          {error && <p className="text-xs text-red-400 bg-red-900/20 border border-red-900/30 rounded-lg px-3 py-2">{error}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-xs font-medium bg-raised text-ink-2 hover:bg-edge transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── CSV Import Modal ──────────────────────────────────────
 
-function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
+// A row matching an existing record on date + amount is almost certainly the
+// same transaction re-imported — descriptions vary between bank exports, so
+// they're deliberately excluded from the key.
+function duplicateKey(date: string | null, amount: number) {
+  return `${date ?? ''}|${Math.abs(amount).toFixed(2)}`
+}
+
+function CsvExpenseImportModal({ taxReturnId, existing, onClose, onImported }: {
   taxReturnId: string | null
+  existing:    KlippaExpenseRecord[]
   onClose:     () => void
   onImported:  (records: KlippaExpenseRecord[]) => void
 }) {
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([])
   const [selected,     setSelected]     = useState<Set<number>>(new Set())
+  const [duplicates,   setDuplicates]   = useState<Set<number>>(new Set())
   const [bankName,     setBankName]     = useState<string | null>(null)
   const [csvFile,      setCsvFile]      = useState<File | null>(null)
   const [saving,       setSaving]       = useState(false)
@@ -445,7 +592,12 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
       const debits = result.transactions.filter((t) => t.amount < 0)
       setTransactions(debits)
       setBankName(result.bank)
-      setSelected(new Set(debits.map((_, i) => i)))
+      // Flag rows that look like already-imported records and leave them
+      // unselected — re-importing a statement must not double-count expenses.
+      const existingKeys = new Set(existing.map((r) => duplicateKey(r.expense_date, r.amount)))
+      const dups = new Set(debits.flatMap((t, i) => existingKeys.has(duplicateKey(t.date, t.amount)) ? [i] : []))
+      setDuplicates(dups)
+      setSelected(new Set(debits.map((_, i) => i).filter((i) => !dups.has(i))))
     }
     reader.readAsText(file)
   }
@@ -538,9 +690,17 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
           </div>
         ) : (
           <>
-            <p className="text-xs text-ink-2 flex-shrink-0">
-              {bankName && `${bankName} · `}{transactions.length} debit transactions · AI classifies after import
-            </p>
+            <div className="flex-shrink-0 space-y-1">
+              <p className="text-xs text-ink-2">
+                {bankName && `${bankName} · `}{transactions.length} debit transactions · you&apos;ll review and confirm each one after import
+              </p>
+              {duplicates.size > 0 && (
+                <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                  {duplicates.size} row{duplicates.size !== 1 ? 's' : ''} match existing records (same date and amount) and {duplicates.size !== 1 ? 'were' : 'was'} unselected to avoid double-counting.
+                </p>
+              )}
+            </div>
             <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
               {transactions.map((t, i) => (
                 <button
@@ -558,7 +718,12 @@ function CsvExpenseImportModal({ taxReturnId, onClose, onImported }: {
                     {selected.has(i) && <Check className="w-2.5 h-2.5 text-white" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-ink-1">{t.description}</p>
+                    <p className="truncate text-ink-1">
+                      {t.description}
+                      {duplicates.has(i) && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 uppercase">Duplicate?</span>
+                      )}
+                    </p>
                     <p className="text-xs text-ink-2">{formatDate(t.date)}</p>
                   </div>
                   <span className="text-ink-1 font-medium tabular-nums flex-shrink-0">{formatRand(Math.abs(t.amount))}</span>
@@ -636,7 +801,19 @@ function ExpensesPage() {
   const [capturePreFill, setCapturePreFill] = useState<CapturePreFill | undefined>(undefined)
   const [captureError,   setCaptureError]   = useState<string | null>(null)
   const [freeAiUsed,     setFreeAiUsed]     = useState(0)
+  const [editRecord,     setEditRecord]     = useState<KlippaExpenseRecord | null>(null)
+  const [bulkConfirming, setBulkConfirming] = useState(false)
+  // Two-tap delete: first tap arms the row, second tap within 3s deletes
+  const [confirmDelete,  setConfirmDelete]  = useState<string | null>(null)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const captureRef = useRef<HTMLInputElement>(null)
+  const autoCaptureFired = useRef(false)
+
+  const armDelete = (id: string) => {
+    setConfirmDelete(id)
+    if (confirmTimer.current) clearTimeout(confirmTimer.current)
+    confirmTimer.current = setTimeout(() => setConfirmDelete(null), 3000)
+  }
 
   const loadRecords = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -653,6 +830,18 @@ function ExpensesPage() {
   }, [])
 
   useEffect(() => { loadRecords() }, [loadRecords])
+
+  // Deep link from the dashboard "Snap receipt" quick action: try to open the
+  // camera as soon as the page knows the user has capture access. Browsers may
+  // block a programmatic file-input click without a user gesture — in that
+  // case the user simply lands here with the Capture button one tap away.
+  const wantsCapture = searchParams.get('capture') === '1'
+  useEffect(() => {
+    if (!wantsCapture || loading || autoCaptureFired.current) return
+    if (!isStarterOrAbove(profile)) return
+    autoCaptureFired.current = true
+    captureRef.current?.click()
+  }, [wantsCapture, loading, profile])
 
   // Unique merchants from history for the datalist
   const merchantHistory = useMemo(() =>
@@ -730,8 +919,25 @@ function ExpensesPage() {
   }
 
   const handleDelete = async (id: string) => {
+    setConfirmDelete(null)
     await fetch('/api/expenses', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setRecords((r) => r.filter((x) => x.id !== id))
+  }
+
+  // Bulk-confirm every pending record the AI is highly confident about —
+  // turns a card-by-card chore into one tap; uncertain ones stay for review.
+  const handleBulkConfirm = async (ids: string[]) => {
+    setBulkConfirming(true)
+    try {
+      for (const id of ids) {
+        const res = await fetch('/api/expenses', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, classification_status: 'confirmed' }) })
+        const data = await res.json()
+        if (data.record) setRecords((prev) => prev.map((r) => r.id === id ? data.record : r))
+      }
+      if (profile) awardXp(profile.id, 'first_ai_confirmed')
+    } finally {
+      setBulkConfirming(false)
+    }
   }
 
   const closeAdd = () => {
@@ -759,6 +965,7 @@ function ExpensesPage() {
   }
 
   const pending   = records.filter((r) => r.classification_status === 'pending')
+  const highConfidencePending = pending.filter((r) => r.ai_confidence === 'high')
   const confirmed = records.filter((r) => r.classification_status === 'confirmed')
   const displayed = activeTab === 'pending' ? pending : activeTab === 'confirmed' ? confirmed : records
 
@@ -865,11 +1072,21 @@ function ExpensesPage() {
 
         {/* Pending review banner */}
         {pending.length > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex-wrap">
             <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <p className="text-sm text-amber-200">
-              <span className="font-semibold">{pending.length} expenses</span> need your review. Accept or reject the AI classification.
+            <p className="flex-1 text-sm text-amber-200 min-w-[200px]">
+              <span className="font-semibold">{pending.length} expense{pending.length !== 1 ? 's' : ''}</span> need{pending.length === 1 ? 's' : ''} your review. Accept or reject the AI classification.
             </p>
+            {highConfidencePending.length > 1 && (
+              <button
+                onClick={() => handleBulkConfirm(highConfidencePending.map((r) => r.id))}
+                disabled={bulkConfirming}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-colors flex-shrink-0"
+              >
+                {bulkConfirming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCheck className="w-3.5 h-3.5" />}
+                {bulkConfirming ? 'Confirming…' : `Confirm ${highConfidencePending.length} high-confidence`}
+              </button>
+            )}
           </div>
         )}
 
@@ -958,9 +1175,27 @@ function ExpensesPage() {
                     <td className="px-4 py-3 text-right text-ink-1 tabular-nums">{formatRand(r.amount)}</td>
                     <td className="px-4 py-3 text-right text-emerald-400 font-medium tabular-nums">{formatRand(r.deductible_amount)}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => handleDelete(r.id)} className="text-ink-3 hover:text-red-400 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setEditRecord(r)}
+                          title="Edit"
+                          className="text-ink-3 hover:text-ink-1 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {confirmDelete === r.id ? (
+                          <button
+                            onClick={() => handleDelete(r.id)}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors whitespace-nowrap"
+                          >
+                            Delete?
+                          </button>
+                        ) : (
+                          <button onClick={() => armDelete(r.id)} title="Delete" className="text-ink-3 hover:text-red-400 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -993,9 +1228,18 @@ function ExpensesPage() {
         />
       )}
 
+      {editRecord && (
+        <EditExpenseModal
+          record={editRecord}
+          onClose={() => setEditRecord(null)}
+          onSaved={(r) => setRecords((prev) => prev.map((x) => x.id === r.id ? r : x))}
+        />
+      )}
+
       {showCSV && (
         <CsvExpenseImportModal
           taxReturnId={taxReturn?.id ?? null}
+          existing={records}
           onClose={() => setShowCSV(false)}
           onImported={(recs) => { setRecords((prev) => [...recs, ...prev]); setActiveTab('pending') }}
         />

@@ -164,12 +164,23 @@ export async function PATCH(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id, classification_status, category, deductible_percentage } = await request.json()
+  const { id, classification_status, category, deductible_percentage, merchant_name, amount, expense_date, description } = await request.json()
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  if (amount !== undefined && isNaN(parseFloat(amount))) {
+    return NextResponse.json({ error: 'amount must be a number' }, { status: 400 })
+  }
 
   const { data, error } = await supabase
     .from('klippa_expense_records')
-    .update({ classification_status, category, deductible_percentage })
+    .update({
+      classification_status,
+      category,
+      deductible_percentage,
+      merchant_name,
+      amount: amount !== undefined ? parseFloat(amount) : undefined,
+      expense_date,
+      description,
+    })
     .eq('id', id)
     .eq('user_id', user.id)
     .select()

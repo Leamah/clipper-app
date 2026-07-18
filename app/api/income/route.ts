@@ -90,6 +90,35 @@ export async function GET() {
   return NextResponse.json({ records: data ?? [] })
 }
 
+export async function PATCH(request: NextRequest) {
+  const supabase = createSupabaseServer()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id, source_name, income_type, amount, received_date, description } = await request.json()
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  if (amount !== undefined && isNaN(parseFloat(amount))) {
+    return NextResponse.json({ error: 'amount must be a number' }, { status: 400 })
+  }
+
+  const { data, error } = await supabase
+    .from('klippa_income_records')
+    .update({
+      source_name,
+      income_type,
+      amount: amount !== undefined ? parseFloat(amount) : undefined,
+      received_date,
+      description,
+    })
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ record: data })
+}
+
 export async function DELETE(request: NextRequest) {
   const supabase = createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
